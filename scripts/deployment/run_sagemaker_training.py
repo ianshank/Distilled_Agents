@@ -12,7 +12,7 @@ from pathlib import Path
 # Add training directory to path
 sys.path.append(str(Path(__file__).parent))
 
-from launch_all_agents_sagemaker import MangoMASSageMakerLauncher
+from scripts.deployment.launch_all_agents_sagemaker import MangoMASSageMakerLauncher
 
 def setup_environment():
     """Setup environment variables and AWS configuration"""
@@ -42,9 +42,9 @@ def validate_training_files():
     """Validate that all required training files exist"""
     print("🔍 Validating training files...")
     
-    required_files = [
+    data_files = [
         "product_manager_agent_real_data.jsonl",
-        "sqe_agent_real_data.jsonl", 
+        "sqe_agent_real_data.jsonl",
         "architect_agent_real_data.jsonl",
         "swe_agent_real_data.jsonl",
         "product_manager_agent.jsonl",
@@ -53,13 +53,27 @@ def validate_training_files():
         "swe_agent.jsonl",
         "vp_product_agent.jsonl",
         "devops_agent.jsonl",
-        "tools_agent.jsonl",
+        "tools_agent.jsonl"
+    ]
+
+    script_files = [
         "train_distilled_adapter.py"
     ]
-    
+
     missing_files = []
-    for file in required_files:
-        file_path = Path(f"training/{file}")
+
+    # Check data files
+    for file in data_files:
+        file_path = Path(f"data/training/{file}")
+        if not file_path.exists():
+            missing_files.append(file)
+            print(f"❌ Missing: {file}")
+        else:
+            print(f"✅ Found: {file}")
+
+    # Check script files
+    for file in script_files:
+        file_path = Path(f"scripts/training/{file}")
         if not file_path.exists():
             missing_files.append(file)
             print(f"❌ Missing: {file}")

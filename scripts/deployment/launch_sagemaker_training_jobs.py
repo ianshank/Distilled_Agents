@@ -220,9 +220,12 @@ class MangoMASSageMakerLauncher:
                 return False
         
         # Upload training script
-        script_files = ["train_distilled_adapter.py", "requirements.txt"]
-        for script in script_files:
-            local_path = f"training/{script}" if os.path.exists(f"training/{script}") else script
+        script_files = [
+            ("train_distilled_adapter.py", "scripts/training"),
+            ("requirements.txt", "config")
+        ]
+        for script, directory in script_files:
+            local_path = f"{directory}/{script}" if os.path.exists(f"{directory}/{script}") else script
             if os.path.exists(local_path):
                 try:
                     self.s3_client.upload_file(local_path, s3_bucket, f"scripts/{script}")

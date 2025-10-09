@@ -127,9 +127,9 @@ class MangoMASSageMakerLauncher:
         """Validate that all training files exist"""
         print("🔍 Validating training files...")
         missing_files = []
-        
+
         for config in self.agent_configs:
-            file_path = Path(f"training/{config.training_file}")
+            file_path = Path(f"data/training/{config.training_file}")
             if not file_path.exists():
                 missing_files.append(config.training_file)
                 print(f"❌ Missing: {config.training_file}")
@@ -163,7 +163,7 @@ class MangoMASSageMakerLauncher:
         s3_uris = {}
         
         for config in self.agent_configs:
-            local_path = f"training/{config.training_file}"
+            local_path = f"data/training/{config.training_file}"
             s3_key = f"training-data/{config.training_file}"
             
             try:
