@@ -1,0 +1,157 @@
+# Development Configuration for Enhanced Agent System
+# Optimized for local development and debugging
+
+# Input Validation Settings
+input_validation:
+  max_length: 2048
+  enable_pii_detection: false  # Disabled for faster dev iteration
+  enable_injection_detection: true
+  pii_entities: []
+  injection_patterns:
+    - sql_injection
+    - command_injection
+
+# Caching Configuration
+caching:
+  l1:
+    enabled: true
+    max_size: 100
+    ttl: 600
+  l2:
+    enabled: false  # Disabled for dev unless Redis is running locally
+    host: localhost
+    port: 6379
+    db: 1
+    ttl: 1800
+    pool_size: 2
+  l3:
+    enabled: false  # Disabled for dev
+    bucket: dev-agent-cache
+    region: us-east-1
+    prefix: dev/
+    ttl: 86400
+  semantic_similarity:
+    enabled: false  # Disabled for faster dev iteration
+    threshold: 0.90
+    model: all-MiniLM-L6-v2
+
+# Error Handling Configuration
+error_handling:
+  max_retries: 2
+  base_delay: 0.5
+  max_delay: 8.0
+  exponential_base: 2
+  enable_fallback: true
+  enable_error_learning: false
+  error_db_path: ./dev_data/errors.db
+
+# Confidence Calibration
+confidence:
+  enabled: true
+  calibration_method: platt
+  min_samples_for_calibration: 10
+  reliability_bands:
+    low: [0.0, 0.5]
+    medium: [0.5, 0.75]
+    high: [0.75, 0.9]
+    very_high: [0.9, 1.0]
+
+# Multi-Agent Consensus
+consensus:
+  enabled: false  # Disabled for faster dev
+  min_agents: 2
+  max_agents: 3
+  threshold: 0.6
+  agreement_method: exact_match
+  ensemble_method: majority_vote
+
+# Adaptive Routing
+routing:
+  enabled: true
+  complexity_model: heuristic
+  agent_profiles_path: ./enhanced_system/config/agent_profiles.json
+  routing_strategy: cost_optimized
+
+# Streaming Configuration
+streaming:
+  enabled: true
+  buffer_size: 5
+  confidence_per_token: false
+  stop_conditions:
+    max_tokens: 512
+    quality_threshold: 0.2
+    detect_eos: true
+
+# Batch Processing
+batch_processing:
+  enabled: false  # Disabled for simpler debugging
+  max_batch_size: 8
+  batch_timeout_ms: 200
+  num_workers: 1
+  queue_size: 100
+  priority_levels: 2
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  prometheus_port: 9090
+  metrics_interval: 30
+  alerting:
+    enabled: false  # Disabled for dev
+    latency_threshold_ms: 10000
+    error_rate_threshold: 0.5
+    token_rate_threshold: 500
+  metrics:
+    - request_latency
+    - error_rate
+    - cache_hit_rate
+
+# A/B Testing
+ab_testing:
+  enabled: false  # Disabled for dev
+  default_traffic_split: 0.5
+  min_samples_for_significance: 10
+  significance_level: 0.1
+  metrics_to_track:
+    - latency
+
+# Training Orchestration
+training:
+  parallel_training: false  # Sequential for easier debugging
+  max_parallel_jobs: 1
+  dependency_tracking: true
+  resource_limits:
+    max_memory_gb: 8
+    max_gpus: 1
+
+# Data Curation
+data_curation:
+  quality_threshold: 0.5
+  enable_augmentation: false
+  augmentation_factor: 1
+  enable_balancing: false
+  diversity_threshold: 0.6
+
+# Logging
+logging:
+  level: DEBUG
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: ./logs/dev.log
+  max_bytes: 1048576  # 1MB
+  backup_count: 2
+
+# Model Configuration
+models:
+  default_model_path: ./models
+  teacher_model: mistralai/Mistral-7B-v0.1
+  student_model: microsoft/DialoGPT-medium
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+
+# Security
+security:
+  enable_rate_limiting: false
+  rate_limit_per_minute: 1000
+  rate_limit_per_hour: 10000
+  enable_audit_logging: false
+  audit_log_path: ./logs/audit_dev.log
+

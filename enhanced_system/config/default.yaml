@@ -1,0 +1,172 @@
+# Default Configuration for Enhanced Agent System
+# This configuration provides sensible defaults for local development
+
+# Input Validation Settings
+input_validation:
+  max_length: 4096
+  enable_pii_detection: true
+  enable_injection_detection: true
+  pii_entities:
+    - PERSON
+    - EMAIL_ADDRESS
+    - PHONE_NUMBER
+    - CREDIT_CARD
+    - SSN
+    - IP_ADDRESS
+  injection_patterns:
+    - sql_injection
+    - command_injection
+    - prompt_injection
+
+# Caching Configuration
+caching:
+  l1:
+    enabled: true
+    max_size: 1000
+    ttl: 3600  # 1 hour
+  l2:
+    enabled: true
+    host: localhost
+    port: 6379
+    db: 0
+    ttl: 86400  # 24 hours
+    pool_size: 10
+    socket_timeout: 5
+    socket_connect_timeout: 5
+  l3:
+    enabled: true
+    bucket: agent-cache
+    region: us-east-1
+    prefix: enhanced-agents/
+    ttl: 604800  # 7 days
+  semantic_similarity:
+    enabled: true
+    threshold: 0.95
+    model: all-MiniLM-L6-v2
+
+# Error Handling Configuration
+error_handling:
+  max_retries: 3
+  base_delay: 1.0
+  max_delay: 32.0
+  exponential_base: 2
+  enable_fallback: true
+  enable_error_learning: true
+  error_db_path: ./data/errors.db
+
+# Confidence Calibration
+confidence:
+  enabled: true
+  calibration_method: isotonic  # isotonic or platt
+  min_samples_for_calibration: 100
+  reliability_bands:
+    low: [0.0, 0.5]
+    medium: [0.5, 0.75]
+    high: [0.75, 0.9]
+    very_high: [0.9, 1.0]
+
+# Multi-Agent Consensus
+consensus:
+  enabled: false
+  min_agents: 3
+  max_agents: 5
+  threshold: 0.7
+  agreement_method: embedding_similarity  # embedding_similarity or exact_match
+  ensemble_method: confidence_weighted  # confidence_weighted or majority_vote
+
+# Adaptive Routing
+routing:
+  enabled: true
+  complexity_model: heuristic  # heuristic or ml_model
+  agent_profiles_path: ./config/agent_profiles.json
+  routing_strategy: cost_optimized  # cost_optimized, quality_optimized, or balanced
+
+# Streaming Configuration
+streaming:
+  enabled: true
+  buffer_size: 10
+  confidence_per_token: true
+  stop_conditions:
+    max_tokens: 2048
+    quality_threshold: 0.3
+    detect_eos: true
+
+# Batch Processing
+batch_processing:
+  enabled: true
+  max_batch_size: 32
+  batch_timeout_ms: 100
+  num_workers: 4
+  queue_size: 1000
+  priority_levels: 3
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  prometheus_port: 9090
+  metrics_interval: 10
+  alerting:
+    enabled: true
+    latency_threshold_ms: 5000
+    error_rate_threshold: 0.1
+    token_rate_threshold: 1000
+  metrics:
+    - request_latency
+    - token_count
+    - error_rate
+    - cache_hit_rate
+    - agent_utilization
+    - consensus_agreement_rate
+
+# A/B Testing
+ab_testing:
+  enabled: false
+  default_traffic_split: 0.1
+  min_samples_for_significance: 100
+  significance_level: 0.05
+  metrics_to_track:
+    - latency
+    - accuracy
+    - user_satisfaction
+    - cost_per_request
+
+# Training Orchestration
+training:
+  parallel_training: true
+  max_parallel_jobs: 3
+  dependency_tracking: true
+  resource_limits:
+    max_memory_gb: 32
+    max_gpus: 2
+
+# Data Curation
+data_curation:
+  quality_threshold: 0.7
+  enable_augmentation: true
+  augmentation_factor: 2
+  enable_balancing: true
+  diversity_threshold: 0.8
+
+# Logging
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: ./logs/enhanced_system.log
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+# Model Configuration
+models:
+  default_model_path: /opt/ml/model
+  teacher_model: mistralai/Mistral-7B-v0.1
+  student_model: microsoft/DialoGPT-medium
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+
+# Security
+security:
+  enable_rate_limiting: true
+  rate_limit_per_minute: 60
+  rate_limit_per_hour: 1000
+  enable_audit_logging: true
+  audit_log_path: ./logs/audit.log
+
