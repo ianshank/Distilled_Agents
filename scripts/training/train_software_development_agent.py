@@ -11,7 +11,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from train_distilled_adapter import AgentDistillationTrainer
+from scripts.training.train_distilled_adapter import AgentDistillationTrainer
 
 # Configure logging
 logging.basicConfig(
@@ -123,7 +123,7 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     
     # Prepare dataset
-    input_file = os.path.join('training', args.input_file)
+    input_file = os.path.join('data', 'training', args.input_file)
     prepared_file = os.path.join(args.output_dir, 'prepared_data.jsonl')
     
     if not os.path.exists(input_file):
