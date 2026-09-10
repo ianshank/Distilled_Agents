@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from enhanced_system.core.streaming_inference import StreamingInference, StreamToken
+from enhanced_system.core.streaming_inference import StreamingInference
 
 
 @pytest.mark.unit
@@ -27,5 +27,4 @@ class TestStreamingInference:
             return "one two three"
 
         tokens = [token async for token in streamer.stream_response(generate, "task")]
-        assert all(isinstance(item, StreamToken) for item in tokens)
-        assert "".join(item.token for item in tokens).replace(" ", "").find("one") != -1 or tokens
+        assert [item.token for item in tokens] == ["one", "two", "three"]

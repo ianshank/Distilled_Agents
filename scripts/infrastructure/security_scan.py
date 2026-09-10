@@ -31,7 +31,23 @@ def _run(command: list[str]) -> dict:
 @click.option("--output", default="security_report.json")
 def security_scan(output):
     checks = [
-        _run([sys.executable, "-m", "bandit", "-r", "enhanced_system", "-q", "-f", "json"]),
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "bandit",
+                "-r",
+                "enhanced_system",
+                "scripts",
+                "-x",
+                "tests,enhanced_system/tests,enhanced_system/examples",
+                "-c",
+                "pyproject.toml",
+                "-q",
+                "-f",
+                "json",
+            ]
+        ),
         _run([sys.executable, "-m", "pip_audit", "-f", "json"]),
     ]
     failed = [item for item in checks if item.get("returncode", 1) not in (0, None)]

@@ -46,13 +46,15 @@ class SemanticCacheManager:
             logger.error("Embedding generation error: %s", exc)
             return None
 
-    def find_similar_cached(self, text: str) -> Optional[str]:
+    def find_similar_cached(self, text: str, namespace: str = "") -> Optional[str]:
         if not self.enabled or not self.model:
             return None
         embedding = self.get_embedding(text)
         if embedding is None:
             return None
-        for cache_key, cached_embedding in self.cache_embeddings.items():
+        for cache_key, (cached_namespace, cached_embedding) in self.cache_embeddings.items():
+            if cached_namespace != namespace:
+                continue
             similarity = np.dot(embedding, cached_embedding) / (
                 np.linalg.norm(embedding) * np.linalg.norm(cached_embedding)
             )
@@ -61,9 +63,9 @@ class SemanticCacheManager:
                 return cache_key
         return None
 
-    def register_embedding(self, cache_key: str, text: str) -> None:
+    def register_embedding(self, cache_key: str, text: str, namespace: str = "") -> None:
         if not self.enabled:
             return
         embedding = self.get_embedding(text)
         if embedding is not None:
-            self.cache_embeddings[cache_key] = embedding
+            self.cache_embeddings[cache_key] = (namespace, embedding)

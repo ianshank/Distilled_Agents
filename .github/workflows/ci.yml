@@ -54,7 +54,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install scanners
-        run: pip install bandit pip-audit
+        run: pip install -e ".[dev]"
       - name: Bandit
         run: bandit -r enhanced_system scripts -x tests,enhanced_system/tests,enhanced_system/examples -c pyproject.toml -q
       - name: pip-audit

@@ -30,16 +30,15 @@ class IntelligentCacheManager:
         logger.info("IntelligentCacheManager initialized")
 
     def compute_cache_key(self, task: str, agent: str, params: Optional[dict] = None) -> str:
-        similar_key = self.semantic_cache.find_similar_cached(task)
+        param_part = str(sorted((params or {}).items()))
+        namespace = hashlib.sha256(f"{agent}|{param_part}".encode()).hexdigest()[:16]
+        similar_key = self.semantic_cache.find_similar_cached(task, namespace=namespace)
         if similar_key:
             return similar_key
 
-        key_components = [task, agent]
-        if params:
-            key_components.append(str(sorted(params.items())))
-        key_string = "|".join(key_components)
+        key_string = "|".join([task, agent, param_part])
         cache_key = hashlib.sha256(key_string.encode()).hexdigest()
-        self.semantic_cache.register_embedding(cache_key, task)
+        self.semantic_cache.register_embedding(cache_key, task, namespace=namespace)
         return cache_key
 
     async def get_or_compute(self, key: str, compute_func: Callable, *args, **kwargs) -> Any:

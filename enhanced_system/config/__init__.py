@@ -37,7 +37,11 @@ class Config(BaseModel):
         class L3Config(BaseModel):
             enabled: bool = True
             bucket: str = "agent-cache"
-            region: str = Field(default_factory=lambda: os.getenv("AWS_REGION", "us-east-1"))
+            region: str = Field(
+                default_factory=lambda: (
+                    os.getenv("AWS_REGION") or os.getenv("MANGOMAS_AWS_REGION") or "us-east-1"
+                )
+            )
             prefix: str = "enhanced-agents/"
             ttl: int = 604800
 
@@ -79,7 +83,7 @@ class Config(BaseModel):
     class RoutingConfig(BaseModel):
         enabled: bool = True
         complexity_model: str = "heuristic"
-        agent_profiles_path: str = "./configs/agent_profiles.json"
+        agent_profiles_path: str = str(Path(__file__).resolve().parent / "agent_profiles.json")
         routing_strategy: str = "cost_optimized"
 
     class StreamingConfig(BaseModel):
@@ -209,7 +213,24 @@ def load_config(config_name: Optional[str] = None, config_path: Optional[str] = 
     with open(resolved, encoding="utf-8") as handle:
         config_dict = yaml.safe_load(handle) or {}
 
+    routing = config_dict.get("routing") or {}
+    raw_profiles = routing.get("agent_profiles_path")
+    if raw_profiles:
+        routing["agent_profiles_path"] = _resolve_agent_profiles_path(str(raw_profiles))
+        config_dict["routing"] = routing
+
     return Config(**config_dict)
+
+
+def _resolve_agent_profiles_path(raw: str) -> str:
+    """Prefer a real file; fall back to packaged profiles after install."""
+    candidate = Path(raw)
+    if candidate.exists():
+        return str(candidate)
+    packaged = Path(__file__).resolve().parent / "agent_profiles.json"
+    if packaged.exists():
+        return str(packaged)
+    return raw
 
 
 # Global config instance

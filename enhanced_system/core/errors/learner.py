@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
+from pathlib import Path
 from typing import Any
 
 from enhanced_system.core.errors.types import ErrorRecord
@@ -19,10 +21,24 @@ class ErrorLearner:
         db_path: str = "./data/errors.db",
         enabled: bool = True,
     ):
-        self.db_path = db_path
+        self.db_path = self._sqlite_path(db_path)
         self.enabled = enabled
         if enabled:
             self._init_database()
+
+    @staticmethod
+    def _sqlite_path(db_path: str) -> str:
+        """SQLite cannot open object-store URIs; fall back to a local file."""
+        if db_path.startswith(("s3://", "http://", "https://")):
+            logger.warning(
+                "error_db_path %s is not a SQLite file; using ./data/errors.db",
+                db_path,
+            )
+            return os.path.join("data", "errors.db")
+        parent = Path(db_path).expanduser().parent
+        if str(parent) not in {"", "."}:
+            parent.mkdir(parents=True, exist_ok=True)
+        return db_path
 
     def _init_database(self) -> None:
         try:

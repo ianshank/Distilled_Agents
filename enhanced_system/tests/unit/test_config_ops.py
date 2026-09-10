@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from enhanced_system.config.builders import ConfigBuilder
 from enhanced_system.core.cache.serialize import dumps, loads
@@ -73,9 +75,13 @@ def test_launcher_validate_missing_files(tmp_path):
     spec = launcher.create_job_spec(launcher.agent_configs[0])
     assert "hyperparameters" in spec
     assert spec["hyperparameters"]["trust_remote_code"] == "false"
+    assert spec["hyperparameters"]["teacher_model_name"]
+    assert spec["hyperparameters"]["student_model_name"]
+    assert "model_name_or_path" not in spec["hyperparameters"]
     source = launcher.training_source_dir()
     assert (source / "train_distilled_adapter.py").exists()
     assert (source / "distill" / "trainer.py").exists()
+    assert (source / "requirements.txt").exists()
 
 
 @pytest.mark.unit
@@ -86,6 +92,8 @@ def test_load_config_default():
     assert config.input_validation.max_length >= 1
     assert "agent_profiles" in config.routing.agent_profiles_path
 
+    assert Path(config.routing.agent_profiles_path).exists()
+
 
 @pytest.mark.unit
 def test_distill_io_helpers(tmp_path):
@@ -95,3 +103,4 @@ def test_distill_io_helpers(tmp_path):
     sample.write_text('{"prompt": "hello"}\n', encoding="utf-8")
     assert resolve_train_file(str(tmp_path)).endswith("sample.jsonl")
     assert texts_from_examples({"prompt": ["a"]}) == ["a"]
+    assert texts_from_examples({"prompt": ["p"], "completion": ["c"]}) == ["p\nc"]

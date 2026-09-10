@@ -54,7 +54,7 @@ error_handling:
   exponential_base: 2
   enable_fallback: true
   enable_error_learning: true
-  error_db_path: s3://production-agent-data/errors/
+  error_db_path: ./data/errors.db
 
 # Confidence Calibration
 confidence:

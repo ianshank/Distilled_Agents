@@ -6,12 +6,10 @@ from enhanced_system.ops.sagemaker_launcher import (
 )
 from enhanced_system.ops.settings import MangoMASSettings, get_settings
 from enhanced_system.ops.training_system import (
-    AgentTrainingConfig as SkillTrainingConfig,
-)
-from enhanced_system.ops.training_system import (
     AutomatedTrainingSystem,
     InfrastructureConfig,
     RegisteredSkill,
+    SkillTrainingConfig,
 )
 
 __all__ = [
