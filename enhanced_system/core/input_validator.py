@@ -8,6 +8,8 @@ import logging
 from typing import Tuple, List, Dict, Any, Optional
 from dataclasses import dataclass
 
+from enhanced_system.core.base.validator import BaseValidator, ValidationResult as BaseValidationResult
+
 try:
     from presidio_analyzer import AnalyzerEngine
     from presidio_analyzer.nlp_engine import NlpEngineProvider
@@ -21,23 +23,19 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ValidationResult:
-    """Result of input validation"""
-    is_valid: bool
-    error_message: Optional[str] = None
-    warnings: List[str] = None
-    sanitized_input: Optional[str] = None
+class ValidationResult(BaseValidationResult):
+    """Result of input validation with optional PII details."""
+
     pii_detected: bool = False
-    pii_entities: List[Dict[str, Any]] = None
-    
+    pii_entities: list = None
+
     def __post_init__(self):
-        if self.warnings is None:
-            self.warnings = []
+        super().__post_init__()
         if self.pii_entities is None:
             self.pii_entities = []
 
 
-class InputValidator:
+class InputValidator(BaseValidator):
     """
     Comprehensive input validation and sanitization
     
@@ -65,9 +63,10 @@ class InputValidator:
     ]
     
     COMMAND_INJECTION_PATTERNS = [
-        r"(\||&&|;|\n)",
+        r"(&&|\|\|)",
         r"(\$\(.*\))",
         r"(`.*`)",
+        r"(\|)",
         r"(\bwget\b|\bcurl\b)",
         r"(\brm\b.*-rf)",
         r"(\bsudo\b)",
@@ -75,9 +74,9 @@ class InputValidator:
     ]
     
     PROMPT_INJECTION_PATTERNS = [
-        r"(ignore\s+(previous|all|above)\s+(instructions|rules|prompts?))",
-        r"(disregard\s+(previous|all|above)\s+(instructions|rules|prompts?))",
-        r"(forget\s+(previous|all|above)\s+(instructions|rules|prompts?))",
+        r"(ignore\s+(?:all\s+)?(?:previous|above|all)\s+(?:instructions|rules|prompts?))",
+        r"(disregard\s+(?:all\s+)?(?:previous|above|all)\s+(?:instructions|rules|prompts?))",
+        r"(forget\s+(?:all\s+)?(?:previous|above|all)\s+(?:instructions|rules|prompts?))",
         r"(system\s*:\s*)",
         r"(you\s+are\s+now\s+)",
         r"(new\s+instructions?\s*:)",
@@ -329,6 +328,14 @@ class InputValidator:
         
         is_safe = len(issues) == 0
         return is_safe, issues
+
+    def validate(self, input_data: str) -> ValidationResult:
+        """ABC-compatible validate entry point."""
+        return self.validate_task_input(input_data)
+
+    def sanitize(self, input_data: str) -> str:
+        """ABC-compatible sanitize entry point."""
+        return self.sanitize_input(input_data)
 
 
 def validate_input(task: str, config: Optional[Dict[str, Any]] = None) -> ValidationResult:

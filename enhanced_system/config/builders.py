@@ -13,40 +13,9 @@ This follows 2025 Python coding standards:
 from __future__ import annotations
 
 from typing import Any, Optional
-from dataclasses import dataclass, field
-from enum import Enum
 
 from enhanced_system.core.constants import *
 from enhanced_system.core.enums import *
-
-
-@dataclass
-class Config:
-    """Complete system configuration."""
-    
-    input_validation: dict[str, Any] = field(default_factory=dict)
-    caching: dict[str, Any] = field(default_factory=dict)
-    error_handling: dict[str, Any] = field(default_factory=dict)
-    confidence: dict[str, Any] = field(default_factory=dict)
-    consensus: dict[str, Any] = field(default_factory=dict)
-    routing: dict[str, Any] = field(default_factory=dict)
-    streaming: dict[str, Any] = field(default_factory=dict)
-    batch_processing: dict[str, Any] = field(default_factory=dict)
-    monitoring: dict[str, Any] = field(default_factory=dict)
-    
-    def dict(self) -> dict[str, Any]:
-        """Convert config to dictionary."""
-        return {
-            'input_validation': self.input_validation,
-            'caching': self.caching,
-            'error_handling': self.error_handling,
-            'confidence': self.confidence,
-            'consensus': self.consensus,
-            'routing': self.routing,
-            'streaming': self.streaming,
-            'batch_processing': self.batch_processing,
-            'monitoring': self.monitoring,
-        }
 
 
 class ConfigBuilder:
@@ -98,22 +67,22 @@ class ConfigBuilder:
         Returns:
             Self for chaining.
         """
-        self._config['caching'] = {
-            'l1': {
-                'enabled': l1_enabled,
-                'max_size': l1_max_size,
-                'ttl': l1_ttl
+        l3: dict[str, Any] = {"enabled": l3_enabled}
+        if l3_bucket:
+            l3["bucket"] = l3_bucket
+        self._config["caching"] = {
+            "l1": {
+                "enabled": l1_enabled,
+                "max_size": l1_max_size,
+                "ttl": l1_ttl,
             },
-            'l2': {
-                'enabled': l2_enabled,
-                'host': l2_host,
-                'port': l2_port,
-                'ttl': l2_ttl
+            "l2": {
+                "enabled": l2_enabled,
+                "host": l2_host,
+                "port": l2_port,
+                "ttl": l2_ttl,
             },
-            'l3': {
-                'enabled': l3_enabled,
-                'bucket': l3_bucket
-            },
+            "l3": l3,
             'semantic_similarity': {
                 'enabled': semantic_enabled,
                 'threshold': semantic_threshold,
@@ -332,30 +301,17 @@ class ConfigBuilder:
         }
         return self
     
-    def build(self) -> Config:
+    def build(self):
         """
         Build and validate configuration.
-        
+
         Returns:
-            Validated Config instance.
-        
-        Raises:
-            ValueError: If configuration is invalid.
+            Validated Pydantic Config instance.
         """
-        # Validate configuration
+        from enhanced_system.config import Config as PydanticConfig
+
         self._validate()
-        
-        return Config(
-            input_validation=self._config.get('input_validation', {}),
-            caching=self._config.get('caching', {}),
-            error_handling=self._config.get('error_handling', {}),
-            confidence=self._config.get('confidence', {}),
-            consensus=self._config.get('consensus', {}),
-            routing=self._config.get('routing', {}),
-            streaming=self._config.get('streaming', {}),
-            batch_processing=self._config.get('batch_processing', {}),
-            monitoring=self._config.get('monitoring', {}),
-        )
+        return PydanticConfig(**self._config)
     
     def _validate(self) -> None:
         """Validate configuration before building."""

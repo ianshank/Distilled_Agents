@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-def test_training_data(data_file: str):
+def validate_training_data(data_file: str):
     """Test and validate the training data"""
     print(f"🔍 Testing training data: {data_file}")
     
@@ -89,7 +89,7 @@ def test_training_data(data_file: str):
     
     return valid_examples > 0
 
-def test_sample_predictions():
+def demo_sample_predictions():
     """Test sample predictions with the training data"""
     print(f"\n🧪 Testing Sample Predictions")
     
@@ -115,7 +115,7 @@ def test_sample_predictions():
     print(f"  ✅ Database design and optimization")
     print(f"  ✅ API design and implementation")
 
-def test_training_configuration():
+def validate_training_configuration():
     """Test the training configuration"""
     print(f"\n⚙️  Training Configuration Test")
     
@@ -150,14 +150,14 @@ def main():
     print("=" * 60)
     
     # Test training data
-    data_file = "training/sample_training_data.jsonl"
-    data_valid = test_training_data(data_file)
+    data_file = str(Path(__file__).resolve().parents[1] / "data" / "training" / "sample_training_data.jsonl")
+    data_valid = validate_training_data(data_file)
     
     # Test sample predictions
-    test_sample_predictions()
+    demo_sample_predictions()
     
     # Test training configuration
-    config_valid = test_training_configuration()
+    config_valid = validate_training_configuration()
     
     # Summary
     print(f"\n📋 Test Summary:")

@@ -5,27 +5,14 @@ Provides dynamic agent selection based on task characteristics
 
 import logging
 import json
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
-from enum import Enum
 import re
+
+from enhanced_system.core.enums import RoutingStrategy, TaskComplexity
 
 
 logger = logging.getLogger(__name__)
-
-
-class TaskComplexity(Enum):
-    """Task complexity levels"""
-    SIMPLE = "simple"
-    MEDIUM = "medium"
-    COMPLEX = "complex"
-
-
-class RoutingStrategy(Enum):
-    """Routing optimization strategies"""
-    COST_OPTIMIZED = "cost_optimized"
-    QUALITY_OPTIMIZED = "quality_optimized"
-    BALANCED = "balanced"
 
 
 @dataclass
@@ -64,12 +51,14 @@ class AdaptiveRouter:
     
     # Task type keywords for classification
     TASK_TYPE_KEYWORDS = {
-        'coding': ['code', 'program', 'function', 'bug', 'debug', 'implement', 'algorithm'],
+        'coding': ['code', 'program', 'function', 'bug', 'debug', 'implement', 'algorithm', 'python'],
         'analysis': ['analyze', 'evaluate', 'assess', 'compare', 'review'],
+        'architecture': ['design', 'architect', 'architecture', 'microservices', 'plan', 'structure'],
         'design': ['design', 'architect', 'plan', 'structure', 'model'],
-        'documentation': ['document', 'explain', 'describe', 'write', 'readme'],
-        'testing': ['test', 'qa', 'quality', 'verify', 'validate'],
-        'security': ['security', 'vulnerability', 'auth', 'encryption', 'secure'],
+        'documentation': ['document', 'explain', 'describe', 'readme'],
+        'testing': ['test', 'qa', 'quality', 'verify', 'validate', 'unit tests'],
+        'security': ['security', 'vulnerability', 'auth', 'encryption', 'secure', 'audit'],
+        'devops': ['deploy', 'release', 'cicd', 'ci/cd', 'pipeline', 'infrastructure', 'github actions'],
         'deployment': ['deploy', 'release', 'cicd', 'pipeline', 'infrastructure'],
     }
     
@@ -416,9 +405,12 @@ class AdaptiveRouter:
         task_agent_map = {
             'coding': 'swe_agent',
             'design': 'architect_agent',
+            'architecture': 'architect_agent',
             'testing': 'sqe_agent',
             'analysis': 'architect_agent',
             'security': 'swe_agent',
+            'devops': 'swe_agent',
+            'deployment': 'swe_agent',
         }
         
         specialist_id = task_agent_map.get(task_type)

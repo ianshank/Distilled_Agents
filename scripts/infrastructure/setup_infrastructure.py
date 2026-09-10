@@ -1,52 +1,31 @@
 #!/usr/bin/env python3
-"""
-CI/CD Infrastructure Setup Script
-================================
+"""Set up AWS infrastructure for agent training."""
 
-Sets up AWS infrastructure required for agent training pipeline.
-"""
+from __future__ import annotations
 
 import asyncio
-import click
-import json
-import logging
+import os
 import sys
-from pathlib import Path
 
-# Add the src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+import click
 
-from agents.automated_training_system import (
-    AutomatedTrainingSystem,
-    InfrastructureConfig
-)
+from enhanced_system.ops.settings import get_settings
+from enhanced_system.ops.training_system import AutomatedTrainingSystem, InfrastructureConfig
+
 
 @click.command()
-@click.option('--region', default='us-east-1', help='AWS region')
-@click.option('--bucket', default='mangomas-agent-training', help='S3 bucket')
-@click.option('--table', default='agent-skill-registry', help='DynamoDB table')
+@click.option("--region", default=lambda: os.getenv("AWS_REGION", get_settings().aws_region))
+@click.option("--bucket", default=lambda: get_settings().training_data_bucket)
+@click.option("--table", default=lambda: get_settings().dynamodb_table)
 def setup_infrastructure(region, bucket, table):
-    """Setup AWS infrastructure for agent training"""
-    
-    config = InfrastructureConfig(
-        aws_region=region,
-        s3_bucket=bucket,
-        dynamodb_table=table
-    )
-    
-    result = asyncio.run(run_setup(config))
-    
-    if result["status"] == "completed":
-        print("✅ Infrastructure setup completed")
+    config = InfrastructureConfig(aws_region=region, s3_bucket=bucket, dynamodb_table=table)
+    result = asyncio.run(AutomatedTrainingSystem(config).setup_infrastructure())
+    if result.get("status") == "completed":
+        print("Infrastructure setup completed")
         sys.exit(0)
-    else:
-        print(f"❌ Infrastructure setup failed: {result.get('error', 'Unknown')}")
-        sys.exit(1)
+    print(f"Infrastructure setup failed: {result.get('error', 'Unknown')}")
+    sys.exit(1)
 
-async def run_setup(config):
-    """Execute infrastructure setup"""
-    system = AutomatedTrainingSystem(config)
-    return await system.setup_infrastructure()
 
 if __name__ == "__main__":
-    setup_infrastructure() 
+    setup_infrastructure()

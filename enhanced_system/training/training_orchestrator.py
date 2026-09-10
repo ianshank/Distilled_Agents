@@ -8,19 +8,11 @@ import asyncio
 from typing import Dict, List, Any, Optional, Set
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+
+from enhanced_system.core.enums import TrainingStatus
 
 
 logger = logging.getLogger(__name__)
-
-
-class TrainingStatus(Enum):
-    """Training job status"""
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
 
 
 @dataclass

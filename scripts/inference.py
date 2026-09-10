@@ -41,7 +41,7 @@ class DistilledAgentInference:
                 model_dir,
                 torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
                 device_map="auto" if torch.cuda.is_available() else None,
-                trust_remote_code=True
+                trust_remote_code=os.getenv("MANGOMAS_TRUST_REMOTE_CODE", "false").lower() == "true",
             )
             
             # Check if LoRA adapter is present
@@ -205,4 +205,5 @@ if __name__ == "__main__":
     
     # Run Flask app
     port = int(os.getenv("PORT", 8080))
-    app.run(host="0.0.0.0", port=port, debug=False) 
+    host = os.getenv("MANGOMAS_BIND_HOST", os.getenv("BIND_HOST", "127.0.0.1"))
+    app.run(host=host, port=port, debug=False) 

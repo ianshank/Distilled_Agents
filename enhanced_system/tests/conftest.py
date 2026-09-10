@@ -29,37 +29,33 @@ from enhanced_system.core.enums import *
 
 @pytest.fixture
 def test_config() -> dict[str, Any]:
-    """Provide test configuration."""
-    try:
-        config = load_config('development')
-        return config.dict() if hasattr(config, 'dict') else config
-    except Exception:
-        # Fallback to minimal config
-        return {
-            'input_validation': {
-                'max_length': DEFAULT_MAX_LENGTH,
-                'enable_pii_detection': False,  # Disable for testing
-                'enable_injection_detection': True,
-            },
-            'caching': {
-                'l1': {'enabled': True, 'max_size': 100, 'ttl': 60},
-                'l2': {'enabled': False},  # Disable Redis for unit tests
-                'l3': {'enabled': False},  # Disable S3 for unit tests
-                'semantic_similarity': {'enabled': False},  # Disable embeddings
-            },
-            'error_handling': {
-                'max_retries': 3,
-                'base_delay': 0.1,  # Faster for testing
-                'enable_error_learning': False,
-            },
-            'confidence': {
-                'enabled': True,
-                'calibration_method': CalibrationMethod.ISOTONIC.value,
-            },
-            'monitoring': {
-                'enabled': False,  # Disable Prometheus for unit tests
-            }
-        }
+    """Provide isolated test configuration (no Redis/S3/Prometheus)."""
+    return {
+        "input_validation": {
+            "max_length": DEFAULT_MAX_LENGTH,
+            "enable_pii_detection": False,
+            "enable_injection_detection": True,
+        },
+        "caching": {
+            "l1": {"enabled": True, "max_size": 100, "ttl": 60},
+            "l2": {"enabled": False},
+            "l3": {"enabled": False},
+            "semantic_similarity": {"enabled": False},
+        },
+        "error_handling": {
+            "max_retries": 3,
+            "base_delay": 0.1,
+            "enable_error_learning": False,
+            "enable_fallback": True,
+        },
+        "confidence": {
+            "enabled": True,
+            "calibration_method": CalibrationMethod.ISOTONIC.value,
+        },
+        "monitoring": {
+            "enabled": False,
+        },
+    }
 
 
 @pytest.fixture

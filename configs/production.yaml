@@ -1,0 +1,177 @@
+# Production Configuration for Enhanced Agent System
+# Optimized for production deployment with high availability
+
+# Input Validation Settings
+input_validation:
+  max_length: 8192
+  enable_pii_detection: true
+  enable_injection_detection: true
+  pii_entities:
+    - PERSON
+    - EMAIL_ADDRESS
+    - PHONE_NUMBER
+    - CREDIT_CARD
+    - SSN
+    - IP_ADDRESS
+    - LOCATION
+  injection_patterns:
+    - sql_injection
+    - command_injection
+    - prompt_injection
+    - xss
+
+# Caching Configuration
+caching:
+  l1:
+    enabled: true
+    max_size: 5000
+    ttl: 1800
+  l2:
+    enabled: true
+    host: redis-cluster.production.internal
+    port: 6379
+    db: 0
+    ttl: 86400
+    pool_size: 50
+    socket_timeout: 3
+    socket_connect_timeout: 3
+  l3:
+    enabled: true
+    bucket: production-agent-cache
+    region: us-east-1
+    prefix: enhanced-agents/v1/
+    ttl: 604800
+  semantic_similarity:
+    enabled: true
+    threshold: 0.98
+    model: all-MiniLM-L6-v2
+
+# Error Handling Configuration
+error_handling:
+  max_retries: 5
+  base_delay: 0.5
+  max_delay: 16.0
+  exponential_base: 2
+  enable_fallback: true
+  enable_error_learning: true
+  error_db_path: s3://production-agent-data/errors/
+
+# Confidence Calibration
+confidence:
+  enabled: true
+  calibration_method: isotonic
+  min_samples_for_calibration: 500
+  reliability_bands:
+    low: [0.0, 0.5]
+    medium: [0.5, 0.75]
+    high: [0.75, 0.9]
+    very_high: [0.9, 1.0]
+
+# Multi-Agent Consensus
+consensus:
+  enabled: true
+  min_agents: 3
+  max_agents: 5
+  threshold: 0.75
+  agreement_method: embedding_similarity
+  ensemble_method: confidence_weighted
+
+# Adaptive Routing
+routing:
+  enabled: true
+  complexity_model: ml_model
+  agent_profiles_path: s3://production-agent-config/agent_profiles.json
+  routing_strategy: balanced
+
+# Streaming Configuration
+streaming:
+  enabled: true
+  buffer_size: 20
+  confidence_per_token: true
+  stop_conditions:
+    max_tokens: 4096
+    quality_threshold: 0.5
+    detect_eos: true
+
+# Batch Processing
+batch_processing:
+  enabled: true
+  max_batch_size: 64
+  batch_timeout_ms: 50
+  num_workers: 16
+  queue_size: 10000
+  priority_levels: 5
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  prometheus_port: 9090
+  metrics_interval: 5
+  alerting:
+    enabled: true
+    latency_threshold_ms: 3000
+    error_rate_threshold: 0.05
+    token_rate_threshold: 2000
+  metrics:
+    - request_latency
+    - token_count
+    - error_rate
+    - cache_hit_rate
+    - agent_utilization
+    - consensus_agreement_rate
+    - cost_per_request
+    - throughput
+
+# A/B Testing
+ab_testing:
+  enabled: true
+  default_traffic_split: 0.05
+  min_samples_for_significance: 1000
+  significance_level: 0.01
+  metrics_to_track:
+    - latency
+    - accuracy
+    - user_satisfaction
+    - cost_per_request
+    - error_rate
+
+# Training Orchestration
+training:
+  parallel_training: true
+  max_parallel_jobs: 10
+  dependency_tracking: true
+  resource_limits:
+    max_memory_gb: 256
+    max_gpus: 8
+
+# Data Curation
+data_curation:
+  quality_threshold: 0.8
+  enable_augmentation: true
+  augmentation_factor: 3
+  enable_balancing: true
+  diversity_threshold: 0.85
+
+# Logging
+logging:
+  level: WARNING
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: /var/log/enhanced_system/production.log
+  max_bytes: 52428800  # 50MB
+  backup_count: 10
+
+# Model Configuration
+models:
+  default_model_path: s3://production-models/enhanced-agents/
+  teacher_model: mistralai/Mistral-7B-v0.1
+  student_model: microsoft/DialoGPT-medium
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+
+# Security
+security:
+  enable_rate_limiting: true
+  rate_limit_per_minute: 1000
+  rate_limit_per_hour: 50000
+  enable_audit_logging: true
+  audit_log_path: s3://production-audit-logs/enhanced-system/
+

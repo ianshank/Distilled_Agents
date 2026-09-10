@@ -9,6 +9,15 @@ from .adaptive_router import AdaptiveRouter
 from .streaming_inference import StreamingInference
 from .batch_processor import BatchProcessor
 from .monitoring import AgentMonitor
+from .factories import (
+    AdaptiveRouterFactory,
+    BatchProcessorFactory,
+    CacheManagerFactory,
+    ConfidenceCalibratorFactory,
+    ConsensusInferenceFactory,
+    MonitorFactory,
+    ValidatorFactory,
+)
 
 __all__ = [
     "InputValidator",
@@ -22,5 +31,12 @@ __all__ = [
     "StreamingInference",
     "BatchProcessor",
     "AgentMonitor",
+    "ValidatorFactory",
+    "CacheManagerFactory",
+    "ConfidenceCalibratorFactory",
+    "ConsensusInferenceFactory",
+    "AdaptiveRouterFactory",
+    "BatchProcessorFactory",
+    "MonitorFactory",
 ]
 

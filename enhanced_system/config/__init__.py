@@ -36,7 +36,7 @@ class Config(BaseModel):
         class L3Config(BaseModel):
             enabled: bool = True
             bucket: str = "agent-cache"
-            region: str = "us-east-1"
+            region: str = Field(default_factory=lambda: os.getenv("AWS_REGION", "us-east-1"))
             prefix: str = "enhanced-agents/"
             ttl: int = 604800
         
@@ -76,7 +76,7 @@ class Config(BaseModel):
     class RoutingConfig(BaseModel):
         enabled: bool = True
         complexity_model: str = "heuristic"
-        agent_profiles_path: str = "./config/agent_profiles.json"
+        agent_profiles_path: str = "./configs/agent_profiles.json"
         routing_strategy: str = "cost_optimized"
     
     class StreamingConfig(BaseModel):
@@ -157,6 +157,19 @@ class Config(BaseModel):
     security: SecurityConfig = Field(default_factory=SecurityConfig)
 
 
+def _config_search_dirs() -> list[Path]:
+    """Prefer ops configs/, then the installable package YAML."""
+    env_dir = os.getenv("MANGOMAS_CONFIG_DIR") or os.getenv("ENHANCED_SYSTEM_CONFIG_DIR")
+    package_dir = Path(__file__).resolve().parent
+    repo_configs = package_dir.parents[1] / "configs"
+    dirs: list[Path] = []
+    if env_dir:
+        dirs.append(Path(env_dir))
+    dirs.append(repo_configs)
+    dirs.append(package_dir)
+    return dirs
+
+
 def load_config(config_name: Optional[str] = None, config_path: Optional[str] = None) -> Config:
     """
     Load configuration from YAML file
@@ -168,25 +181,31 @@ def load_config(config_name: Optional[str] = None, config_path: Optional[str] = 
     Returns:
         Config object with validated configuration
     """
-    if config_path is None:
-        # Determine config name from environment or default
+    if config_path is not None:
+        resolved = Path(config_path)
+    else:
         if config_name is None:
             config_name = os.getenv("ENHANCED_SYSTEM_ENV", "default")
-        
-        # Build path to config file
-        config_dir = Path(__file__).parent
-        config_path = config_dir / f"{config_name}.yaml"
-    else:
-        config_path = Path(config_path)
-    
-    # Load YAML file
-    if not config_path.exists():
-        raise FileNotFoundError(f"Configuration file not found: {config_path}")
-    
-    with open(config_path, 'r') as f:
-        config_dict = yaml.safe_load(f)
-    
-    # Create and validate Config object
+        filename = f"{config_name}.yaml"
+        resolved = None
+        searched: list[str] = []
+        for directory in _config_search_dirs():
+            candidate = directory / filename
+            searched.append(str(candidate))
+            if candidate.exists():
+                resolved = candidate
+                break
+        if resolved is None:
+            raise FileNotFoundError(
+                f"Configuration file not found: {filename} (searched {searched})"
+            )
+
+    if not resolved.exists():
+        raise FileNotFoundError(f"Configuration file not found: {resolved}")
+
+    with open(resolved, "r", encoding="utf-8") as handle:
+        config_dict = yaml.safe_load(handle) or {}
+
     return Config(**config_dict)
 
 
@@ -212,5 +231,7 @@ def get_config(reload: bool = False) -> Config:
     return _config
 
 
-__all__ = ["Config", "load_config", "get_config"]
+from .builders import ConfigBuilder
+
+__all__ = ["Config", "load_config", "get_config", "ConfigBuilder"]
 

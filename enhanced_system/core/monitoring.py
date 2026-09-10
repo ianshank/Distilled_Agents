@@ -11,10 +11,17 @@ from datetime import datetime
 import threading
 
 try:
-    from prometheus_client import Counter, Histogram, Gauge, Summary, start_http_server, REGISTRY
+    from prometheus_client import (
+        CollectorRegistry,
+        Counter,
+        Gauge,
+        Histogram,
+        start_http_server,
+    )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
+    CollectorRegistry = None  # type: ignore[misc,assignment]
     logging.warning("Prometheus client not available. Monitoring will be limited.")
 
 
@@ -32,75 +39,75 @@ class Alert:
 
 
 class MetricsCollector:
-    """Collect and expose metrics"""
-    
-    def __init__(self):
-        """Initialize metrics collector"""
-        self.enabled = PROMETHEUS_AVAILABLE
-        
+    """Collect and expose metrics using an isolated Prometheus registry."""
+
+    def __init__(self, enabled: bool = True, registry=None):
+        self.enabled = bool(enabled and PROMETHEUS_AVAILABLE)
+        self.registry = None
+
         if self.enabled:
-            # Define metrics
+            self.registry = registry or CollectorRegistry()
             self.request_counter = Counter(
-                'agent_requests_total',
-                'Total number of agent requests',
-                ['agent', 'status']
+                "agent_requests_total",
+                "Total number of agent requests",
+                ["agent", "status"],
+                registry=self.registry,
             )
-            
             self.request_latency = Histogram(
-                'agent_request_latency_seconds',
-                'Request latency in seconds',
-                ['agent'],
-                buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+                "agent_request_latency_seconds",
+                "Request latency in seconds",
+                ["agent"],
+                buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0],
+                registry=self.registry,
             )
-            
             self.token_counter = Counter(
-                'agent_tokens_total',
-                'Total number of tokens processed',
-                ['agent', 'type']  # type: input or output
+                "agent_tokens_total",
+                "Total number of tokens processed",
+                ["agent", "type"],
+                registry=self.registry,
             )
-            
             self.error_counter = Counter(
-                'agent_errors_total',
-                'Total number of errors',
-                ['agent', 'error_type']
+                "agent_errors_total",
+                "Total number of errors",
+                ["agent", "error_type"],
+                registry=self.registry,
             )
-            
             self.cache_hit_counter = Counter(
-                'cache_hits_total',
-                'Total cache hits',
-                ['cache_level']  # L1, L2, L3
+                "cache_hits_total",
+                "Total cache hits",
+                ["cache_level"],
+                registry=self.registry,
             )
-            
             self.cache_miss_counter = Counter(
-                'cache_misses_total',
-                'Total cache misses',
-                ['cache_level']
+                "cache_misses_total",
+                "Total cache misses",
+                ["cache_level"],
+                registry=self.registry,
             )
-            
             self.agent_utilization = Gauge(
-                'agent_utilization',
-                'Current agent utilization',
-                ['agent']
+                "agent_utilization",
+                "Current agent utilization",
+                ["agent"],
+                registry=self.registry,
             )
-            
             self.consensus_agreement = Histogram(
-                'consensus_agreement_score',
-                'Consensus agreement scores',
-                buckets=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+                "consensus_agreement_score",
+                "Consensus agreement scores",
+                buckets=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+                registry=self.registry,
             )
-            
             self.confidence_scores = Histogram(
-                'confidence_scores',
-                'Confidence scores distribution',
-                ['agent'],
-                buckets=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+                "confidence_scores",
+                "Confidence scores distribution",
+                ["agent"],
+                buckets=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+                registry=self.registry,
             )
-            
             self.queue_size = Gauge(
-                'batch_queue_size',
-                'Current batch queue size'
+                "batch_queue_size",
+                "Current batch queue size",
+                registry=self.registry,
             )
-            
             logger.info("Metrics collector initialized with Prometheus")
         else:
             logger.warning("Metrics collector initialized without Prometheus")
@@ -281,17 +288,17 @@ class AgentMonitor:
         self.prometheus_port = config.get('prometheus_port', 9090)
         
         # Initialize components
-        self.metrics_collector = MetricsCollector()
+        self.metrics_collector = MetricsCollector(enabled=self.enabled)
         self.alert_manager = AlertManager(config.get('alerting', {}))
         
         # Tracking data
         self.request_stats: Dict[str, Dict[str, Any]] = {}
         self.lock = threading.Lock()
         
-        # Start Prometheus server
-        if self.enabled and PROMETHEUS_AVAILABLE:
+        # Start Prometheus server only when explicitly enabled
+        if self.enabled and PROMETHEUS_AVAILABLE and self.metrics_collector.registry:
             try:
-                start_http_server(self.prometheus_port)
+                start_http_server(self.prometheus_port, registry=self.metrics_collector.registry)
                 logger.info(f"Prometheus metrics server started on port {self.prometheus_port}")
             except Exception as e:
                 logger.warning(f"Failed to start Prometheus server: {e}")
@@ -312,28 +319,20 @@ class AgentMonitor:
             task: Input task
             result: Inference result
         """
-        if not self.enabled:
-            return
-        
-        # Extract metrics
         latency_ms = result.get('latency_ms', 0)
         latency_s = latency_ms / 1000.0
         success = result.get('success', True)
         token_count = result.get('token_count', 0)
         confidence = result.get('confidence')
         
-        # Record metrics
         status = 'success' if success else 'failure'
-        self.metrics_collector.record_request(agent, status, latency_s)
-        
-        if token_count > 0:
-            self.metrics_collector.record_tokens(agent, 'output', token_count)
-        
-        if confidence is not None:
-            self.metrics_collector.record_confidence(agent, confidence)
-        
-        # Check thresholds
-        self.alert_manager.check_latency(latency_ms, agent)
+        if self.enabled:
+            self.metrics_collector.record_request(agent, status, latency_s)
+            if token_count > 0:
+                self.metrics_collector.record_tokens(agent, 'output', token_count)
+            if confidence is not None:
+                self.metrics_collector.record_confidence(agent, confidence)
+            self.alert_manager.check_latency(latency_ms, agent)
         
         # Update stats
         with self.lock:
@@ -352,7 +351,8 @@ class AgentMonitor:
                 stats['successful_requests'] += 1
             else:
                 stats['failed_requests'] += 1
-                self.metrics_collector.record_error(agent, 'inference_error')
+                if self.enabled:
+                    self.metrics_collector.record_error(agent, 'inference_error')
             stats['total_latency_ms'] += latency_ms
             stats['total_tokens'] += token_count
             

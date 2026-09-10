@@ -54,11 +54,8 @@ enhanced_system/
 ### Installation
 
 ```bash
-# Install dependencies
-pip install -r enhanced_system/requirements.txt
-
-# For development
-pip install -r enhanced_system/requirements-dev.txt
+# Install the installable library plus test tools from the repo root
+pip install -e ".[dev]"
 ```
 
 ### Basic Usage
@@ -480,17 +477,17 @@ pre-commit run --all-files
 
 ## 📚 Documentation
 
-- [Configuration Guide](docs/configuration.md)
-- [Deployment Guide](docs/deployment.md)
-- [API Reference](docs/api_reference.md)
-- [Migration Guide](docs/migration.md)
+- [Configuration YAML](config/default.yaml)
+- [SageMaker training](../docs/README_SAGEMAKER_TRAINING.md)
+- [Architecture decisions](../docs/adr/0001-json-cache-serialization.md)
+- [Testing](TESTING.md)
 
 ## 🤝 Contributing
 
 1. Follow PEP 8 style guidelines
 2. Add unit tests for new features
 3. Update documentation
-4. Run linters: `black`, `flake8`, `mypy`
+4. Run tests: `pytest -m unit`
 
 ## 📄 License
 

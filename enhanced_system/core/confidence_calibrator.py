@@ -7,8 +7,9 @@ import logging
 import json
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
-from enum import Enum
 import numpy as np
+
+from enhanced_system.core.enums import ReliabilityBand
 
 try:
     from sklearn.calibration import CalibratedClassifierCV
@@ -20,14 +21,6 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
-
-
-class ReliabilityBand(Enum):
-    """Reliability bands for confidence scores"""
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    VERY_HIGH = "very_high"
 
 
 @dataclass

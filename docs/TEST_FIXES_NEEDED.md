@@ -1,5 +1,8 @@
 # Test Fixes Required
 
+> **Status (2026-09):** Unit and integration tests were rewritten to match the real APIs
+> (plan Option 1). Keep this file as a historical mapping; do not reintroduce assumed methods.
+
 ## Summary
 
 The tests were written based on assumed APIs. The actual implementation has different method names and return types. Here are the required fixes:

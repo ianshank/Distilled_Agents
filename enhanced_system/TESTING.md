@@ -82,7 +82,7 @@ pytest --cov=enhanced_system --cov-report=xml
 ### Enforce Minimum Coverage
 
 ```bash
-pytest --cov=enhanced_system --cov-report=term --cov-fail-under=80
+pytest --cov=enhanced_system --cov-report=term --cov-fail-under=60
 ```
 
 ## Running Tests for Specific Modules

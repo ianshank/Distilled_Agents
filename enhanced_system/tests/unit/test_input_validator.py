@@ -6,6 +6,7 @@ import pytest
 from enhanced_system.core.input_validator import InputValidator, ValidationResult
 
 
+@pytest.mark.unit
 class TestInputValidator:
     """Test suite for InputValidator"""
     
@@ -116,6 +117,7 @@ class TestInputValidator:
         assert len(issues) == 0
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 class TestInputValidatorAsync:
     """Async tests for InputValidator"""

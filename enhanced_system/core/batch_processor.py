@@ -8,19 +8,12 @@ import asyncio
 import time
 from typing import List, Dict, Any, Optional, Callable
 from dataclasses import dataclass
-from enum import Enum
 import heapq
+
+from enhanced_system.core.enums import Priority
 
 
 logger = logging.getLogger(__name__)
-
-
-class Priority(Enum):
-    """Request priority levels"""
-    LOW = 3
-    NORMAL = 2
-    HIGH = 1
-    CRITICAL = 0
 
 
 @dataclass
@@ -35,10 +28,8 @@ class BatchRequest:
     
     def __lt__(self, other):
         """For priority queue comparison"""
-        # Lower priority value = higher priority
-        if self.priority.value != other.priority.value:
-            return self.priority.value < other.priority.value
-        # Same priority: FIFO (earlier timestamp = higher priority)
+        if self.priority.numeric_value != other.priority.numeric_value:
+            return self.priority.numeric_value < other.priority.numeric_value
         return self.timestamp < other.timestamp
 
 
