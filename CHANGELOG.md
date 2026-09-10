@@ -23,6 +23,7 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 - SageMaker jobs upload datasets before `fit`, use the `train` channel plus `teacher_model_name`/`student_model_name` hyperparameters, and honor `--train_file`.
 - L1 cache eviction is LRU; semantic cache keys are namespaced by agent and params.
 - Packaged `agent_profiles.json` is used when `./configs/agent_profiles.json` is absent after install.
+- Build backend requires `setuptools>=83` (PYSEC-2026-3447 / CVE-2026-59890). CI pip-audit upgrades setuptools before scanning installed extras.
 
 ### Deprecated
 
