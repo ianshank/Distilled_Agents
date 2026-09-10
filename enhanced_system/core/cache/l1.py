@@ -28,8 +28,8 @@ class L1Cache(BaseCache):
             now = datetime.now().timestamp()
             if (now - timestamp) < self.ttl:
                 self._hits += 1
-                # Recency for LRU eviction; keep the original timestamp so TTL stays absolute.
                 self.cache.move_to_end(key)
+                self.cache[key] = (value, now)
                 logger.debug("L1 cache hit for key: %s...", key[:20])
                 return value
             del self.cache[key]
