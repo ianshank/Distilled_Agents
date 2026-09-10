@@ -6,71 +6,24 @@ A comprehensive system for training, deploying, and managing distilled AI agents
 
 ```
 Distilled_Agents/
-├── config/                        # Configuration files
-│   └── requirements.txt          # Python dependencies
-├── data/                          # Training and test data
-│   ├── training/                 # Training datasets (.jsonl files)
-│   │   ├── architect_agent.jsonl
-│   │   ├── architect_agent_real_data.jsonl
-│   │   ├── devops_agent.jsonl
-│   │   ├── product_manager_agent_real_data.jsonl
-│   │   ├── sample_training_data.jsonl
-│   │   ├── sqe_agent.jsonl
-│   │   ├── sqe_agent_real_data.jsonl
-│   │   ├── swe_agent.jsonl
-│   │   ├── swe_agent_real_data.jsonl
-│   │   ├── tools_agent.jsonl
-│   │   └── vp_product_agent.jsonl
-│   └── samples/                  # Sample data for testing
-├── docs/                          # Documentation
-│   ├── README_AGENT_DISTILLATION.md
-│   ├── README_SAGEMAKER_LAUNCHER.md
-│   ├── README_SAGEMAKER_TRAINING.md
-│   ├── IMPLEMENTATION_SUMMARY.md
-│   ├── REFACTORING_SUMMARY.md
-│   └── TEST_FIXES_NEEDED.md
-├── enhanced_system/               # Core enhanced inference system
-│   ├── config/                   # System configuration
-│   ├── core/                     # Core components
-│   │   ├── adaptive_router.py
-│   │   ├── cache_manager.py
-│   │   ├── confidence_calibrator.py
-│   │   ├── consensus_inference.py
-│   │   ├── error_handler.py
-│   │   ├── input_validator.py
-│   │   └── monitoring.py
-│   ├── evaluation/               # Evaluation tools
-│   └── tests/                    # Unit and integration tests
-│       ├── unit/
-│       └── integration/
-├── scripts/                       # Operational scripts
-│   ├── deployment/               # Deployment scripts
-│   │   ├── launch_all_agents_sagemaker.py
-│   │   ├── launch_sagemaker_training_jobs.py
-│   │   ├── run_sagemaker_training.py
-│   │   ├── sagemaker_distillation_job.py
-│   │   ├── simple_launch_sagemaker.py
-│   │   └── simple_launch_sagemaker_cpu.py
-│   ├── evaluation/               # Evaluation scripts
-│   │   ├── evaluate_agent_skill.py
-│   │   └── register_agent_skill.py
-│   ├── infrastructure/           # Infrastructure setup
-│   │   ├── notify_failure.py
-│   │   ├── security_scan.py
-│   │   ├── setup_infrastructure.py
-│   │   └── verify_infrastructure.py
-│   ├── training/                 # Training scripts
-│   │   ├── train_agent_skill.py
-│   │   ├── train_distilled_adapter.py
-│   │   └── train_software_development_agent.py
-│   ├── generate_deployment_summary.py
-│   ├── inference.py              # Main inference script
-│   ├── package_to_onnx.py
-│   └── validate_dataset.py
-└── tests/                         # Root-level tests
-    ├── quick_test.py
-    └── test_software_dev_agent.py
-
+├── pyproject.toml                 # Installable package, pytest, ruff, coverage
+├── tox.ini                        # Root test/lint environments
+├── LICENSE
+├── .github/                       # CI, Dependabot, CODEOWNERS
+├── configs/                       # Hoisted YAML + agent profiles
+├── config/                        # SageMaker image requirements
+│   └── requirements.txt
+├── data/training/                 # Training datasets (.jsonl)
+├── docs/                          # Guides and ADRs
+│   └── adr/
+├── enhanced_system/               # Installable inference library
+│   ├── config/
+│   ├── core/
+│   ├── evaluation/
+│   ├── ops/                       # Shared SageMaker launcher + settings
+│   └── tests/
+├── scripts/                       # Thin CLIs over shared modules
+└── tests/                         # Root pytest (training-data smoke tests)
 ```
 
 ## Getting Started
@@ -83,10 +36,14 @@ python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-2. Install dependencies:
+2. Install the package (library + test tools):
 ```bash
-pip install -r config/requirements.txt
+pip install -e ".[dev]"
 ```
+
+SageMaker training images still use `config/requirements.txt` (ML + AWS only). Copy `.env.example` to `.env` for local overrides. Use an IAM role or `aws login`; do not commit access keys.
+
+CI runs on GitHub Actions (`.github/workflows/ci.yml`). ADRs live in `docs/adr/`. License: MIT.
 
 ### Quick Start
 
@@ -170,4 +127,4 @@ pytest --tb=short
 
 ## License
 
-[Add your license information here]
+MIT. See [LICENSE](LICENSE).

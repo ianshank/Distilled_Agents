@@ -54,11 +54,8 @@ enhanced_system/
 ### Installation
 
 ```bash
-# Install dependencies
-pip install -r enhanced_system/requirements.txt
-
-# For development
-pip install -r enhanced_system/requirements-dev.txt
+# Install the installable library plus test tools from the repo root
+pip install -e ".[dev]"
 ```
 
 ### Basic Usage
@@ -68,7 +65,7 @@ from enhanced_system.core import InputValidator, IntelligentCacheManager
 from enhanced_system.config import load_config
 
 # Load configuration
-config = load_config('default')
+config = load_config("default")
 
 # Input validation
 validator = InputValidator(config.input_validation)
@@ -84,9 +81,11 @@ else:
 cache_manager = IntelligentCacheManager(config.caching)
 cache_key = cache_manager.compute_cache_key(task, "agent_name")
 
+
 # Get or compute result
 async def compute():
     return await your_agent_function(task)
+
 
 result = await cache_manager.get_or_compute(cache_key, compute)
 ```
@@ -103,7 +102,7 @@ result = validator.validate_task_input(task)
 
 # Features:
 # - Length validation
-# - SQL/Command/Prompt injection detection  
+# - SQL/Command/Prompt injection detection
 # - PII detection and redaction
 # - Content policy enforcement
 ```
@@ -131,17 +130,10 @@ retry_handler = IntelligentRetryHandler(config)
 fallback_manager = FallbackManager(config)
 
 # Intelligent retry with exponential backoff
-result = await retry_handler.execute_with_retry(
-    agent_function,
-    task,
-    agent="my_agent"
-)
+result = await retry_handler.execute_with_retry(agent_function, task, agent="my_agent")
 
 # Multi-level fallback strategies
-result = await fallback_manager.execute_with_fallback(
-    primary_function,
-    task
-)
+result = await fallback_manager.execute_with_fallback(primary_function, task)
 ```
 
 ### 4. Confidence Calibration
@@ -152,11 +144,7 @@ from enhanced_system.core import ConfidenceCalibrator
 calibrator = ConfidenceCalibrator(config)
 
 # Calibrate confidence scores
-result = calibrator.calibrate_confidence(
-    raw_confidence=0.8,
-    agent="my_agent",
-    task_type="coding"
-)
+result = calibrator.calibrate_confidence(raw_confidence=0.8, agent="my_agent", task_type="coding")
 
 print(f"Confidence: {result.confidence:.2%}")
 print(f"Band: {result.reliability_band.value}")
@@ -172,8 +160,7 @@ consensus = ConsensusInference(config)
 
 # Run multiple agents and get consensus
 result = await consensus.infer_with_consensus(
-    task="Design a microservices architecture",
-    agent_funcs=[agent1, agent2, agent3]
+    task="Design a microservices architecture", agent_funcs=[agent1, agent2, agent3]
 )
 
 print(f"Agreement: {result.agreement_score:.2%}")
@@ -189,8 +176,7 @@ router = AdaptiveRouter(config)
 
 # Route task to optimal agents
 decision = router.route_task(
-    task="Implement a RESTful API",
-    constraints={'max_cost': 0.02, 'min_quality': 0.85}
+    task="Implement a RESTful API", constraints={"max_cost": 0.02, "min_quality": 0.85}
 )
 
 print(f"Selected agents: {decision.selected_agents}")
@@ -206,7 +192,7 @@ streamer = StreamingInference(config)
 
 # Stream tokens in real-time
 async for token in streamer.stream_response(generate_func, task):
-    print(token.token, end='', flush=True)
+    print(token.token, end="", flush=True)
     if token.confidence and token.confidence < 0.3:
         print("\n[Low confidence detected]")
 ```
@@ -220,10 +206,7 @@ processor = BatchProcessor(config)
 await processor.start()
 
 # Submit requests with priority
-result = await processor.submit_request(
-    task="Generate unit tests",
-    priority=Priority.HIGH
-)
+result = await processor.submit_request(task="Generate unit tests", priority=Priority.HIGH)
 
 await processor.stop()
 ```
@@ -239,12 +222,7 @@ monitor = AgentMonitor(config)
 monitor.track_inference(
     agent="swe_agent",
     task=task,
-    result={
-        'latency_ms': 150,
-        'token_count': 500,
-        'confidence': 0.92,
-        'success': True
-    }
+    result={"latency_ms": 150, "token_count": 500, "confidence": 0.92, "success": True},
 )
 
 # Get statistics
@@ -267,15 +245,15 @@ orchestrator.add_training_job(
     job_id="base_agent",
     agent_name="base",
     dataset_path="s3://bucket/base_data.jsonl",
-    model_config={'epochs': 5}
+    model_config={"epochs": 5},
 )
 
 orchestrator.add_training_job(
     job_id="swe_agent",
     agent_name="swe",
     dataset_path="s3://bucket/swe_data.jsonl",
-    model_config={'epochs': 5},
-    dependencies=["base_agent"]  # Train after base_agent
+    model_config={"epochs": 5},
+    dependencies=["base_agent"],  # Train after base_agent
 )
 
 # Train all agents in parallel
@@ -305,19 +283,15 @@ curated_data = curator.curate_dataset(raw_data)
 from enhanced_system.training import AdaptiveTrainingConfig
 
 # Create configuration
-config = AdaptiveTrainingConfig.from_dict({
-    'batch_size': 16,
-    'num_epochs': 5,
-    'learning_rate': 5e-5,
-    'early_stopping': {
-        'enabled': True,
-        'patience': 5
-    },
-    'lr_schedule': {
-        'strategy': 'cosine_annealing',
-        'warmup_steps': 1000
+config = AdaptiveTrainingConfig.from_dict(
+    {
+        "batch_size": 16,
+        "num_epochs": 5,
+        "learning_rate": 5e-5,
+        "early_stopping": {"enabled": True, "patience": 5},
+        "lr_schedule": {"strategy": "cosine_annealing", "warmup_steps": 1000},
     }
-})
+)
 
 # Get adaptive learning rate
 lr = config.calculate_lr(step=500, total_steps=10000)
@@ -334,9 +308,7 @@ evaluator = SkillEvaluator()
 
 # Evaluate agent
 result = evaluator.evaluate_agent(
-    agent_name="swe_agent",
-    test_suite=test_cases,
-    agent_func=agent.infer
+    agent_name="swe_agent", test_suite=test_cases, agent_func=agent.infer
 )
 
 # View report
@@ -358,7 +330,7 @@ experiment_id = ab_test.create_experiment(
     name="Model v2 vs v1",
     control_model="model_v1",
     treatment_model="model_v2",
-    traffic_split=0.1  # 10% to treatment
+    traffic_split=0.1,  # 10% to treatment
 )
 
 # Route requests
@@ -392,7 +364,7 @@ Or programmatically:
 ```python
 from enhanced_system.config import load_config
 
-config = load_config('production')
+config = load_config("production")
 ```
 
 ## 🔧 Infrastructure
@@ -480,17 +452,17 @@ pre-commit run --all-files
 
 ## 📚 Documentation
 
-- [Configuration Guide](docs/configuration.md)
-- [Deployment Guide](docs/deployment.md)
-- [API Reference](docs/api_reference.md)
-- [Migration Guide](docs/migration.md)
+- [Configuration YAML](config/default.yaml)
+- [SageMaker training](../docs/README_SAGEMAKER_TRAINING.md)
+- [Architecture decisions](../docs/adr/0001-json-cache-serialization.md)
+- [Testing](TESTING.md)
 
 ## 🤝 Contributing
 
 1. Follow PEP 8 style guidelines
 2. Add unit tests for new features
 3. Update documentation
-4. Run linters: `black`, `flake8`, `mypy`
+4. Run tests: `pytest -m unit`
 
 ## 📄 License
 

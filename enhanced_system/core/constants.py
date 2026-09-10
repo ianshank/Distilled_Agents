@@ -266,4 +266,3 @@ FACTOR_WEIGHT_TRAINING_COVERAGE: Final[float] = 0.3
 
 FACTOR_WEIGHT_OUTPUT_CONSISTENCY: Final[float] = 0.2
 """Weight for output consistency factor."""
-

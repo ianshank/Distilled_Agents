@@ -1,0 +1,65 @@
+{
+  "agents": [
+    {
+      "agent_id": "base_agent",
+      "name": "Base Agent",
+      "specializations": ["general"],
+      "cost": 0.005,
+      "quality_score": 0.7,
+      "speed": 150.0,
+      "capabilities": ["general_tasks"],
+      "max_complexity": "medium"
+    },
+    {
+      "agent_id": "swe_agent",
+      "name": "Software Engineer Agent",
+      "specializations": ["coding", "debugging", "implementation"],
+      "cost": 0.015,
+      "quality_score": 0.9,
+      "speed": 100.0,
+      "capabilities": ["code_generation", "debugging", "refactoring", "code_review"],
+      "max_complexity": "complex"
+    },
+    {
+      "agent_id": "architect_agent",
+      "name": "Principal Architect Agent",
+      "specializations": ["design", "architecture", "planning", "analysis"],
+      "cost": 0.02,
+      "quality_score": 0.95,
+      "speed": 80.0,
+      "capabilities": ["system_design", "architecture", "planning", "technical_strategy"],
+      "max_complexity": "complex"
+    },
+    {
+      "agent_id": "sqe_agent",
+      "name": "Quality Engineer Agent",
+      "specializations": ["testing", "qa", "validation"],
+      "cost": 0.01,
+      "quality_score": 0.85,
+      "speed": 120.0,
+      "capabilities": ["test_design", "qa", "validation", "test_automation"],
+      "max_complexity": "complex"
+    },
+    {
+      "agent_id": "devops_agent",
+      "name": "DevOps Engineer Agent",
+      "specializations": ["deployment", "infrastructure", "cicd"],
+      "cost": 0.012,
+      "quality_score": 0.88,
+      "speed": 110.0,
+      "capabilities": ["deployment", "infrastructure", "cicd", "monitoring"],
+      "max_complexity": "complex"
+    },
+    {
+      "agent_id": "security_agent",
+      "name": "Security Specialist Agent",
+      "specializations": ["security", "vulnerability", "auth"],
+      "cost": 0.018,
+      "quality_score": 0.92,
+      "speed": 90.0,
+      "capabilities": ["security_audit", "vulnerability_assessment", "secure_coding"],
+      "max_complexity": "complex"
+    }
+  ]
+}
+

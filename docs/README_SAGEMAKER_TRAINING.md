@@ -51,12 +51,10 @@ The MangoMAS SageMaker Training System provides automated training for specializ
 # Install required packages
 pip install sagemaker boto3 transformers datasets torch
 
-# Configure AWS credentials
-aws configure
-# or set environment variables:
-export AWS_ACCESS_KEY_ID=your_access_key
-export AWS_SECRET_ACCESS_KEY=your_secret_key
-export AWS_REGION=us-east-1
+# Configure AWS credentials via SSO/profile or an instance role.
+# Do not commit access keys. Local-dev only: `aws configure` or `aws login`.
+export AWS_REGION="${AWS_REGION:-us-east-1}"
+export SAGEMAKER_ROLE_ARN="${SAGEMAKER_ROLE_ARN:-}"
 ```
 
 ### **SageMaker Role Setup**
