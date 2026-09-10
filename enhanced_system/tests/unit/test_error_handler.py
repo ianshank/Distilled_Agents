@@ -8,6 +8,7 @@ import pytest
 from enhanced_system.core.constants import DEFAULT_BASE_DELAY, DEFAULT_MAX_RETRIES
 from enhanced_system.core.enums import ErrorType
 from enhanced_system.core.error_handler import (
+    AllStrategiesFailedError,
     ErrorLearner,
     ErrorRecord,
     FallbackManager,
@@ -162,7 +163,7 @@ class TestFallbackManager:
             raise Exception("Always fails")
 
         manager.register_fallback(failing_agent, name="fallback")
-        with pytest.raises(Exception, match="All strategies failed"):
+        with pytest.raises(AllStrategiesFailedError, match="All strategies failed"):
             await manager.execute_with_fallback(failing_agent, "Test task")
 
     def test_register_fallback(self, test_config):
@@ -215,3 +216,8 @@ class TestErrorLearner:
             )
         )
         assert learner.get_error_stats()["total_errors"] == 0
+
+    def test_s3_uri_falls_back_to_local_sqlite(self):
+        learner = ErrorLearner(db_path="s3://production-agent-data/errors/", enabled=False)
+        assert not learner.db_path.startswith("s3://")
+        assert learner.db_path.endswith("errors.db")

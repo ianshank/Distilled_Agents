@@ -26,6 +26,12 @@ from enhanced_system.ops.training_system import (
 @click.option("--batch_size", default=lambda: get_settings().skill_batch_size, type=int)
 @click.option("--learning_rate", default=lambda: get_settings().skill_learning_rate, type=float)
 @click.option("--output_dir", required=True)
+@click.option(
+    "--mock",
+    is_flag=True,
+    default=False,
+    help="Return synthetic artifacts without launching SageMaker.",
+)
 @click.option("--region", default=lambda: os.getenv("AWS_REGION", get_settings().aws_region))
 @click.option("--bucket", default=lambda: get_settings().training_data_bucket)
 @click.option("--table", default=lambda: get_settings().dynamodb_table)
@@ -39,6 +45,7 @@ def train_agent(
     batch_size,
     learning_rate,
     output_dir,
+    mock,
     region,
     bucket,
     table,
@@ -55,7 +62,7 @@ def train_agent(
         learning_rate=learning_rate,
         epochs=epochs,
         instance_type=instance_type,
-        use_mock_training=not system.aws_available,
+        use_mock_training=mock,
     )
     result = asyncio.run(system.train_agent_skill(training))
     if result.get("status") == "success":

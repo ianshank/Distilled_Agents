@@ -26,7 +26,7 @@ class MangoMASSettings(BaseSettings):
     cpu_instance_type: str = Field(default="ml.m5.large")
     teacher_model: str = Field(default="mistralai/Mistral-7B-v0.1")
     student_model: str = Field(default="microsoft/DialoGPT-medium")
-    cpu_model: str = Field(default="distilbert-base-uncased")
+    cpu_model: str = Field(default="distilgpt2")
     max_run_seconds: int = Field(default=7200)
     trust_remote_code: bool = Field(default=False)
     bind_host: str = Field(default="127.0.0.1")

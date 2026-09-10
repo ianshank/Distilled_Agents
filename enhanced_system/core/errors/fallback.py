@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any, Callable, Optional
 
 from enhanced_system.core.errors.learner import ErrorLearner
-from enhanced_system.core.errors.types import ErrorRecord
+from enhanced_system.core.errors.types import AllStrategiesFailedError, ErrorRecord
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,9 @@ class FallbackManager:
                     resolved=False,
                 )
             )
-        raise Exception(f"All strategies failed. Primary error: {primary_error}")
+        raise AllStrategiesFailedError(
+            f"All strategies failed. Primary error: {primary_error}"
+        ) from primary_error
 
     def _is_acceptable_result(self, result: Any) -> bool:
         if result is None:

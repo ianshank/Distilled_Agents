@@ -33,5 +33,5 @@ jobs:
           cache: pip
       - name: pip-audit
         run: |
-          pip install pip-audit
-          pip-audit || true
+          pip install -e ".[dev]"
+          pip-audit

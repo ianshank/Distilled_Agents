@@ -14,6 +14,7 @@ from enhanced_system.ops.training_system import (
 from enhanced_system.ops.training_system import (
     AutomatedTrainingSystem,
     InfrastructureConfig,
+    RegisteredSkill,
     SkillTrainingConfig,
 )
 
@@ -33,6 +34,7 @@ def test_training_source_dir_includes_distill():
     assert source.name == "training" or (source / "distill").exists()
     assert (source / "distill").is_dir()
     assert (source / "train_distilled_adapter.py").exists()
+    assert (source / "requirements.txt").exists()
 
 
 @pytest.mark.unit
@@ -40,6 +42,9 @@ def test_create_job_spec_disables_trust_remote_code(tmp_path):
     launcher = MangoMASSageMakerLauncher(data_dir=tmp_path)
     spec = launcher.create_job_spec(launcher.agent_configs[0])
     assert spec["hyperparameters"]["trust_remote_code"] == "false"
+    assert spec["hyperparameters"]["teacher_model_name"]
+    assert spec["hyperparameters"]["student_model_name"]
+    assert "model_name_or_path" not in spec["hyperparameters"]
 
 
 @pytest.mark.unit
@@ -80,7 +85,33 @@ def test_deprecated_skill_alias_warns():
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_automated_training_system_success_and_fail_shapes():
+async def test_launch_all_jobs_refuses_when_upload_fails(tmp_path, monkeypatch):
+    launcher = MangoMASSageMakerLauncher(data_dir=tmp_path)
+    for config in launcher.agent_configs:
+        (tmp_path / config.training_file).write_text('{"prompt": "x"}\n', encoding="utf-8")
+    monkeypatch.delenv("MANGOMAS_SKIP_UPLOAD", raising=False)
+    monkeypatch.setattr(launcher, "upload_training_data_to_s3", lambda *_a, **_k: False)
+    assert await launcher.launch_all_jobs() == []
+
+
+@pytest.mark.unit
+def test_create_job_spec_uses_cpu_models_when_set(tmp_path):
+    launcher = MangoMASSageMakerLauncher(data_dir=tmp_path)
+    spec = launcher.create_job_spec(
+        AgentTrainingConfig(
+            agent_name="swe_agent",
+            training_file="swe.jsonl",
+            model_name="distilgpt2",
+            student_model="distilgpt2",
+        )
+    )
+    assert spec["hyperparameters"]["teacher_model_name"] == "distilgpt2"
+    assert spec["hyperparameters"]["student_model_name"] == "distilgpt2"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_automated_training_system_success_and_fail_shapes(tmp_path):
     system = AutomatedTrainingSystem(
         InfrastructureConfig(aws_region="us-west-2", s3_bucket="b", dynamodb_table="t")
     )
@@ -106,8 +137,44 @@ async def test_automated_training_system_success_and_fail_shapes():
     assert "error" in missing
 
     setup = await system.setup_infrastructure()
-    assert setup["status"] == "completed"
+    assert setup["status"] == "mock"
     assert setup["mode"] == "mock"
+    assert setup["error"]
+
+    missing_suite = await system.evaluate_agent_skill("swe", "missing-suite.json", 85)
+    assert missing_suite.pass_rate == 0
+    assert missing_suite.error
+
+    registered = await system.register_skill(
+        RegisteredSkill(role="swe", adapter_uri="s3://x", pass_rate=90, model="m")
+    )
+    assert registered["status"] == "failed"
+
+    suite = tmp_path / "suite.json"
+    suite.write_text(
+        '{"tests": [{"passed": true}, {"passed": false}, {"expected": "ok", "actual": "ok"}]}',
+        encoding="utf-8",
+    )
+    scored = await system.evaluate_agent_skill("swe", str(suite), 90)
+    assert scored.total_tests == 3
+    assert scored.passed_tests == 2
+    assert scored.pass_rate == pytest.approx(200 / 3)
+    assert scored.error
+
+    onnx = await system.package_onnx("swe", "missing-adapter.bin", "out.onnx")
+    assert onnx["status"] == "failed"
+
+    dataset = tmp_path / "data.jsonl"
+    dataset.write_text('{"prompt": "x", "completion": "y"}\n', encoding="utf-8")
+    aws_train = await system.train_agent_skill(
+        SkillTrainingConfig(
+            role="swe",
+            dataset_path=str(dataset),
+            base_model="m",
+            use_mock_training=False,
+        )
+    )
+    assert aws_train["status"] == "failed"
 
 
 @pytest.mark.unit

@@ -28,6 +28,7 @@ class AgentTrainingConfig:
     max_length: int = 512
     use_spot_instances: bool = True
     max_runtime: int = 0
+    student_model: str = ""
 
 
 class MangoMASSageMakerLauncher:
@@ -208,8 +209,9 @@ class MangoMASSageMakerLauncher:
             "role": self._get_execution_role(),
             "bucket": self._get_s3_bucket(),
             "hyperparameters": {
-                "model_name_or_path": config.model_name or self.settings.teacher_model,
-                "train_file": config.training_file,
+                "teacher_model_name": config.model_name or self.settings.teacher_model,
+                "student_model_name": config.student_model or self.settings.student_model,
+                "train_file": Path(config.training_file).name,
                 "num_train_epochs": str(config.epochs),
                 "per_device_train_batch_size": str(config.batch_size),
                 "learning_rate": str(config.learning_rate),
@@ -238,7 +240,7 @@ class MangoMASSageMakerLauncher:
                 output_path=f"s3://{spec['bucket']}/models/{config.agent_name}/",
             )
             estimator.fit(
-                {"training": f"s3://{spec['bucket']}/datasets/{config.training_file}"},
+                {"train": f"s3://{spec['bucket']}/datasets/{Path(config.training_file).name}"},
                 wait=False,
             )
             return {
@@ -264,6 +266,12 @@ class MangoMASSageMakerLauncher:
     ) -> list[dict[str, Any]]:
         if not self.validate_training_data():
             logger.error("Refusing to launch: training data missing")
+            return []
+        skip_upload = os.getenv("MANGOMAS_SKIP_UPLOAD", "").lower() in {"1", "true", "yes"}
+        if skip_upload:
+            logger.warning("Skipping S3 upload because MANGOMAS_SKIP_UPLOAD is set")
+        elif not self.upload_training_data_to_s3():
+            logger.error("Refusing to launch: training data was not uploaded to S3")
             return []
         concurrent = max_concurrent or self.settings.max_concurrent_jobs
         semaphore = asyncio.Semaphore(concurrent)

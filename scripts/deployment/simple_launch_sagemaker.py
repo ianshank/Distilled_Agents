@@ -21,6 +21,13 @@ def launch_sagemaker_training_jobs(use_cpu: bool = False):
     )
     if use_cpu:
         launcher.agent_configs = launcher.agent_configs[:3]
+        for config in launcher.agent_configs:
+            config.instance_type = settings.cpu_instance_type
+            config.model_name = settings.cpu_model
+            config.student_model = settings.cpu_model
+            config.epochs = 1
+            config.batch_size = 1
+            config.use_spot_instances = False
     return asyncio.run(launcher.launch_all_jobs())
 
 

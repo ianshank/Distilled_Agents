@@ -75,19 +75,33 @@ class TestIntelligentCacheManager:
         assert cache.l1_cache.get("key_3") is not None
         assert cache.l1_cache.get("key_4") is not None
 
+    def test_l1_cache_get_refreshes_lru(self, cache_config):
+        cache_config["l1"]["max_size"] = 2
+        cache = IntelligentCacheManager(cache_config)
+        cache.l1_cache.set("a", 1)
+        cache.l1_cache.set("b", 2)
+        assert cache.l1_cache.get("a") == 1
+        cache.l1_cache.set("c", 3)
+        assert cache.l1_cache.get("a") == 1
+        assert cache.l1_cache.get("b") is None
+
     def test_compute_cache_key_basic(self, cache_config):
-        """Test basic cache key computation."""
+        """Cache keys are deterministic for the same request."""
         cache = IntelligentCacheManager(cache_config)
 
         key1 = cache.compute_cache_key("test task", "agent1", {"param": "value"})
         key2 = cache.compute_cache_key("test task", "agent1", {"param": "value"})
         key3 = cache.compute_cache_key("different task", "agent1", {"param": "value"})
 
-        # Same inputs should produce same key
         assert key1 == key2
-
-        # Different inputs should produce different keys
         assert key1 != key3
+
+    def test_compute_cache_key_differs_by_agent(self, cache_config):
+        cache_config["semantic_similarity"]["enabled"] = False
+        cache = IntelligentCacheManager(cache_config)
+        first = cache.compute_cache_key("same task", "agent1", {})
+        second = cache.compute_cache_key("same task", "agent2", {})
+        assert first != second
 
     def test_compute_cache_key_order_invariant(self, cache_config):
         """Test that cache key is invariant to parameter order."""

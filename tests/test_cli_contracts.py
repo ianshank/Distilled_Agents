@@ -42,3 +42,30 @@ def test_train_cli_uses_skill_training_config():
     source = (REPO / "scripts" / "training" / "train_agent_skill.py").read_text(encoding="utf-8")
     assert "SkillTrainingConfig" in source
     assert "AgentTrainingConfig(" not in source
+    assert "use_mock_training=mock" in source
+    assert "is_flag=True" in source
+
+
+@pytest.mark.regression
+def test_simple_launch_cpu_flag_uses_cpu_model():
+    source = (REPO / "scripts" / "deployment" / "simple_launch_sagemaker.py").read_text(
+        encoding="utf-8"
+    )
+    assert "settings.cpu_model" in source
+    assert "settings.cpu_instance_type" in source
+
+
+@pytest.mark.regression
+def test_cpu_launcher_wrapper_always_enables_cpu():
+    source = (REPO / "scripts" / "deployment" / "simple_launch_sagemaker_cpu.py").read_text(
+        encoding="utf-8"
+    )
+    assert "use_cpu=True" in source
+
+
+@pytest.mark.regression
+def test_setup_cli_rejects_mock_status():
+    source = (REPO / "scripts" / "infrastructure" / "setup_infrastructure.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'result.get("status") == "completed"' in source

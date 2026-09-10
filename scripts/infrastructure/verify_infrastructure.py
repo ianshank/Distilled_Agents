@@ -17,11 +17,11 @@ from enhanced_system.ops.training_system import AutomatedTrainingSystem, Infrast
 @click.option("--table", default=lambda: get_settings().dynamodb_table)
 def verify_infrastructure(region, bucket, table):
     config = InfrastructureConfig(aws_region=region, s3_bucket=bucket, dynamodb_table=table)
-    system = AutomatedTrainingSystem(config)
-    if system.aws_available:
+    result = AutomatedTrainingSystem(config).verify_resources()
+    if result.get("status") == "verified":
         print("AWS infrastructure verified")
         sys.exit(0)
-    print("AWS infrastructure not available (mock mode)")
+    print(f"AWS infrastructure not available: {result.get('error', result)}")
     sys.exit(1)
 
 

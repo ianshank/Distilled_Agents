@@ -49,8 +49,23 @@ def test_resolve_train_file_empty_dir(tmp_path):
 
 
 @pytest.mark.unit
+def test_resolve_train_file_training_channel(tmp_path, monkeypatch):
+    channel = tmp_path / "training"
+    channel.mkdir()
+    target = channel / "job.jsonl"
+    target.write_text('{"prompt": "x", "completion": "y"}\n', encoding="utf-8")
+    monkeypatch.setenv("SM_CHANNEL_TRAINING", str(channel))
+    monkeypatch.delenv("SM_CHANNEL_TRAIN", raising=False)
+    assert resolve_train_file() == str(target)
+    named = channel / "named.jsonl"
+    named.write_text("{}\n", encoding="utf-8")
+    assert resolve_train_file(train_file="named.jsonl").endswith("named.jsonl")
+
+
+@pytest.mark.unit
 def test_texts_from_examples_fallbacks():
     assert texts_from_examples({"prompt": ["a"]}) == ["a"]
+    assert texts_from_examples({"prompt": ["p"], "completion": ["c"]}) == ["p\nc"]
     assert texts_from_examples({"text": ["b"]}) == ["b"]
     assert texts_from_examples({"input": ["c"]}) == ["c"]
     assert texts_from_examples({"other": ["d"]}) == ["d"]

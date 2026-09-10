@@ -7,6 +7,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from enhanced_system.core.enums import RoutingStrategy, TaskComplexity
@@ -144,7 +145,12 @@ class AdaptiveRouter:
             return
 
         try:
-            with open(profiles_path) as f:
+            resolved = Path(profiles_path)
+            if not resolved.exists():
+                packaged = Path(__file__).resolve().parents[1] / "config" / "agent_profiles.json"
+                if packaged.exists():
+                    resolved = packaged
+            with open(resolved) as f:
                 profiles_data = json.load(f)
 
             for profile_data in profiles_data.get("agents", []):

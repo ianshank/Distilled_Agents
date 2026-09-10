@@ -74,7 +74,7 @@ class AgentDistillationTrainer:
         )
 
     def prepare_dataset(self) -> Dataset:
-        train_file = resolve_train_file()
+        train_file = resolve_train_file(train_file=getattr(self.args, "train_file", None))
         dataset = load_dataset("json", data_files={"train": train_file})  # nosec B615
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
 

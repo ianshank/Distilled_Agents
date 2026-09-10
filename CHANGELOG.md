@@ -19,6 +19,10 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 - `scripts/deployment/run_sagemaker_training.py` imports `MangoMASSageMakerLauncher` from `enhanced_system.ops` and reads region from `get_settings()`.
 - Distill/inference bind host, `trust_remote_code`, and model revision go through `get_settings()` with env fallback for SageMaker images.
 - Docker runtime image uses Python 3.11; false `:8080/health` HEALTHCHECK removed.
+- Ops CLIs no longer report mock AWS, unevaluated suites, missing adapters, or unregistered skills as success. Training mock mode is an explicit `--mock` flag.
+- SageMaker jobs upload datasets before `fit`, use the `train` channel plus `teacher_model_name`/`student_model_name` hyperparameters, and honor `--train_file`.
+- L1 cache eviction is LRU; semantic cache keys are namespaced by agent and params.
+- Packaged `agent_profiles.json` is used when `./configs/agent_profiles.json` is absent after install.
 
 ### Deprecated
 

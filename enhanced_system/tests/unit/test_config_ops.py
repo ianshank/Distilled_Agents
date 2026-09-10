@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from enhanced_system.config.builders import ConfigBuilder
 from enhanced_system.core.cache.serialize import dumps, loads
@@ -85,6 +87,7 @@ def test_load_config_default():
     config = load_config("default")
     assert config.input_validation.max_length >= 1
     assert "agent_profiles" in config.routing.agent_profiles_path
+    assert Path(config.routing.agent_profiles_path).exists()
 
 
 @pytest.mark.unit
@@ -95,3 +98,4 @@ def test_distill_io_helpers(tmp_path):
     sample.write_text('{"prompt": "hello"}\n', encoding="utf-8")
     assert resolve_train_file(str(tmp_path)).endswith("sample.jsonl")
     assert texts_from_examples({"prompt": ["a"]}) == ["a"]
+    assert texts_from_examples({"prompt": ["p"], "completion": ["c"]}) == ["p\nc"]

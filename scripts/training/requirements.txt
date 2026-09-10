@@ -1,6 +1,7 @@
 # Installed by SageMaker from source_dir (scripts/training).
+# Pin torch to the HuggingFace estimator pytorch_version (1.13.1).
 # Keep peft==0.4.0: training-image compatibility pin, not a silent upgrade.
-torch>=2.0.0
+torch==1.13.1
 transformers>=4.30.0
 datasets>=2.12.0
 accelerate>=0.22.0
