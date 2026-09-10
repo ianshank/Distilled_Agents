@@ -116,7 +116,7 @@ The following files were updated to reflect the new directory structure:
 ### 2. `scripts/deployment/run_sagemaker_training.py`
 - **Line 15**: Updated import path
   ```python
-  from scripts.deployment.launch_all_agents_sagemaker import MangoMASSageMakerLauncher
+  from enhanced_system.ops import MangoMASSageMakerLauncher
   ```
 - **Lines 45-76**: Updated validation paths to check both `data/training/` and `scripts/training/`
 

@@ -89,6 +89,7 @@ python_functions = ["test_*"]
 markers = [
     "unit: Unit tests",
     "integration: Integration tests",
+    "regression: CLI/import/contract tests",
     "e2e: End-to-end tests",
     "slow: Slow running tests",
     "benchmark: Performance benchmarks",
@@ -110,7 +111,7 @@ omit = [
 precision = 2
 show_missing = true
 skip_covered = false
-fail_under = 60
+fail_under = 65
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
@@ -147,11 +148,12 @@ ignore = [
 quote-style = "double"
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
 check_untyped_defs = true
+follow_imports = "silent"
 
 [tool.bandit]
 exclude_dirs = ["tests", "enhanced_system/tests", ".venv", "enhanced_system/examples"]

@@ -333,4 +333,4 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "integration: Integration tests")
     config.addinivalue_line("markers", "e2e: End-to-end tests")
     config.addinivalue_line("markers", "slow: Slow running tests")
-    config.addinivalue_line("markers", "benchmark: Performance benchmark tests")
+    config.addinivalue_line("markers", "regression: CLI/import/contract tests")

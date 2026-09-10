@@ -18,6 +18,37 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _optional_settings():
+    """Load settings when the library is on PYTHONPATH (not always true on SM)."""
+    try:
+        from enhanced_system.ops.settings import get_settings
+
+        return get_settings()
+    except Exception:
+        return None
+
+
+def _trust_remote_code() -> bool:
+    settings = _optional_settings()
+    if settings is not None:
+        return bool(settings.trust_remote_code)
+    return os.getenv("MANGOMAS_TRUST_REMOTE_CODE", "false").lower() == "true"
+
+
+def _bind_host() -> str:
+    settings = _optional_settings()
+    if settings is not None:
+        return settings.bind_host
+    return os.getenv("MANGOMAS_BIND_HOST", os.getenv("BIND_HOST", "127.0.0.1"))
+
+
+def _bind_port() -> int:
+    settings = _optional_settings()
+    if settings is not None:
+        return int(settings.bind_port)
+    return int(os.getenv("PORT", os.getenv("MANGOMAS_BIND_PORT", "8080")))
+
+
 class DistilledAgentInference:
     """Inference handler for distilled agent models"""
 
@@ -42,8 +73,7 @@ class DistilledAgentInference:
                 model_dir,
                 torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
                 device_map="auto" if torch.cuda.is_available() else None,
-                trust_remote_code=os.getenv("MANGOMAS_TRUST_REMOTE_CODE", "false").lower()
-                == "true",
+                trust_remote_code=_trust_remote_code(),
             )
 
             # Check if LoRA adapter is present
@@ -198,7 +228,4 @@ if __name__ == "__main__":
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
-    # Run Flask app
-    port = int(os.getenv("PORT", 8080))
-    host = os.getenv("MANGOMAS_BIND_HOST", os.getenv("BIND_HOST", "127.0.0.1"))
-    app.run(host=host, port=port, debug=False)
+    app.run(host=_bind_host(), port=_bind_port(), debug=False)

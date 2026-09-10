@@ -1,0 +1,13 @@
+# MangoMAS Gitleaks config (extends the default rule set).
+title = "MangoMAS"
+
+[extend]
+useDefault = true
+
+# Fictional credentials in templates and training prompts are not secrets.
+[allowlist]
+description = "Example env template and training JSONL prompts"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)data/training/.*\.jsonl$''',
+]

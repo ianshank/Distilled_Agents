@@ -12,6 +12,7 @@ import os
 from datetime import datetime
 
 import click
+from enhanced_system.ops.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +21,17 @@ logger = logging.getLogger(__name__)
 @click.option("--environment", default="production", help="Target environment")
 @click.option("--workflow_run_id", required=True, help="GitHub workflow run ID")
 @click.option("--output", required=True, help="Output file path")
-@click.option("--region", default="us-east-1", help="AWS region")
-@click.option("--table", default="agent-skill-registry", help="DynamoDB table")
+@click.option("--region", default=lambda: get_settings().aws_region, help="AWS region")
+@click.option("--table", default=lambda: get_settings().dynamodb_table, help="DynamoDB table")
 def generate_summary(environment, workflow_run_id, output, region, table):
     """Generate deployment summary"""
-
+    logger.info(
+        "Generating deployment summary environment=%s region=%s table=%s",
+        environment,
+        region,
+        table,
+    )
     try:
-        # Query deployment results from reports
         agents_data = collect_agent_results()
 
         # Generate summary

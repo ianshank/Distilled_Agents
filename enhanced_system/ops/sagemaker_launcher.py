@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -11,6 +12,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from enhanced_system.ops.settings import MangoMASSettings, get_settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -50,6 +53,12 @@ class MangoMASSageMakerLauncher:
         self.training_results: list[dict[str, Any]] = []
         self.failed_jobs: list[dict[str, Any]] = []
         self._clients: dict[str, Any] = {}
+        logger.info(
+            "Launcher ready region=%s instance_type=%s agents=%s",
+            self.region,
+            self.instance_type,
+            len(self.agent_configs),
+        )
 
     def _find_terraform_config(self) -> Optional[str]:
         for path in (
@@ -65,7 +74,8 @@ class MangoMASSageMakerLauncher:
             return None
         try:
             with open(self.terraform_config_path, encoding="utf-8") as handle:
-                return json.load(handle)
+                loaded = json.load(handle)
+            return loaded if isinstance(loaded, dict) else None
         except OSError:
             return None
 
@@ -101,7 +111,8 @@ class MangoMASSageMakerLauncher:
         try:
             import boto3
 
-            return boto3.client("sts", region_name=self.region).get_caller_identity()["Account"]
+            account = boto3.client("sts", region_name=self.region).get_caller_identity()["Account"]
+            return str(account)
         except Exception:
             return "000000000000"
 
@@ -109,7 +120,7 @@ class MangoMASSageMakerLauncher:
         if self.role_arn:
             return self.role_arn
         if self.terraform_config and "role_arn" in self.terraform_config:
-            return self.terraform_config["role_arn"]
+            return str(self.terraform_config["role_arn"])
         env_role = os.getenv("SAGEMAKER_ROLE_ARN")
         if env_role:
             return env_role
@@ -117,7 +128,7 @@ class MangoMASSageMakerLauncher:
 
     def _get_s3_bucket(self) -> str:
         if self.terraform_config and "s3_bucket" in self.terraform_config:
-            return self.terraform_config["s3_bucket"]
+            return str(self.terraform_config["s3_bucket"])
         return self.settings.production_bucket(self._account_id())
 
     def training_source_dir(self) -> Path:
@@ -138,25 +149,34 @@ class MangoMASSageMakerLauncher:
             path = self.data_dir / config.training_file
             if not path.exists() and not Path(config.training_file).exists():
                 missing.append(config.training_file)
-        return not missing
+        if missing:
+            logger.warning("Missing training files: %s", missing)
+            return False
+        logger.info("Validated %s training files", len(self.agent_configs))
+        return True
 
     def upload_training_scripts_to_s3(self, bucket_name: Optional[str] = None) -> bool:
         """Upload train_distilled_adapter.py and the distill/ package to s3://bucket/scripts/."""
         bucket = bucket_name or self._get_s3_bucket()
         source = self.training_source_dir()
         if not source.exists():
+            logger.warning("Training source dir missing: %s", source)
             return False
         try:
             import boto3
 
             client = boto3.client("s3", region_name=self.region)
+            uploaded = 0
             for path in source.rglob("*"):
                 if not path.is_file() or path.suffix not in {".py", ".txt"}:
                     continue
                 key = f"scripts/{path.relative_to(source).as_posix()}"
                 client.upload_file(str(path), bucket, key)
+                uploaded += 1
+            logger.info("Uploaded %s training scripts to s3://%s/scripts/", uploaded, bucket)
             return True
-        except Exception:
+        except Exception as exc:
+            logger.warning("Script upload failed: %s", exc)
             return False
 
     def upload_training_data_to_s3(self, bucket_name: Optional[str] = None) -> bool:
@@ -173,8 +193,10 @@ class MangoMASSageMakerLauncher:
                 if local.exists():
                     client.upload_file(str(local), bucket, f"datasets/{config.training_file}")
             self.upload_training_scripts_to_s3(bucket)
+            logger.info("Uploaded training data to s3://%s", bucket)
             return True
-        except Exception:
+        except Exception as exc:
+            logger.warning("Upload to S3 failed: %s", exc)
             return False
 
     def create_job_spec(self, config: AgentTrainingConfig) -> dict[str, Any]:
@@ -229,6 +251,7 @@ class MangoMASSageMakerLauncher:
                 "timestamp": datetime.now().isoformat(),
             }
         except Exception as exc:
+            logger.warning("Launch failed for %s: %s", config.agent_name, exc)
             return {
                 "agent_name": config.agent_name,
                 "status": "failed",
@@ -237,11 +260,13 @@ class MangoMASSageMakerLauncher:
             }
 
     async def launch_all_jobs(
-        self, parallel: bool = True, max_concurrent: int = 3
+        self, parallel: bool = True, max_concurrent: Optional[int] = None
     ) -> list[dict[str, Any]]:
         if not self.validate_training_data():
+            logger.error("Refusing to launch: training data missing")
             return []
-        semaphore = asyncio.Semaphore(max_concurrent)
+        concurrent = max_concurrent or self.settings.max_concurrent_jobs
+        semaphore = asyncio.Semaphore(concurrent)
 
         async def _one(config: AgentTrainingConfig) -> dict[str, Any]:
             async with semaphore:
@@ -257,7 +282,7 @@ class MangoMASSageMakerLauncher:
         self.training_results = []
         self.failed_jobs = []
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 self.failed_jobs.append({"error": str(result)})
             elif result.get("status") == "failed":
                 self.failed_jobs.append(result)

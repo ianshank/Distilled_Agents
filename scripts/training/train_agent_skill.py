@@ -10,9 +10,9 @@ import sys
 import click
 from enhanced_system.ops.settings import get_settings
 from enhanced_system.ops.training_system import (
-    AgentTrainingConfig,
     AutomatedTrainingSystem,
     InfrastructureConfig,
+    SkillTrainingConfig,
 )
 
 
@@ -22,9 +22,9 @@ from enhanced_system.ops.training_system import (
 @click.option("--model", required=True)
 @click.option("--adapter_type", default="ALoRA")
 @click.option("--instance_type", default=lambda: get_settings().gpu_instance_type)
-@click.option("--epochs", default=5, type=int)
-@click.option("--batch_size", default=16, type=int)
-@click.option("--learning_rate", default=1e-4, type=float)
+@click.option("--epochs", default=lambda: get_settings().skill_epochs, type=int)
+@click.option("--batch_size", default=lambda: get_settings().skill_batch_size, type=int)
+@click.option("--learning_rate", default=lambda: get_settings().skill_learning_rate, type=float)
 @click.option("--output_dir", required=True)
 @click.option("--region", default=lambda: os.getenv("AWS_REGION", get_settings().aws_region))
 @click.option("--bucket", default=lambda: get_settings().training_data_bucket)
@@ -45,7 +45,7 @@ def train_agent(
 ):
     config = InfrastructureConfig(aws_region=region, s3_bucket=bucket, dynamodb_table=table)
     system = AutomatedTrainingSystem(config)
-    training = AgentTrainingConfig(
+    training = SkillTrainingConfig(
         role=role,
         dataset_path=dataset,
         base_model=model,

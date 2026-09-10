@@ -22,17 +22,47 @@ except ImportError:
     from distill.trainer import AgentDistillationTrainer, DistillationTrainer
 
 
+def _optional_settings():
+    try:
+        from enhanced_system.ops.settings import get_settings
+
+        return get_settings()
+    except Exception:
+        return None
+
+
 def main():
+    settings = _optional_settings()
+    teacher_default = (
+        settings.teacher_model
+        if settings is not None
+        else os.getenv("MANGOMAS_TEACHER_MODEL", "mistralai/Mistral-7B-v0.1")
+    )
+    student_default = (
+        settings.student_model
+        if settings is not None
+        else os.getenv("MANGOMAS_STUDENT_MODEL", "microsoft/DialoGPT-medium")
+    )
+    trust_default = (
+        str(settings.trust_remote_code)
+        if settings is not None
+        else os.getenv("MANGOMAS_TRUST_REMOTE_CODE", "False")
+    )
+    revision_default = (
+        settings.model_revision
+        if settings is not None
+        else os.getenv("MANGOMAS_MODEL_REVISION", "")
+    )
     parser = argparse.ArgumentParser(description="MangoMAS Agent Distillation Training")
     parser.add_argument(
         "--teacher_model_name",
         type=str,
-        default=os.getenv("MANGOMAS_TEACHER_MODEL", "mistralai/Mistral-7B-v0.1"),
+        default=teacher_default,
     )
     parser.add_argument(
         "--student_model_name",
         type=str,
-        default=os.getenv("MANGOMAS_STUDENT_MODEL", "microsoft/DialoGPT-medium"),
+        default=student_default,
     )
     parser.add_argument("--train_file", type=str, default="train.jsonl")
     parser.add_argument("--eval_file", type=str, default=None)
@@ -61,7 +91,13 @@ def main():
     parser.add_argument(
         "--trust_remote_code",
         type=str,
-        default=os.getenv("MANGOMAS_TRUST_REMOTE_CODE", "False"),
+        default=trust_default,
+    )
+    parser.add_argument(
+        "--model_revision",
+        type=str,
+        default=revision_default or None,
+        help="Optional Hugging Face revision (MANGOMAS_MODEL_REVISION)",
     )
     parser.add_argument("--logging_steps", type=int, default=100)
     parser.add_argument("--save_steps", type=int, default=500)

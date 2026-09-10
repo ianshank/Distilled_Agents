@@ -4,12 +4,26 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any, Optional
 
 from enhanced_system.core.base.cache import BaseCache
 from enhanced_system.core.cache.serialize import dumps, loads
 
 logger = logging.getLogger(__name__)
+
+
+def _default_region() -> str:
+    env_region = os.getenv("AWS_REGION") or os.getenv("MANGOMAS_AWS_REGION")
+    if env_region:
+        return env_region
+    try:
+        from enhanced_system.ops.settings import get_settings
+
+        return get_settings().aws_region
+    except Exception:
+        return "us-east-1"
+
 
 try:
     import boto3
@@ -30,7 +44,7 @@ class L3Cache(BaseCache):
         self.enabled = config.get("enabled", True) and S3_AVAILABLE
         self.bucket = config.get("bucket", "agent-cache")
         self.prefix = config.get("prefix", "enhanced-agents/")
-        self.region = config.get("region", "us-east-1")
+        self.region = config.get("region") or _default_region()
         self.s3_client = None
         self._hits = 0
         self._misses = 0

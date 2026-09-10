@@ -5,7 +5,11 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from enhanced_system.core.consensus_inference import ConsensusInference, ConsensusResult
+from enhanced_system.core.consensus_inference import (
+    AgentResponse,
+    ConsensusInference,
+    ConsensusResult,
+)
 from enhanced_system.core.enums import AgreementMethod, EnsembleMethod
 
 
@@ -192,3 +196,24 @@ class TestConsensusInference:
         result = await consensus.infer_with_consensus("Test", [agent, agent])
         assert result.metadata.get("num_agents") == 2
         assert result.agreement_score is not None
+
+    def test_exact_match_agreement_numeric(self):
+        import numpy as np
+
+        consensus = ConsensusInference(
+            {
+                "enabled": True,
+                "agreement_method": AgreementMethod.EXACT_MATCH.value,
+            }
+        )
+        identical = [
+            AgentResponse("a", "The answer is 42", 0.9, 1.0, {}),
+            AgentResponse("b", "The answer is 42", 0.85, 1.0, {}),
+            AgentResponse("c", "The answer is 42", 0.88, 1.0, {}),
+        ]
+        np.testing.assert_allclose(consensus.calculate_agreement(identical), 1.0)
+        mixed = identical[:2] + [AgentResponse("c", "different", 0.5, 1.0, {})]
+        np.testing.assert_allclose(consensus.calculate_agreement(mixed), 0.5)
+        overall = consensus._calculate_overall_confidence(identical, 1.0)
+        expected = float(np.mean([0.9, 0.85, 0.88]))
+        np.testing.assert_allclose(overall, expected)

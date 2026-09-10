@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
-"""
-MangoMAS SageMaker Agent Distillation Training Job
-Configures and launches SageMaker training jobs for agent distillation
-"""
+"""Configure and launch SageMaker training jobs for agent distillation."""
 
+from __future__ import annotations
+
+import logging
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import boto3
 import sagemaker
+from enhanced_system.ops.archive import safe_extract_tar
+from enhanced_system.ops.settings import get_settings
 from sagemaker import get_execution_role
 from sagemaker.pytorch import PyTorch
 
+logger = logging.getLogger(__name__)
+
 
 class AgentDistillationJob:
-    """SageMaker training job manager for agent distillation"""
+    """SageMaker training job manager for agent distillation."""
 
-    def __init__(self, region: str = "us-east-1"):
-        self.region = region
+    def __init__(self, region: Optional[str] = None):
+        settings = get_settings()
+        self.region = region or settings.aws_region
+        self.settings = settings
         self.sagemaker_session = sagemaker.Session()
         self.role = get_execution_role()
         self.s3_bucket = self.sagemaker_session.default_bucket()
@@ -37,27 +44,7 @@ class AgentDistillationJob:
         max_wait_time: int = 3600,
         **kwargs,
     ) -> str:
-        """
-        Create and launch a SageMaker training job for agent distillation
-
-        Args:
-            job_name: Name of the training job
-            teacher_model: HuggingFace model name for teacher
-            student_model: HuggingFace model name for student
-            train_data_s3: S3 URI for training data
-            eval_data_s3: S3 URI for evaluation data (optional)
-            instance_type: SageMaker instance type
-            instance_count: Number of instances
-            hyperparameters: Training hyperparameters
-            use_spot_instances: Whether to use spot instances
-            max_wait_time: Maximum wait time in seconds
-            **kwargs: Additional arguments
-
-        Returns:
-            Training job name
-        """
-
-        # Default hyperparameters
+        """Create and launch a SageMaker training job for agent distillation."""
         default_hyperparameters = {
             "teacher_model_name": teacher_model,
             "student_model_name": student_model,
@@ -83,17 +70,13 @@ class AgentDistillationJob:
             "use_fp16": True,
             "use_device_map": True,
             "use_wandb": False,
+            "trust_remote_code": str(self.settings.trust_remote_code).lower(),
         }
-
-        # Update with provided hyperparameters
         if hyperparameters:
             default_hyperparameters.update(hyperparameters)
-
-        # Add evaluation file if provided
         if eval_data_s3:
             default_hyperparameters["eval_file"] = "/opt/ml/input/data/eval/train.jsonl"
 
-        # Create PyTorch estimator
         estimator = PyTorch(
             entry_point="train_distilled_adapter.py",
             source_dir="training",
@@ -111,22 +94,17 @@ class AgentDistillationJob:
             base_job_name=job_name,
             **kwargs,
         )
-
-        # Prepare input data configuration
         inputs = {
             "train": sagemaker.inputs.TrainingInput(
                 s3_data=train_data_s3, content_type="application/json"
             )
         }
-
         if eval_data_s3:
             inputs["eval"] = sagemaker.inputs.TrainingInput(
                 s3_data=eval_data_s3, content_type="application/json"
             )
-
-        # Launch training job
+        logger.info("Launching distillation job %s in %s", job_name, self.region)
         estimator.fit(inputs, job_name=job_name)
-
         return job_name
 
     def create_distillation_pipeline(
@@ -138,135 +116,86 @@ class AgentDistillationJob:
         eval_data_s3: Optional[str] = None,
         **kwargs,
     ) -> str:
-        """
-        Create a complete distillation pipeline with multiple stages
-
-        Args:
-            pipeline_name: Name of the pipeline
-            teacher_model: Teacher model name
-            student_model: Student model name
-            train_data_s3: Training data S3 URI
-            eval_data_s3: Evaluation data S3 URI
-            **kwargs: Additional arguments
-
-        Returns:
-            Pipeline name
-        """
-
-        # Stage 1: Initial distillation
+        """Create a two-stage distillation pipeline."""
         stage1_job = f"{pipeline_name}-stage1-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        stage1_hyperparameters = {
-            "distillation_alpha": 0.7,
-            "temperature": 3.0,
-            "num_train_epochs": 2,
-            "learning_rate": 1e-4,
-        }
-
         self.create_training_job(
             job_name=stage1_job,
             teacher_model=teacher_model,
             student_model=student_model,
             train_data_s3=train_data_s3,
             eval_data_s3=eval_data_s3,
-            hyperparameters=stage1_hyperparameters,
+            hyperparameters={
+                "distillation_alpha": 0.7,
+                "temperature": 3.0,
+                "num_train_epochs": 2,
+                "learning_rate": 1e-4,
+            },
             **kwargs,
         )
-
-        # Stage 2: Fine-tuning
         stage2_job = f"{pipeline_name}-stage2-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        stage2_hyperparameters = {
-            "distillation_alpha": 0.3,
-            "temperature": 1.5,
-            "num_train_epochs": 1,
-            "learning_rate": 5e-5,
-        }
-
-        # Use output from stage 1 as input for stage 2
         stage1_output = (
             f"s3://{self.s3_bucket}/mangomas-distillation-output/{stage1_job}/output/model.tar.gz"
         )
-
         self.create_training_job(
             job_name=stage2_job,
             teacher_model=teacher_model,
-            student_model=stage1_output,  # Use stage 1 output
+            student_model=stage1_output,
             train_data_s3=train_data_s3,
             eval_data_s3=eval_data_s3,
-            hyperparameters=stage2_hyperparameters,
+            hyperparameters={
+                "distillation_alpha": 0.3,
+                "temperature": 1.5,
+                "num_train_epochs": 1,
+                "learning_rate": 5e-5,
+            },
             **kwargs,
         )
-
         return pipeline_name
 
-    def monitor_training_job(self, job_name: str):
-        """Monitor training job progress"""
+    def monitor_training_job(self, job_name: str) -> dict[str, Any]:
+        """Return SageMaker training job status and metrics."""
         client = boto3.client("sagemaker", region_name=self.region)
-
         try:
             response = client.describe_training_job(TrainingJobName=job_name)
             status = response["TrainingJobStatus"]
+            logger.info("Training job %s status=%s", job_name, status)
+            return {
+                "job_name": job_name,
+                "status": status,
+                "metrics": response.get("FinalMetricDataList", []),
+                "output": response.get("OutputDataConfig", {}),
+            }
+        except Exception:
+            logger.exception("Error monitoring job %s", job_name)
+            return {"job_name": job_name, "status": "error"}
 
-            print(f"Training Job: {job_name}")
-            print(f"Status: {status}")
-
-            if "FinalMetricDataList" in response:
-                print("\nFinal Metrics:")
-                for metric in response["FinalMetricDataList"]:
-                    print(f"  {metric['MetricName']}: {metric['Value']}")
-
-            if "OutputDataConfig" in response:
-                output_location = response["OutputDataConfig"]["S3OutputPath"]
-                print(f"\nOutput Location: {output_location}")
-
-        except Exception as e:
-            print(f"Error monitoring job: {e}")
-
-    def list_training_jobs(self, name_contains: str = "mangomas"):
-        """List training jobs with optional filtering"""
+    def list_training_jobs(self, name_contains: str = "mangomas") -> list[dict[str, Any]]:
+        """List training jobs with optional name filter."""
         client = boto3.client("sagemaker", region_name=self.region)
-
         try:
             response = client.list_training_jobs(NameContains=name_contains, MaxResults=20)
+            summaries = response.get("TrainingJobSummaries", [])
+            logger.info("Found %s jobs matching %s", len(summaries), name_contains)
+            return summaries
+        except Exception:
+            logger.exception("Error listing jobs")
+            return []
 
-            print(f"Training Jobs containing '{name_contains}':")
-            for job in response["TrainingJobSummaries"]:
-                print(
-                    f"  {job['TrainingJobName']} - {job['TrainingJobStatus']} - {job['CreationTime']}"
-                )
-
-        except Exception as e:
-            print(f"Error listing jobs: {e}")
-
-    def download_model(self, job_name: str, local_path: str):
-        """Download trained model from S3"""
-        import tarfile
-
-        # Get model location
+    def download_model(self, job_name: str, local_path: str) -> str:
+        """Download a trained model archive and extract it safely."""
         client = boto3.client("sagemaker", region_name=self.region)
         response = client.describe_training_job(TrainingJobName=job_name)
         model_data = response["ModelArtifacts"]["S3ModelArtifacts"]
-
-        # Download and extract
-        s3_client = boto3.client("s3")
-
-        # Parse S3 URI
+        s3_client = boto3.client("s3", region_name=self.region)
         bucket = model_data.split("/")[2]
         key = "/".join(model_data.split("/")[3:])
-
-        # Download
-        local_tar = os.path.join(local_path, "model.tar.gz")
-        s3_client.download_file(bucket, key, local_tar)
-
-        # Extract without allowing path traversal out of local_path.
-        with tarfile.open(local_tar, "r:gz") as tar:
-            dest = os.path.abspath(local_path)
-            for member in tar.getmembers():
-                member_path = os.path.abspath(os.path.join(dest, member.name))
-                if not (member_path == dest or member_path.startswith(dest + os.sep)):
-                    raise ValueError(f"Blocked path traversal in archive member: {member.name}")
-                tar.extract(member, dest)
-
-        print(f"Model downloaded to: {local_path}")
+        dest = Path(local_path)
+        dest.mkdir(parents=True, exist_ok=True)
+        local_tar = dest / "model.tar.gz"
+        s3_client.download_file(bucket, key, str(local_tar))
+        safe_extract_tar(local_tar, dest)
+        logger.info("Model downloaded to %s", dest)
+        return str(dest)
 
     def create_inference_endpoint(
         self,
@@ -275,74 +204,68 @@ class AgentDistillationJob:
         instance_type: str = "ml.m5.large",
         instance_count: int = 1,
     ):
-        """Create SageMaker inference endpoint for distilled model"""
-
-        # Create model
+        """Create a SageMaker inference endpoint for a distilled model."""
         model = sagemaker.pytorch.PyTorchModel(
-            model_data=f"s3://{self.s3_bucket}/mangomas-distillation-output/{model_name}/output/model.tar.gz",
+            model_data=(
+                f"s3://{self.s3_bucket}/mangomas-distillation-output/"
+                f"{model_name}/output/model.tar.gz"
+            ),
             role=self.role,
             entry_point="inference.py",
             source_dir="training",
             framework_version="2.0.1",
             py_version="py310",
         )
-
-        # Deploy endpoint
-        predictor = model.deploy(
+        return model.deploy(
             initial_instance_count=instance_count,
             instance_type=instance_type,
             endpoint_name=endpoint_name,
         )
 
-        return predictor
 
-
-def main():
-    """Example usage of AgentDistillationJob"""
-
-    # Initialize job manager
-    job_manager = AgentDistillationJob(region="us-east-1")
-
-    # Example training job
+def main() -> int:
+    """Example usage of AgentDistillationJob (does not launch unless AWS is configured)."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    settings = get_settings()
+    job_manager = AgentDistillationJob(region=settings.aws_region)
     job_name = f"mangomas-distillation-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-
-    # Training data (replace with your S3 URI)
-    train_data_s3 = "s3://your-bucket/mangomas/training-data/train.jsonl"
-    eval_data_s3 = "s3://your-bucket/mangomas/training-data/eval.jsonl"
-
-    # Hyperparameters
+    train_data_s3 = os.getenv(
+        "MANGOMAS_DISTILL_TRAIN_S3",
+        f"s3://{settings.training_data_bucket}/mangomas/training-data/train.jsonl",
+    )
+    eval_data_s3 = os.getenv(
+        "MANGOMAS_DISTILL_EVAL_S3",
+        f"s3://{settings.training_data_bucket}/mangomas/training-data/eval.jsonl",
+    )
     hyperparameters = {
-        "teacher_model_name": "mistralai/Mistral-7B-v0.1",
-        "student_model_name": "microsoft/DialoGPT-medium",
+        "teacher_model_name": settings.teacher_model,
+        "student_model_name": settings.student_model,
         "num_train_epochs": 3,
         "distillation_alpha": 0.5,
         "temperature": 2.0,
         "use_lora": True,
         "use_fp16": True,
+        "trust_remote_code": str(settings.trust_remote_code).lower(),
     }
-
-    # Create training job
     try:
-        job_name = job_manager.create_training_job(
+        created = job_manager.create_training_job(
             job_name=job_name,
-            teacher_model="mistralai/Mistral-7B-v0.1",
-            student_model="microsoft/DialoGPT-medium",
+            teacher_model=settings.teacher_model,
+            student_model=settings.student_model,
             train_data_s3=train_data_s3,
             eval_data_s3=eval_data_s3,
-            instance_type="ml.g5.2xlarge",
+            instance_type=settings.gpu_instance_type,
             hyperparameters=hyperparameters,
             use_spot_instances=True,
-            max_wait_time=7200,  # 2 hours
+            max_wait_time=settings.max_run_seconds,
         )
-
-        print(f"Training job created: {job_name}")
-
-        # Monitor job
-        job_manager.monitor_training_job(job_name)
-
-    except Exception as e:
-        print(f"Error creating training job: {e}")
+        print(f"Training job created: {created}")
+        job_manager.monitor_training_job(created)
+        return 0
+    except Exception:
+        logger.exception("Error creating training job")
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

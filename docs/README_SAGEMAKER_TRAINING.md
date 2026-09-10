@@ -79,19 +79,21 @@ aws iam attach-role-policy --role-name SageMakerExecutionRole \
 
 ### **1. Simple Training Launch**
 ```bash
-cd training
-python run_sagemaker_training.py
+python scripts/deployment/run_sagemaker_training.py
 ```
 
 ### **2. Custom Configuration**
 ```python
-from launch_all_agents_sagemaker import MangoMASSageMakerLauncher
+from enhanced_system.ops.settings import get_settings
+from enhanced_system.ops import MangoMASSageMakerLauncher
 import asyncio
+import os
 
 # Create launcher with custom configuration
+settings = get_settings()
 launcher = MangoMASSageMakerLauncher(
-    region='us-east-1',
-    role_arn='arn:aws:iam::123456789012:role/SageMakerExecutionRole'
+    region=settings.aws_region,
+    role_arn=os.environ.get("SAGEMAKER_ROLE_ARN"),
 )
 
 # Launch training jobs
@@ -103,19 +105,19 @@ results = asyncio.run(launcher.launch_all_jobs(
 
 ### **3. Individual Agent Training**
 ```python
-from launch_all_agents_sagemaker import MangoMASSageMakerLauncher, TrainingJobConfig
+from enhanced_system.ops import AgentTrainingConfig, MangoMASSageMakerLauncher
 
 launcher = MangoMASSageMakerLauncher()
 
 # Train specific agent
-config = TrainingJobConfig(
+config = AgentTrainingConfig(
     agent_name="product_manager",
     training_file="product_manager_agent_real_data.jsonl",
     epochs=3,
     batch_size=2
 )
 
-result = asyncio.run(launcher.launch_training_job(config, s3_uri))
+result = asyncio.run(launcher.launch_training_job(config))
 ```
 
 ## 📚 Usage
@@ -123,8 +125,7 @@ result = asyncio.run(launcher.launch_training_job(config, s3_uri))
 ### **Command Line Usage**
 ```bash
 # Basic usage
-cd training
-python run_sagemaker_training.py
+python scripts/deployment/run_sagemaker_training.py
 
 # With environment variables
 export AWS_REGION=us-east-1
@@ -135,12 +136,15 @@ python run_sagemaker_training.py
 ### **Programmatic Usage**
 ```python
 import asyncio
-from launch_all_agents_sagemaker import MangoMASSageMakerLauncher
+import os
+from enhanced_system.ops import MangoMASSageMakerLauncher
+from enhanced_system.ops.settings import get_settings
 
 # Initialize launcher
+settings = get_settings()
 launcher = MangoMASSageMakerLauncher(
-    region='us-east-1',
-    role_arn='arn:aws:iam::123456789012:role/SageMakerExecutionRole'
+    region=settings.aws_region,
+    role_arn=os.environ.get("SAGEMAKER_ROLE_ARN"),
 )
 
 # Launch all training jobs
@@ -159,7 +163,7 @@ results = asyncio.run(main())
 ```python
 # Check training status
 launcher = MangoMASSageMakerLauncher()
-status = launcher.get_training_status()
+status = launcher.monitor_training_jobs()
 
 # Generate summary report
 summary = launcher.generate_summary_report()
@@ -171,10 +175,10 @@ launcher.save_results('training_results.json')
 
 ### **Custom Training Configuration**
 ```python
-from launch_all_agents_sagemaker import TrainingJobConfig
+from enhanced_system.ops import AgentTrainingConfig
 
 # Create custom configuration
-config = TrainingJobConfig(
+config = AgentTrainingConfig(
     agent_name="custom_agent",
     training_file="custom_training_data.jsonl",
     model_name="microsoft/DialoGPT-medium",
@@ -185,14 +189,14 @@ config = TrainingJobConfig(
 )
 
 # Launch training with custom config
-result = await launcher.launch_training_job(config, s3_uri)
+result = await launcher.launch_training_job(config)
 ```
 
 ## 📋 Training Configuration
 
 ### **Default Hyperparameters**
 ```python
-TrainingJobConfig(
+AgentTrainingConfig(
     model_name='mistralai/Mistral-7B-v0.1',
     instance_type='ml.g4dn.xlarge',
     epochs=3,
@@ -348,7 +352,7 @@ pipeline = Pipeline(
 ### **Complete Training Workflow**
 ```python
 import asyncio
-from launch_all_agents_sagemaker import MangoMASSageMakerLauncher
+from enhanced_system.ops import MangoMASSageMakerLauncher
 
 async def train_all_agents():
     # Initialize launcher
@@ -375,10 +379,10 @@ results = asyncio.run(train_all_agents())
 
 ### **Custom Agent Training**
 ```python
-from launch_all_agents_sagemaker import TrainingJobConfig
+from enhanced_system.ops import AgentTrainingConfig
 
 # Create custom training configuration
-custom_config = TrainingJobConfig(
+custom_config = AgentTrainingConfig(
     agent_name="custom_agent",
     training_file="custom_training_data.jsonl",
     model_name="microsoft/DialoGPT-medium",
@@ -388,7 +392,7 @@ custom_config = TrainingJobConfig(
 )
 
 # Train custom agent
-result = await launcher.launch_training_job(custom_config, s3_uri)
+result = await launcher.launch_training_job(custom_config)
 ```
 
 ## 🐛 Troubleshooting

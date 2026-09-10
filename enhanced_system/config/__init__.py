@@ -37,7 +37,11 @@ class Config(BaseModel):
         class L3Config(BaseModel):
             enabled: bool = True
             bucket: str = "agent-cache"
-            region: str = Field(default_factory=lambda: os.getenv("AWS_REGION", "us-east-1"))
+            region: str = Field(
+                default_factory=lambda: (
+                    os.getenv("AWS_REGION") or os.getenv("MANGOMAS_AWS_REGION") or "us-east-1"
+                )
+            )
             prefix: str = "enhanced-agents/"
             ttl: int = 604800
 

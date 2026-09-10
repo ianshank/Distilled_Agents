@@ -15,7 +15,7 @@ from enhanced_system.ops.training_system import AutomatedTrainingSystem, Infrast
 @click.command()
 @click.option("--role", required=True)
 @click.option("--test_suite", required=True)
-@click.option("--threshold", default=85, type=float)
+@click.option("--threshold", default=lambda: get_settings().evaluation_threshold, type=float)
 @click.option("--region", default=lambda: os.getenv("AWS_REGION", get_settings().aws_region))
 @click.option("--bucket", default=lambda: get_settings().training_data_bucket)
 @click.option("--table", default=lambda: get_settings().dynamodb_table)

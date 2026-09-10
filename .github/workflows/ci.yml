@@ -9,53 +9,29 @@ permissions:
   contents: read
 
 jobs:
-  lint:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install lint tools
-        run: pip install ruff
-      - name: Ruff check
-        run: ruff check enhanced_system scripts tests
-      - name: Ruff format
-        run: ruff format --check enhanced_system scripts tests
+      - name: Pre-PR validation
+        uses: ./.github/actions/mangomas-validate
 
-  test:
+  pip-audit:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install package
-        run: pip install -e ".[dev]"
-      - name: Unit tests
-        run: pytest -m unit --cov=enhanced_system --cov-report=term --cov-report=xml
-      - name: Integration tests
-        run: pytest -m integration --cov=enhanced_system --cov-append --cov-report=term --cov-report=xml --cov-fail-under=60
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-xml
-          path: coverage.xml
-
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-      - name: Install scanners
-        run: pip install bandit pip-audit
-      - name: Bandit
-        run: bandit -r enhanced_system scripts -x tests,enhanced_system/tests,enhanced_system/examples -c pyproject.toml -q
       - name: pip-audit
-        run: pip-audit || true
+        run: |
+          pip install pip-audit
+          pip-audit || true

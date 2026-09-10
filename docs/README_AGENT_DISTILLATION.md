@@ -92,10 +92,11 @@ trainer.train()
 ### 2. SageMaker Training
 
 ```python
-from sagemaker_distillation_job import AgentDistillationJob
+from enhanced_system.ops.settings import get_settings
+from scripts.deployment.sagemaker_distillation_job import AgentDistillationJob
 
-# Initialize job manager
-job_manager = AgentDistillationJob(region='us-east-1')
+# Initialize job manager (region from MANGOMAS_AWS_REGION / AWS_DEFAULT_REGION)
+job_manager = AgentDistillationJob(region=get_settings().aws_region)
 
 # Create training job
 job_name = job_manager.create_training_job(

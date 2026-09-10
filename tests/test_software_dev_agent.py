@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""
-Test script for Software Development Agent Distillation
-Validates training data and demonstrates the system
+"""Manual training-data demo.
+
+Pytest does not collect these helpers (no ``test_`` prefix). Use
+``tests/test_training_data.py`` for automated JSONL checks.
 """
 
 import json

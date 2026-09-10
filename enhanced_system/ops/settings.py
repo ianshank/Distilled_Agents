@@ -31,6 +31,13 @@ class MangoMASSettings(BaseSettings):
     trust_remote_code: bool = Field(default=False)
     bind_host: str = Field(default="127.0.0.1")
     grafana_admin_password: str = Field(default="")
+    model_revision: str = Field(default="")
+    skill_epochs: int = Field(default=5)
+    skill_batch_size: int = Field(default=16)
+    skill_learning_rate: float = Field(default=1e-4)
+    evaluation_threshold: float = Field(default=85.0)
+    max_concurrent_jobs: int = Field(default=3)
+    bind_port: int = Field(default=8080)
 
     def role_arn(self, account_id: str) -> str:
         return f"arn:aws:iam::{account_id}:role/{self.execution_role_name}"
