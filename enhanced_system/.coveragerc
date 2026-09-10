@@ -1,6 +1,6 @@
 [run]
 source = enhanced_system
-omit = 
+omit =
     */tests/*
     */examples/*
     */scripts/*
@@ -11,6 +11,7 @@ omit =
 precision = 2
 show_missing = True
 skip_covered = False
+fail_under = 40
 exclude_lines =
     pragma: no cover
     def __repr__
@@ -19,7 +20,3 @@ exclude_lines =
     if __name__ == .__main__.:
     if TYPE_CHECKING:
     @abstractmethod
-
-[html]
-directory = htmlcov
-
