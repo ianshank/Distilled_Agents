@@ -7,25 +7,26 @@ Provides shared fixtures for all tests.
 
 from __future__ import annotations
 
-import pytest
 import asyncio
-from typing import Any, Dict
-from pathlib import Path
-import tempfile
 import shutil
 
 # Add parent directory to path for imports
 import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from enhanced_system.config import load_config
 from enhanced_system.core.constants import *
 from enhanced_system.core.enums import *
-
 
 # =============================================================================
 # Configuration Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def test_config() -> dict[str, Any]:
@@ -62,26 +63,10 @@ def test_config() -> dict[str, Any]:
 def cache_config() -> dict[str, Any]:
     """Provide cache-specific configuration."""
     return {
-        'l1': {
-            'enabled': True,
-            'max_size': 100,
-            'ttl': 60
-        },
-        'l2': {
-            'enabled': False,
-            'host': 'localhost',
-            'port': 6379,
-            'ttl': 300
-        },
-        'l3': {
-            'enabled': False,
-            'bucket': 'test-bucket',
-            'prefix': 'test/'
-        },
-        'semantic_similarity': {
-            'enabled': False,
-            'threshold': 0.95
-        }
+        "l1": {"enabled": True, "max_size": 100, "ttl": 60},
+        "l2": {"enabled": False, "host": "localhost", "port": 6379, "ttl": 300},
+        "l3": {"enabled": False, "bucket": "test-bucket", "prefix": "test/"},
+        "semantic_similarity": {"enabled": False, "threshold": 0.95},
     }
 
 
@@ -89,43 +74,47 @@ def cache_config() -> dict[str, Any]:
 # Mock Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def mock_agent():
     """Provide a mock agent function."""
+
     async def agent_func(task: str, **kwargs) -> dict[str, Any]:
         """Mock agent that returns consistent results."""
         await asyncio.sleep(0.01)  # Simulate processing
         return {
-            'response': f"Processed: {task[:50]}",
-            'confidence': 0.85,
-            'token_count': 100,
-            'success': True,
-            'latency_ms': 10.0
+            "response": f"Processed: {task[:50]}",
+            "confidence": 0.85,
+            "token_count": 100,
+            "success": True,
+            "latency_ms": 10.0,
         }
+
     return agent_func
 
 
 @pytest.fixture
 def mock_agents(mock_agent):
     """Provide multiple mock agents for consensus testing."""
+
     async def agent1(task: str, **kwargs):
         result = await mock_agent(task, **kwargs)
-        result['response'] = f"Agent1: {result['response']}"
-        result['confidence'] = 0.9
+        result["response"] = f"Agent1: {result['response']}"
+        result["confidence"] = 0.9
         return result
-    
+
     async def agent2(task: str, **kwargs):
         result = await mock_agent(task, **kwargs)
-        result['response'] = f"Agent2: {result['response']}"
-        result['confidence'] = 0.85
+        result["response"] = f"Agent2: {result['response']}"
+        result["confidence"] = 0.85
         return result
-    
+
     async def agent3(task: str, **kwargs):
         result = await mock_agent(task, **kwargs)
-        result['response'] = f"Agent3: {result['response']}"
-        result['confidence'] = 0.8
+        result["response"] = f"Agent3: {result['response']}"
+        result["confidence"] = 0.8
         return result
-    
+
     return [agent1, agent2, agent3]
 
 
@@ -151,6 +140,7 @@ def sample_task() -> str:
 # Temporary Directory Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def temp_dir():
     """Provide a temporary directory for test files."""
@@ -169,27 +159,28 @@ def temp_db_path(temp_dir) -> str:
 # Data Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def sample_training_data() -> list[dict[str, Any]]:
     """Provide sample training data."""
     return [
         {
-            'id': 'sample_1',
-            'prompt': 'Write a function',
-            'completion': 'def function(): pass',
-            'category': 'coding'
+            "id": "sample_1",
+            "prompt": "Write a function",
+            "completion": "def function(): pass",
+            "category": "coding",
         },
         {
-            'id': 'sample_2',
-            'prompt': 'Design a system',
-            'completion': 'System architecture...',
-            'category': 'design'
+            "id": "sample_2",
+            "prompt": "Design a system",
+            "completion": "System architecture...",
+            "category": "design",
         },
         {
-            'id': 'sample_3',
-            'prompt': 'Test a component',
-            'completion': 'Test cases...',
-            'category': 'testing'
+            "id": "sample_3",
+            "prompt": "Test a component",
+            "completion": "Test cases...",
+            "category": "testing",
         },
     ]
 
@@ -199,25 +190,25 @@ def sample_validation_results() -> list[dict[str, Any]]:
     """Provide sample validation/test results."""
     return [
         {
-            'test_id': 'test_1',
-            'passed': True,
-            'accuracy': 0.9,
-            'latency_ms': 150,
-            'prompt': 'Test prompt 1'
+            "test_id": "test_1",
+            "passed": True,
+            "accuracy": 0.9,
+            "latency_ms": 150,
+            "prompt": "Test prompt 1",
         },
         {
-            'test_id': 'test_2',
-            'passed': True,
-            'accuracy': 0.85,
-            'latency_ms': 200,
-            'prompt': 'Test prompt 2'
+            "test_id": "test_2",
+            "passed": True,
+            "accuracy": 0.85,
+            "latency_ms": 200,
+            "prompt": "Test prompt 2",
         },
         {
-            'test_id': 'test_3',
-            'passed': False,
-            'accuracy': 0.4,
-            'latency_ms': 180,
-            'prompt': 'Test prompt 3'
+            "test_id": "test_3",
+            "passed": False,
+            "accuracy": 0.4,
+            "latency_ms": 180,
+            "prompt": "Test prompt 3",
         },
     ]
 
@@ -225,6 +216,7 @@ def sample_validation_results() -> list[dict[str, Any]]:
 # =============================================================================
 # Event Loop Fixtures
 # =============================================================================
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -238,66 +230,71 @@ def event_loop():
 # Mock External Services
 # =============================================================================
 
+
 @pytest.fixture
 def mock_redis():
     """Provide a mock Redis client."""
+
     class MockRedis:
         def __init__(self):
             self.data = {}
-        
+
         def get(self, key):
             return self.data.get(key)
-        
+
         def set(self, key, value):
             self.data[key] = value
-        
+
         def setex(self, key, ttl, value):
             self.data[key] = value
-        
+
         def delete(self, key):
             return self.data.pop(key, None) is not None
-        
+
         def ping(self):
             return True
-        
+
         def flushdb(self):
             self.data.clear()
-        
+
         def info(self):
             return {
-                'used_memory_human': '1MB',
-                'connected_clients': 1,
-                'total_commands_processed': len(self.data)
+                "used_memory_human": "1MB",
+                "connected_clients": 1,
+                "total_commands_processed": len(self.data),
             }
-    
+
     return MockRedis()
 
 
 @pytest.fixture
 def mock_s3_client():
     """Provide a mock S3 client."""
+
     class MockS3Client:
         def __init__(self):
             self.objects = {}
-        
+
         def head_bucket(self, Bucket):
             return {}
-        
+
         def get_object(self, Bucket, Key):
             if Key in self.objects:
-                return {'Body': self.objects[Key]}
+                return {"Body": self.objects[Key]}
             from botocore.exceptions import ClientError
-            raise ClientError({'Error': {'Code': 'NoSuchKey'}}, 'GetObject')
-        
+
+            raise ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject")
+
         def put_object(self, Bucket, Key, Body):
             self.objects[Key] = Body
-    
+
     return MockS3Client()
 
 
 # =============================================================================
 # Parametrize Helpers
 # =============================================================================
+
 
 @pytest.fixture
 def injection_test_cases() -> list[tuple[str, bool]]:
@@ -318,6 +315,7 @@ def injection_test_cases() -> list[tuple[str, bool]]:
 # Performance Testing Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def benchmark_tasks() -> list[str]:
     """Provide tasks for benchmarking."""
@@ -328,21 +326,11 @@ def benchmark_tasks() -> list[str]:
 # Markers for Test Organization
 # =============================================================================
 
+
 def pytest_configure(config):
     """Configure custom pytest markers."""
-    config.addinivalue_line(
-        "markers", "unit: Unit tests"
-    )
-    config.addinivalue_line(
-        "markers", "integration: Integration tests"
-    )
-    config.addinivalue_line(
-        "markers", "e2e: End-to-end tests"
-    )
-    config.addinivalue_line(
-        "markers", "slow: Slow running tests"
-    )
-    config.addinivalue_line(
-        "markers", "benchmark: Performance benchmark tests"
-    )
-
+    config.addinivalue_line("markers", "unit: Unit tests")
+    config.addinivalue_line("markers", "integration: Integration tests")
+    config.addinivalue_line("markers", "e2e: End-to-end tests")
+    config.addinivalue_line("markers", "slow: Slow running tests")
+    config.addinivalue_line("markers", "benchmark: Performance benchmark tests")

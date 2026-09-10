@@ -23,9 +23,7 @@ class FallbackManager:
         self.error_learner = None
         if config.get("enable_error_learning", True):
             try:
-                self.error_learner = ErrorLearner(
-                    config.get("error_db_path", "./data/errors.db")
-                )
+                self.error_learner = ErrorLearner(config.get("error_db_path", "./data/errors.db"))
             except Exception as exc:
                 logger.warning("Failed to initialize error learner: %s", exc)
 
@@ -35,9 +33,7 @@ class FallbackManager:
         priority: int = 100,
         name: str = "unnamed",
     ) -> None:
-        self.fallback_chain.append(
-            {"strategy": strategy, "priority": priority, "name": name}
-        )
+        self.fallback_chain.append({"strategy": strategy, "priority": priority, "name": name})
         self.fallback_chain.sort(key=lambda item: item["priority"])
         logger.info("Registered fallback strategy: %s (priority: %s)", name, priority)
 
@@ -92,9 +88,7 @@ class FallbackManager:
                         "fallback": True,
                     }
             except Exception as fallback_error:
-                logger.warning(
-                    "Fallback strategy %s failed: %s", strategy_name, fallback_error
-                )
+                logger.warning("Fallback strategy %s failed: %s", strategy_name, fallback_error)
                 continue
 
         if self.error_learner:

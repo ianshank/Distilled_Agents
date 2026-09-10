@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from enhanced_system.core.batch_processor import BatchProcessor
 from enhanced_system.core.enums import Priority
 

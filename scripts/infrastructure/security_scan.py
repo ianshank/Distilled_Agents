@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import json
-import subprocess
+import subprocess  # nosec B404
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,7 +14,7 @@ import click
 
 def _run(command: list[str]) -> dict:
     try:
-        completed = subprocess.run(
+        completed = subprocess.run(  # nosec B603
             command, check=False, capture_output=True, text=True, timeout=120
         )
         return {

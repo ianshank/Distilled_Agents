@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from typing import Any, Optional
+from typing import Any
 
 from enhanced_system.core.errors.types import ErrorRecord
 
@@ -135,9 +135,7 @@ class ErrorLearner:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM errors")
             total = cursor.fetchone()[0]
-            cursor.execute(
-                "SELECT error_type, COUNT(*) FROM errors GROUP BY error_type"
-            )
+            cursor.execute("SELECT error_type, COUNT(*) FROM errors GROUP BY error_type")
             by_type = {row[0]: row[1] for row in cursor.fetchall()}
             conn.close()
             return {"total_errors": total, "by_type": by_type}

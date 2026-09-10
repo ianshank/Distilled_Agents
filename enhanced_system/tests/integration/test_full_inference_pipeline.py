@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from enhanced_system.core.adaptive_router import AdaptiveRouter
 from enhanced_system.core.cache_manager import IntelligentCacheManager
 from enhanced_system.core.confidence_calibrator import ConfidenceCalibrator

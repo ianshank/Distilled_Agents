@@ -29,9 +29,7 @@ class IntelligentCacheManager:
         self.semantic_cache = SemanticCacheManager(config.get("semantic_similarity", {}))
         logger.info("IntelligentCacheManager initialized")
 
-    def compute_cache_key(
-        self, task: str, agent: str, params: Optional[dict] = None
-    ) -> str:
+    def compute_cache_key(self, task: str, agent: str, params: Optional[dict] = None) -> str:
         similar_key = self.semantic_cache.find_similar_cached(task)
         if similar_key:
             return similar_key
@@ -44,9 +42,7 @@ class IntelligentCacheManager:
         self.semantic_cache.register_embedding(cache_key, task)
         return cache_key
 
-    async def get_or_compute(
-        self, key: str, compute_func: Callable, *args, **kwargs
-    ) -> Any:
+    async def get_or_compute(self, key: str, compute_func: Callable, *args, **kwargs) -> Any:
         value = self.l1_cache.get(key)
         if value is not None:
             return value

@@ -1,10 +1,9 @@
 """Enhanced evaluation modules"""
 
-from .skill_evaluator import SkillEvaluator
 from .ab_testing import ABTestFramework
+from .skill_evaluator import SkillEvaluator
 
 __all__ = [
     "SkillEvaluator",
     "ABTestFramework",
 ]
-

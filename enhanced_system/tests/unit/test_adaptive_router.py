@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from enhanced_system.core.adaptive_router import AdaptiveRouter, RoutingDecision
 from enhanced_system.core.enums import RoutingStrategy, TaskComplexity
 
@@ -23,7 +22,9 @@ class TestAdaptiveRouter:
 
     def test_classify_task_coding(self):
         router = AdaptiveRouter({"enabled": True})
-        assert router.classify_task("Write a Python function to implement binary search") == "coding"
+        assert (
+            router.classify_task("Write a Python function to implement binary search") == "coding"
+        )
 
     def test_classify_task_architecture(self):
         router = AdaptiveRouter({"enabled": True})

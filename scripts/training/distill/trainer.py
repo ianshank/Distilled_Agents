@@ -6,12 +6,11 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 import torch
 from datasets import Dataset, load_dataset
 from transformers import (
-    AutoTokenizer,
     DataCollatorForLanguageModeling,
     Trainer,
     TrainingArguments,
@@ -76,7 +75,7 @@ class AgentDistillationTrainer:
 
     def prepare_dataset(self) -> Dataset:
         train_file = resolve_train_file()
-        dataset = load_dataset("json", data_files={"train": train_file})
+        dataset = load_dataset("json", data_files={"train": train_file})  # nosec B615
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
 
         def tokenize_function(examples):
@@ -149,7 +148,7 @@ class AgentDistillationTrainer:
     def prepare_eval_dataset(self) -> Optional[Dataset]:
         if not self.args.eval_file:
             return None
-        dataset = load_dataset("json", data_files={"eval": self.args.eval_file})
+        dataset = load_dataset("json", data_files={"eval": self.args.eval_file})  # nosec B615
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
 
         def tokenize_function(examples):
@@ -171,7 +170,9 @@ class AgentDistillationTrainer:
             "completed_at": datetime.now().isoformat(),
             "device": str(self.device),
         }
-        with open(os.path.join(output_dir, "training_metadata.json"), "w", encoding="utf-8") as handle:
+        with open(
+            os.path.join(output_dir, "training_metadata.json"), "w", encoding="utf-8"
+        ) as handle:
             json.dump(metadata, handle, indent=2)
 
 
@@ -188,9 +189,7 @@ class DistillationTrainer(Trainer):
         student_outputs = model(**inputs)
         with torch.no_grad():
             teacher_outputs = self.teacher_model(**inputs)
-        loss = self.create_distillation_loss(
-            student_outputs, teacher_outputs, inputs.get("labels")
-        )
+        loss = self.create_distillation_loss(student_outputs, teacher_outputs, inputs.get("labels"))
         return (loss, student_outputs) if return_outputs else loss
 
     def create_distillation_loss(self, student_outputs, teacher_outputs, labels):
@@ -206,6 +205,8 @@ class DistillationTrainer(Trainer):
                 torch.nn.functional.log_softmax(student_logits, dim=-1),
                 torch.nn.functional.softmax(teacher_logits, dim=-1),
                 reduction="batchmean",
-            ) * (self.temperature ** 2)
-            return (1 - self.distillation_alpha) * task_loss + self.distillation_alpha * distillation_loss
+            ) * (self.temperature**2)
+            return (
+                1 - self.distillation_alpha
+            ) * task_loss + self.distillation_alpha * distillation_loss
         return task_loss

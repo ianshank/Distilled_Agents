@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 import pytest
-
+from enhanced_system.core.constants import DEFAULT_BASE_DELAY, DEFAULT_MAX_RETRIES
 from enhanced_system.core.enums import ErrorType
 from enhanced_system.core.error_handler import (
     ErrorLearner,
@@ -13,7 +13,6 @@ from enhanced_system.core.error_handler import (
     FallbackManager,
     IntelligentRetryHandler,
 )
-from enhanced_system.core.constants import DEFAULT_BASE_DELAY, DEFAULT_MAX_RETRIES
 
 
 @pytest.mark.unit

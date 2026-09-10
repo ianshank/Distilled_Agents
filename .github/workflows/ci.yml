@@ -11,7 +11,6 @@ permissions:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -48,7 +47,6 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -58,6 +56,6 @@ jobs:
       - name: Install scanners
         run: pip install bandit pip-audit
       - name: Bandit
-        run: bandit -r enhanced_system scripts -x tests,enhanced_system/tests -q
+        run: bandit -r enhanced_system scripts -x tests,enhanced_system/tests,enhanced_system/examples -c pyproject.toml -q
       - name: pip-audit
         run: pip-audit || true

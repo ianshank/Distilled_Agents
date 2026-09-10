@@ -8,7 +8,6 @@ import os
 import sys
 
 import click
-
 from enhanced_system.ops.settings import get_settings
 from enhanced_system.ops.training_system import (
     AutomatedTrainingSystem,
@@ -27,9 +26,7 @@ from enhanced_system.ops.training_system import (
 @click.option("--table", default=lambda: get_settings().dynamodb_table)
 def register_agent(role, adapter_uri, pass_rate, model, region, bucket, table):
     config = InfrastructureConfig(aws_region=region, s3_bucket=bucket, dynamodb_table=table)
-    skill = RegisteredSkill(
-        role=role, adapter_uri=adapter_uri, pass_rate=pass_rate, model=model
-    )
+    skill = RegisteredSkill(role=role, adapter_uri=adapter_uri, pass_rate=pass_rate, model=model)
     result = asyncio.run(AutomatedTrainingSystem(config).register_skill(skill))
     print(result)
     sys.exit(0 if result.get("status") == "success" else 1)

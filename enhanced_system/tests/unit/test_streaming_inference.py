@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from enhanced_system.core.streaming_inference import StreamingInference, StreamToken
 
 

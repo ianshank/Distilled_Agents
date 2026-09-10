@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from enhanced_system.config.builders import ConfigBuilder
 from enhanced_system.core.cache.serialize import dumps, loads
 from enhanced_system.core.factories import CacheManagerFactory, ValidatorFactory

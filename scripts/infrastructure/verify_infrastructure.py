@@ -7,7 +7,6 @@ import os
 import sys
 
 import click
-
 from enhanced_system.ops.settings import get_settings
 from enhanced_system.ops.training_system import AutomatedTrainingSystem, InfrastructureConfig
 

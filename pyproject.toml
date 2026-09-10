@@ -128,7 +128,20 @@ src = ["enhanced_system", "scripts", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
-ignore = ["E203", "E501", "B008"]
+ignore = [
+    "E203",
+    "E501",
+    "B008",
+    "UP006",  # legacy List/Dict annotations; ratchet later
+    "UP035",
+    "UP045",
+    "F403",   # star-imports from constants/enums
+    "F405",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"enhanced_system/tests/conftest.py" = ["E402"]
+"enhanced_system/examples/*" = ["E402"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -141,5 +154,9 @@ ignore_missing_imports = true
 check_untyped_defs = true
 
 [tool.bandit]
-exclude_dirs = ["tests", "enhanced_system/tests", ".venv"]
-skips = ["B101"]
+exclude_dirs = ["tests", "enhanced_system/tests", ".venv", "enhanced_system/examples"]
+skips = [
+    "B101",
+    "B105",  # false positives on pass_rate / numeric defaults
+    "B106",  # false positives on token="" kwargs
+]

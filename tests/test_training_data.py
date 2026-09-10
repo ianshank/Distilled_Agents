@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
-TRAINING_FILE = Path(__file__).resolve().parents[1] / "data" / "training" / "sample_training_data.jsonl"
+TRAINING_FILE = (
+    Path(__file__).resolve().parents[1] / "data" / "training" / "sample_training_data.jsonl"
+)
 
 
 @pytest.mark.unit

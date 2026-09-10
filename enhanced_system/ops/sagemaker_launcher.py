@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -64,7 +64,7 @@ class MangoMASSageMakerLauncher:
         if not self.terraform_config_path:
             return None
         try:
-            with open(self.terraform_config_path, "r", encoding="utf-8") as handle:
+            with open(self.terraform_config_path, encoding="utf-8") as handle:
                 return json.load(handle)
         except OSError:
             return None

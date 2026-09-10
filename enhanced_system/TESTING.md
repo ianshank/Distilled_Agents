@@ -257,16 +257,17 @@ enhanced_system/tests/
 import pytest
 from enhanced_system.core.module import Component
 
+
 @pytest.mark.unit
 class TestComponent:
     """Test Component class."""
-    
+
     def test_basic_functionality(self, test_config):
         """Test basic component behavior."""
         component = Component(test_config)
         result = component.process("input")
         assert result is not None
-    
+
     def test_error_handling(self, test_config):
         """Test error handling."""
         component = Component(test_config)
@@ -281,17 +282,20 @@ class TestComponent:
 async def test_with_mock_agent(test_config, mock_agent):
     """Test using mock agent fixture."""
     result = await mock_agent("test task")
-    assert result['response'] is not None
+    assert result["response"] is not None
 ```
 
 ### Parametrized Tests
 
 ```python
-@pytest.mark.parametrize("input,expected", [
-    ("valid input", True),
-    ("", False),
-    (None, False),
-])
+@pytest.mark.parametrize(
+    "input,expected",
+    [
+        ("valid input", True),
+        ("", False),
+        (None, False),
+    ],
+)
 def test_validation(input, expected):
     """Test validation with multiple inputs."""
     result = validate(input)

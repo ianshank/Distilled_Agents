@@ -15,9 +15,7 @@ try:
 except ImportError:
     EMBEDDINGS_AVAILABLE = False
     np = None  # type: ignore[assignment]
-    logging.warning(
-        "Sentence-transformers not available. Semantic caching will be disabled."
-    )
+    logging.warning("Sentence-transformers not available. Semantic caching will be disabled.")
 
 
 class SemanticCacheManager:

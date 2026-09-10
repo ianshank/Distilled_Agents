@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from enhanced_system.core.consensus_inference import ConsensusInference, ConsensusResult
 from enhanced_system.core.enums import AgreementMethod, EnsembleMethod
 

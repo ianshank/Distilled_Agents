@@ -21,6 +21,4 @@ def loads(data: bytes) -> Any:
 def _default(obj: Any) -> Any:
     if hasattr(obj, "isoformat"):
         return obj.isoformat()
-    raise TypeError(
-        f"Object of type {type(obj).__name__} is not JSON serializable"
-    )
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")

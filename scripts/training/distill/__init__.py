@@ -19,8 +19,6 @@ def __getattr__(name: str):
         from .trainer import AgentDistillationTrainer, DistillationTrainer
 
         return (
-            AgentDistillationTrainer
-            if name == "AgentDistillationTrainer"
-            else DistillationTrainer
+            AgentDistillationTrainer if name == "AgentDistillationTrainer" else DistillationTrainer
         )
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

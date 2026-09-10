@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from enhanced_system.core.enums import TrainingStatus
 from enhanced_system.training.data_curator import DataCurator
 from enhanced_system.training.training_orchestrator import TrainingOrchestrator

@@ -17,4 +17,3 @@ A comprehensive enhancement to the Distilled_Agents system with:
 
 __version__ = "1.0.0"
 __author__ = "MangoMAS Team"
-

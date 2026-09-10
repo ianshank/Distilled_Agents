@@ -95,9 +95,7 @@ class AutomatedTrainingSystem:
     async def register_skill(self, skill: RegisteredSkill) -> dict[str, Any]:
         return {"status": "success", "role": skill.role, "adapter_uri": skill.adapter_uri}
 
-    async def package_onnx(
-        self, role: str, adapter_path: str, output_path: str
-    ) -> dict[str, Any]:
+    async def package_onnx(self, role: str, adapter_path: str, output_path: str) -> dict[str, Any]:
         return {
             "status": "success",
             "onnx_model_path": output_path,

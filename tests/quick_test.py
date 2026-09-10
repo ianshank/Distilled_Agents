@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Quick training-data smoke test (delegates to pytest)."""
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
 

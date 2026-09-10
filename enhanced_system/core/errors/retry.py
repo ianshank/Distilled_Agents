@@ -25,9 +25,7 @@ class IntelligentRetryHandler:
         self.error_learner = None
         if config.get("enable_error_learning", True):
             try:
-                self.error_learner = ErrorLearner(
-                    config.get("error_db_path", "./data/errors.db")
-                )
+                self.error_learner = ErrorLearner(config.get("error_db_path", "./data/errors.db"))
             except Exception as exc:
                 logger.warning("Failed to initialize error learner: %s", exc)
 
@@ -73,7 +71,7 @@ class IntelligentRetryHandler:
         return ErrorType.UNKNOWN
 
     def calculate_delay(self, attempt: int) -> float:
-        delay = self.base_delay * (self.exponential_base ** attempt)
+        delay = self.base_delay * (self.exponential_base**attempt)
         return min(delay, self.max_delay)
 
     async def execute_with_retry(

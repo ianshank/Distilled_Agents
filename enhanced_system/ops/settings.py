@@ -18,9 +18,7 @@ class MangoMASSettings(BaseSettings):
     )
 
     aws_region: str = Field(default="us-east-1")
-    execution_role_name: str = Field(
-        default="mangomas-sagemaker-sagemaker-execution-role"
-    )
+    execution_role_name: str = Field(default="mangomas-sagemaker-sagemaker-execution-role")
     s3_bucket_prefix: str = Field(default="mangomas-sagemaker-production")
     training_data_bucket: str = Field(default="mangomas-training-data")
     dynamodb_table: str = Field(default="agent-skill-registry")
