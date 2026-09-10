@@ -240,7 +240,7 @@ class MangoMASSageMakerLauncher:
                 output_path=f"s3://{spec['bucket']}/models/{config.agent_name}/",
             )
             estimator.fit(
-                {"train": f"s3://{spec['bucket']}/datasets/{Path(config.training_file).name}"},
+                {"training": f"s3://{spec['bucket']}/datasets/{Path(config.training_file).name}"},
                 wait=False,
             )
             return {
