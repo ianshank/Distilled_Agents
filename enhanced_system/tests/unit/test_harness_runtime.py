@@ -6,6 +6,7 @@ import ast
 import json
 import logging
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -430,6 +431,68 @@ def test_transformers_backend_requires_inject():
         backend.generate([{"role": "user", "content": "x"}])
     backend = TransformersBackend(generate_fn=lambda messages, **kwargs: ["ok"])
     assert backend.generate([{"role": "user", "content": "x"}]) == ["ok"]
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_transformers_backend_adds_pad_token_and_clamps_greedy_samples(monkeypatch):
+    class FakeTokenizer:
+        pad_token = None
+        eos_token = None
+        pad_token_id = None
+        eos_token_id = None
+
+        @classmethod
+        def from_pretrained(cls, *args, **kwargs):
+            return cls()
+
+        def add_special_tokens(self, values):
+            self.pad_token = values["pad_token"]
+            self.pad_token_id = 99
+
+        def __len__(self):
+            return 100
+
+        def __call__(self, *args, **kwargs):
+            import torch
+
+            return {"input_ids": torch.tensor([[1, 2]]), "attention_mask": torch.tensor([[1, 1]])}
+
+        def decode(self, tokens, **kwargs):
+            return ",".join(str(token) for token in tokens.tolist())
+
+    class FakeModel:
+        @classmethod
+        def from_pretrained(cls, *args, **kwargs):
+            return cls()
+
+        def resize_token_embeddings(self, size):
+            self.resized_to = size
+
+        def to(self, device):
+            self.device = device
+            return self
+
+        def eval(self):
+            return self
+
+        def generate(self, **kwargs):
+            self.kwargs = kwargs
+            import torch
+
+            return torch.tensor([[1, 2, 3]])
+
+    monkeypatch.setitem(
+        sys.modules,
+        "transformers",
+        SimpleNamespace(AutoModelForCausalLM=FakeModel, AutoTokenizer=FakeTokenizer),
+    )
+    backend = TransformersBackend(model_name="local-model")
+    outputs = backend.generate([{"role": "user", "content": "x"}], n=3, temperature=0.0)
+    assert outputs == ["3"]
+    assert backend._tokenizer.pad_token_id == 99
+    assert backend._model.resized_to == 100
+    assert backend._model.kwargs["num_return_sequences"] == 1
 
 
 @pytest.mark.unit

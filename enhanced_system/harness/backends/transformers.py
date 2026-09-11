@@ -44,8 +44,13 @@ class TransformersBackend:
             trust_remote_code=self._trust_remote_code,
             revision=self._model_revision,
         )
+        needs_resize = False
         if self._tokenizer.pad_token is None:
-            self._tokenizer.pad_token = self._tokenizer.eos_token
+            if self._tokenizer.eos_token is not None:
+                self._tokenizer.pad_token = self._tokenizer.eos_token
+            else:
+                self._tokenizer.add_special_tokens({"pad_token": "<pad>"})  # nosec B105
+                needs_resize = True
         if torch.cuda.is_available():
             self._model = AutoModelForCausalLM.from_pretrained(
                 self._model_name,
@@ -61,6 +66,8 @@ class TransformersBackend:
                 trust_remote_code=self._trust_remote_code,
                 revision=self._model_revision,
             )
+        if needs_resize:
+            self._model.resize_token_embeddings(len(self._tokenizer))
         if not torch.cuda.is_available():
             self._model.to(self._device)
         self._model.eval()
@@ -109,6 +116,7 @@ class TransformersBackend:
             generate_kwargs["temperature"] = temperature
         else:
             generate_kwargs["do_sample"] = False
+            generate_kwargs["num_return_sequences"] = 1
         with torch.no_grad():
             outputs = self._model.generate(**inputs, **generate_kwargs)
         prompt_tokens = inputs["input_ids"].shape[1]
