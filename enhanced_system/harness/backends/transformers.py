@@ -120,6 +120,8 @@ class TransformersBackend:
         with torch.no_grad():
             outputs = self._model.generate(**inputs, **generate_kwargs)
         prompt_tokens = inputs["input_ids"].shape[1]
+        if "attention_mask" in inputs:
+            prompt_tokens = int(inputs["attention_mask"][0].sum().item())
         return [
             tokenizer.decode(
                 output[prompt_tokens:],

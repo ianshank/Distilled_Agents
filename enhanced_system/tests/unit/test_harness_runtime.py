@@ -456,7 +456,10 @@ def test_transformers_backend_adds_pad_token_and_clamps_greedy_samples(monkeypat
         def __call__(self, *args, **kwargs):
             import torch
 
-            return {"input_ids": torch.tensor([[1, 2]]), "attention_mask": torch.tensor([[1, 1]])}
+            return {
+                "input_ids": torch.tensor([[1, 2, 0]]),
+                "attention_mask": torch.tensor([[1, 1, 0]]),
+            }
 
         def decode(self, tokens, **kwargs):
             return ",".join(str(token) for token in tokens.tolist())
