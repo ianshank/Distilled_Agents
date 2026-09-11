@@ -108,7 +108,7 @@ Homepage = "https://github.com/ianshank/Distilled_Agents"
 include = ["enhanced_system*", "scripts*"]
 
 [tool.setuptools.package-data]
-enhanced_system = ["config/*.yaml", "config/*.json"]
+enhanced_system = ["config/*.yaml", "config/*.json", "config/harnesses/*"]
 "scripts.training" = ["requirements.txt"]
 
 [tool.pytest.ini_options]
@@ -123,6 +123,8 @@ markers = [
     "e2e: End-to-end tests",
     "slow: Slow running tests",
     "benchmark: Performance benchmarks",
+    "harness: Agent harness runtime and trajectory tests",
+    "regression: CLI/skill contract regressions",
 ]
 asyncio_mode = "auto"
 addopts = "-v --strict-markers --tb=short"

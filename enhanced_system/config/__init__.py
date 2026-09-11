@@ -147,6 +147,11 @@ class Config(BaseModel):
         enable_audit_logging: bool = True
         audit_log_path: str = "./logs/audit.log"
 
+    class HarnessConfig(BaseModel):
+        enabled: bool = True
+        harness_dir: str = ""
+        default_id: str = ""
+
     input_validation: InputValidationConfig = Field(default_factory=InputValidationConfig)
     caching: CachingConfig = Field(default_factory=CachingConfig)
     error_handling: ErrorHandlingConfig = Field(default_factory=ErrorHandlingConfig)
@@ -162,6 +167,7 @@ class Config(BaseModel):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     models: ModelsConfig = Field(default_factory=ModelsConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
+    harness: HarnessConfig = Field(default_factory=HarnessConfig)
 
 
 def _config_search_dirs() -> list[Path]:

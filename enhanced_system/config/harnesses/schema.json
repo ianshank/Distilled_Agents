@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MangoMASHarnessSpec",
+  "type": "object",
+  "required": ["id", "schema_version"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "schema_version": { "type": "string" },
+    "planning": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style": { "enum": ["react", "codeact", "plan_and_solve"] },
+        "max_steps": { "type": "integer", "minimum": 1 },
+        "first_thought_prefix": { "type": "boolean" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tool_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "window_turns": { "type": "integer", "minimum": 1 },
+        "write_observations": { "type": "boolean" }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sag_samples": { "type": "integer", "minimum": 1 },
+        "sag_temperature": { "type": "number", "minimum": 0 },
+        "teacher": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+id: pm_requirements
+schema_version: "1"
+planning:
+  style: react
+action:
+  tool_ids:
+    - pm_acceptance
+    - final_answer
+memory:
+  write_observations: true
