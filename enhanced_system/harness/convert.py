@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def serialize_thought_action(trajectory: Trajectory) -> str:
     """Join thought+action for each step (observations excluded)."""
-    parts = []
+    parts: list[str] = []
     for step in trajectory.steps:
         chunk = " ".join(part for part in (step.thought, step.action) if part).strip()
         if chunk:

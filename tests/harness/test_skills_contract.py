@@ -34,6 +34,12 @@ CLI_REQUIRED_FLAGS = {
     "scripts/deployment/simple_launch_sagemaker.py": {"--cpu"},
     "scripts/infrastructure/security_scan.py": {"--output"},
     "scripts/harness/run_agent.py": {"--task", "--harness-id"},
+    "scripts/harness/collect_trajectories.py": {
+        "--input",
+        "--output",
+        "--harness-id",
+        "--strict",
+    },
     "scripts/harness/tailor_harness.py": {"--harness-id", "--traces", "--archive-dir"},
 }
 
@@ -88,9 +94,26 @@ def test_skills_frontmatter_and_cli_paths():
         assert not cli.is_absolute()
         assert (REPO / cli).is_file(), f"cli path missing: {cli}"
         assert isinstance(data["inputs"], dict) and data["inputs"]
-    assert "mangomas-harness" in names
-    assert "mangomas-train" in names
-    assert "mangomas-tailor" in names
+    skill_dirs = {path.parent.name for path in skill_files}
+    assert names == skill_dirs
+    for required in (
+        "mangomas-collect",
+        "mangomas-evaluate",
+        "mangomas-harness",
+        "mangomas-launch",
+        "mangomas-scan",
+        "mangomas-tailor",
+        "mangomas-train",
+        "mangomas-validate",
+    ):
+        assert required in names
+    agents = (REPO / "AGENTS.md").read_text(encoding="utf-8")
+    cli_by_skill = {}
+    for path in skill_files:
+        data = _parse_frontmatter(path)
+        cli_by_skill[data["name"]] = data["cli"]
+        assert f".cursor/skills/{data['name']}/SKILL.md" in agents
+        assert f"`{data['cli']}`" in agents or data["cli"] in agents
 
 
 @pytest.mark.regression

@@ -18,4 +18,4 @@ python scripts/harness/run_agent.py \
   --harness-id "${MANGOMAS_HARNESS_ID}"
 ```
 
-Collect traces with `scripts/harness/collect_trajectories.py`. Trajectory SFT uses `train_distilled_adapter.py --trajectory_mode True` locally; do not add launcher hyperparameters.
+Collect traces with the `mangomas-collect` skill (`scripts/harness/collect_trajectories.py`). Trajectory SFT uses `train_distilled_adapter.py --trajectory_mode True` locally; do not add launcher hyperparameters.

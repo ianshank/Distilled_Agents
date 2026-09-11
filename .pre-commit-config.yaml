@@ -16,3 +16,19 @@ repos:
         args: ["--maxkb=500"]
       - id: check-merge-conflict
       - id: check-toml
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [pydantic>=2.0.0, pydantic-settings>=2.0.0, types-PyYAML]
+        args:
+          - enhanced_system/ops
+          - enhanced_system/core/cache
+          - enhanced_system/harness
+        pass_filenames: false

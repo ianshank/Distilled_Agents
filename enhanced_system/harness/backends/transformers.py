@@ -10,7 +10,7 @@ class TransformersBackend:
 
     def __init__(
         self,
-        generate_fn=None,
+        generate_fn: Any = None,
         *,
         model_name: Optional[str] = None,
         trust_remote_code: bool = False,
@@ -24,9 +24,9 @@ class TransformersBackend:
         self._model_revision = model_revision
         self._max_input_length = max_input_length
         self._max_new_tokens = max_new_tokens
-        self._tokenizer = None
-        self._model = None
-        self._device = None
+        self._tokenizer: Any = None
+        self._model: Any = None
+        self._device: Any = None
 
     def _ensure_model(self) -> tuple[Any, Any, Any]:
         if self._generate_fn is not None:
@@ -91,7 +91,8 @@ class TransformersBackend:
     ) -> list[str]:
         generate_fn, tokenizer, device = self._ensure_model()
         if generate_fn is not None:
-            return generate_fn(list(messages), prefix=prefix, n=n, temperature=temperature)
+            generated = generate_fn(list(messages), prefix=prefix, n=n, temperature=temperature)
+            return [str(item) for item in generated]
         import torch
 
         prompt = self._render_prompt(messages, prefix)

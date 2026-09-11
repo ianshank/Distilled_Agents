@@ -4,6 +4,10 @@
 
 The MangoMAS Agent Distillation System enables knowledge transfer from large, powerful teacher models to smaller, specialized student models. This approach allows for efficient deployment of AI agents while maintaining high performance through knowledge distillation techniques.
 
+## Trajectory SFT (local)
+
+`python scripts/training/train_distilled_adapter.py --trajectory_mode True` uses `scripts/training/distill/trajectory_collator.py` (observation masking) and sets `distillation_alpha` from `MANGOMAS_TRAJECTORY_DISTILL_ALPHA` (default `0.0`). Collect traces with `scripts/harness/collect_trajectories.py`. SageMaker `create_job_spec` does not take trajectory keys until argparse and the launcher change together.
+
 ## 🎯 Key Features
 
 - **Knowledge Distillation**: Transfer knowledge from large models to smaller, efficient ones

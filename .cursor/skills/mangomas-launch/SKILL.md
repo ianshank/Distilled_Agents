@@ -4,7 +4,7 @@ description: Launch SageMaker training jobs with the thin CLI wrapper. Use when 
 cli: scripts/deployment/simple_launch_sagemaker.py
 inputs:
   cpu: Use CPU instance from MANGOMAS_CPU_INSTANCE_TYPE (CLI --cpu)
-  region: AWS region from MANGOMAS_AWS_REGION
+  region: AWS region from settings (`MANGOMAS_AWS_REGION`); not a CLI flag
 ---
 
 # Launch SageMaker jobs

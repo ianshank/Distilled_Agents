@@ -1,0 +1,22 @@
+name: MangoMAS validate
+description: Run the full pre-PR suite (ruff, mypy, pytest AQA, bandit, gitleaks)
+
+runs:
+  using: composite
+  steps:
+    - name: Install package
+      shell: bash
+      run: python -m pip install -e ".[dev]"
+
+    - name: Install gitleaks
+      shell: bash
+      run: |
+        version="8.21.2"
+        archive="gitleaks_${version}_linux_x64.tar.gz"
+        curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/${archive}" \
+          | tar -xz -C "${RUNNER_TEMP}" gitleaks
+        echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
+    - name: Validate
+      shell: bash
+      run: make validate

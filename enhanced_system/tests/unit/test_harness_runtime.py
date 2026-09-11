@@ -7,12 +7,12 @@ import json
 import logging
 import re
 import sys
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from datasets import Dataset
 from enhanced_system.config import load_config
 from enhanced_system.harness.adapters import RouterAdapter, SkillEvalAdapter, harness_id_for_agent
 from enhanced_system.harness.backends.echo import EchoBackend
@@ -35,7 +35,6 @@ from enhanced_system.harness.types import HarnessSpec, Step, Trajectory
 from enhanced_system.ops.sagemaker_launcher import MangoMASSageMakerLauncher
 from enhanced_system.ops.settings import get_settings
 from scripts.training.distill.sagemaker_io import texts_from_examples
-from scripts.training.distill.trainer import AgentDistillationTrainer
 from scripts.training.distill.trajectory_collator import (
     TrajectoryDataCollator,
     encode_row,
@@ -106,6 +105,16 @@ def _trainer_args(**overrides):
     }
     base.update(overrides)
     return SimpleNamespace(**base)
+
+
+def _training_test_deps():
+    pytest.importorskip("datasets")
+    pytest.importorskip("torch")
+    pytest.importorskip("transformers")
+    from datasets import Dataset
+    from scripts.training.distill.trainer import AgentDistillationTrainer
+
+    return Dataset, AgentDistillationTrainer
 
 
 @pytest.mark.unit
@@ -212,6 +221,22 @@ def test_runtime_reaches_final_answer():
     result = runtime.run("Write a short greeting", harness_id="base_react")
     assert result.final_answer == "hello"
     assert result.truncated is False
+    assert "harness_seed" in result.metadata
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_runtime_preserves_newlines_when_pii_off():
+    task = "Write a short greeting\nwith a second line"
+    runtime = HarnessFactory.create(
+        {
+            "harness_id": "base_react",
+            "strict_injection": False,
+            "scripted": ['{"tool": "final_answer", "args": {"text": "hi"}}'],
+        }
+    )
+    result = runtime.run(task, harness_id="base_react")
+    assert "\n" in result.trajectory.task
 
 
 @pytest.mark.unit
@@ -315,6 +340,25 @@ def test_trace_store_appends(tmp_path):
     lines = (tmp_path / "t.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     assert json.loads(lines[0])["task"] == "x"
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_trace_store_concurrent_appends(tmp_path):
+    store = JsonlTraceStore(tmp_path / "t.jsonl")
+
+    def _write() -> None:
+        store.append(Trajectory(task="x", final_answer="y"))
+
+    threads = [threading.Thread(target=_write) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    lines = (tmp_path / "t.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 8
+    for line in lines:
+        json.loads(line)
 
 
 @pytest.mark.unit
@@ -436,6 +480,8 @@ def test_transformers_backend_requires_inject():
 @pytest.mark.unit
 @pytest.mark.harness
 def test_transformers_backend_adds_pad_token_and_clamps_greedy_samples(monkeypatch):
+    torch = pytest.importorskip("torch")
+
     class FakeTokenizer:
         pad_token = None
         eos_token = None
@@ -454,8 +500,6 @@ def test_transformers_backend_adds_pad_token_and_clamps_greedy_samples(monkeypat
             return 100
 
         def __call__(self, *args, **kwargs):
-            import torch
-
             return {
                 "input_ids": torch.tensor([[1, 2, 0]]),
                 "attention_mask": torch.tensor([[1, 1, 0]]),
@@ -481,8 +525,6 @@ def test_transformers_backend_adds_pad_token_and_clamps_greedy_samples(monkeypat
 
         def generate(self, **kwargs):
             self.kwargs = kwargs
-            import torch
-
             return torch.tensor([[1, 2, 3]])
 
     monkeypatch.setitem(
@@ -519,6 +561,24 @@ def test_no_hardcoded_cloud_literals():
             if pattern.search(text):
                 offenders.append(str(path.relative_to(REPO)))
     assert not offenders, offenders
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_dual_harness_yaml_trees_match():
+    repo = REPO / "configs" / "harnesses"
+    packaged = REPO / "enhanced_system" / "config" / "harnesses"
+    repo_files = {path.name: path.read_bytes() for path in repo.iterdir() if path.is_file()}
+    pkg_files = {path.name: path.read_bytes() for path in packaged.iterdir() if path.is_file()}
+    assert repo_files == pkg_files
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_dual_agent_profiles_match():
+    repo = REPO / "configs" / "agent_profiles.json"
+    packaged = REPO / "enhanced_system" / "config" / "agent_profiles.json"
+    assert repo.read_bytes() == packaged.read_bytes()
 
 
 @pytest.mark.unit
@@ -572,6 +632,16 @@ def test_validator_rejects_empty_task():
     runtime = HarnessFactory.create({"harness_id": "base_react"})
     with pytest.raises(ValueError):
         runtime.run("   ", harness_id="base_react")
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_factory_create_without_harness_id(monkeypatch):
+    monkeypatch.setenv("MANGOMAS_HARNESS_ID", "")
+    get_settings.cache_clear()
+    runtime = HarnessFactory.create({})
+    with pytest.raises(FileNotFoundError, match="harness id is required"):
+        runtime.run("Write a short greeting")
 
 
 @pytest.mark.unit
@@ -745,6 +815,32 @@ def test_ftp_empty_prefix_and_sag_no_valid():
 
 @pytest.mark.unit
 @pytest.mark.harness
+def test_observation_sql_does_not_abort_loop(monkeypatch):
+    class SqlThenAnswer:
+        def run(self, payload):
+            if payload.get("text") or payload.get("answer"):
+                return get_tool("final_answer").run(payload)
+            return "SELECT * FROM users WHERE id = 1"
+
+    monkeypatch.setattr(
+        "enhanced_system.harness.runtime.get_tool", lambda _tool_id: SqlThenAnswer()
+    )
+    backend = EchoBackend(
+        [
+            '{"tool": "json_schema", "args": {"required": ["a"], "document": {"a": 1}}}',
+            '{"tool": "final_answer", "args": {"text": "ok"}}',
+        ]
+    )
+    spec = load_spec("swe_codeact")
+    spec.policy.teacher = False
+    spec.planning.first_thought_prefix = False
+    result = AgentRuntime(backend, spec=spec).run("Write a short greeting")
+    assert result.final_answer == "ok"
+    assert "SELECT" in result.trajectory.steps[0].observation
+
+
+@pytest.mark.unit
+@pytest.mark.harness
 def test_tools_string_document_and_invalid_payloads():
     assert json.loads(get_tool("json_schema").run({"required": ["a"], "document": '{"a": 1}'}))[
         "ok"
@@ -865,6 +961,7 @@ def test_collator_detects_all_masked_trajectory():
 @pytest.mark.unit
 @pytest.mark.harness
 def test_trajectory_mode_filters_unsupervised_rows(monkeypatch):
+    Dataset, AgentDistillationTrainer = _training_test_deps()
     dataset = Dataset.from_list(
         [
             {
@@ -883,7 +980,9 @@ def test_trajectory_mode_filters_unsupervised_rows(monkeypatch):
         "scripts.training.distill.trainer.resolve_train_file",
         lambda train_file=None: train_file or "train.jsonl",
     )
-    monkeypatch.setattr("scripts.training.distill.trainer.load_tokenizer", lambda *args, **kwargs: _TokenizerStub())
+    monkeypatch.setattr(
+        "scripts.training.distill.trainer.load_tokenizer", lambda *args, **kwargs: _TokenizerStub()
+    )
     trainer = AgentDistillationTrainer(_trainer_args(trajectory_mode=True))
     prepared = trainer.prepare_dataset()
     assert len(prepared) == 1
@@ -893,6 +992,7 @@ def test_trajectory_mode_filters_unsupervised_rows(monkeypatch):
 @pytest.mark.unit
 @pytest.mark.harness
 def test_trajectory_eval_keeps_raw_rows(monkeypatch):
+    Dataset, AgentDistillationTrainer = _training_test_deps()
     dataset = Dataset.from_list(
         [{"prompt": "p", "completion": "c", "trajectory": {"steps": [{"action": "a"}]}}]
     )
@@ -900,7 +1000,9 @@ def test_trajectory_eval_keeps_raw_rows(monkeypatch):
         "scripts.training.distill.trainer.load_dataset",
         lambda *args, **kwargs: {"eval": dataset},
     )
-    monkeypatch.setattr("scripts.training.distill.trainer.load_tokenizer", lambda *args, **kwargs: _TokenizerStub())
+    monkeypatch.setattr(
+        "scripts.training.distill.trainer.load_tokenizer", lambda *args, **kwargs: _TokenizerStub()
+    )
     trainer = AgentDistillationTrainer(_trainer_args(trajectory_mode=True, eval_file="eval.jsonl"))
     prepared = trainer.prepare_eval_dataset()
     assert prepared is not None
@@ -911,6 +1013,7 @@ def test_trajectory_eval_keeps_raw_rows(monkeypatch):
 @pytest.mark.unit
 @pytest.mark.harness
 def test_trajectory_mode_skips_teacher_load(monkeypatch, tmp_path):
+    _, AgentDistillationTrainer = _training_test_deps()
     captured = {}
 
     class FakeTrainingArguments:
@@ -929,13 +1032,19 @@ def test_trajectory_mode_skips_teacher_load(monkeypatch, tmp_path):
 
     monkeypatch.setattr("scripts.training.distill.trainer.TrainingArguments", FakeTrainingArguments)
     monkeypatch.setattr("scripts.training.distill.trainer.DistillationTrainer", FakeTrainer)
-    monkeypatch.setattr("scripts.training.distill.trainer.load_tokenizer", lambda *args, **kwargs: _TokenizerStub())
+    monkeypatch.setattr(
+        "scripts.training.distill.trainer.load_tokenizer", lambda *args, **kwargs: _TokenizerStub()
+    )
     trainer = AgentDistillationTrainer(
         _trainer_args(trajectory_mode=True, distillation_alpha=0.0, output_dir=str(tmp_path))
     )
-    trainer.load_teacher_model = lambda: pytest.fail("teacher model should not load in trajectory mode")
+    trainer.load_teacher_model = lambda: pytest.fail(
+        "teacher model should not load in trajectory mode"
+    )
     trainer.load_student_model = lambda: object()
-    trainer.prepare_dataset = lambda: [{"prompt": "p", "completion": "c", "trajectory": {"steps": []}}]
+    trainer.prepare_dataset = lambda: [
+        {"prompt": "p", "completion": "c", "trajectory": {"steps": []}}
+    ]
     trainer.prepare_eval_dataset = lambda: None
     trainer.save_training_metadata = lambda _output_dir: None
     trainer.train()
@@ -998,7 +1107,8 @@ def test_trajectory_mode_zeros_distillation_alpha():
     )
     assert "--trajectory_mode" in text
     assert 'type=str, default="False"' in text
-    assert "args.distillation_alpha = 0.0" in text
+    assert "MANGOMAS_TRAJECTORY_DISTILL_ALPHA" in text
+    assert "parse_trajectory_distill_alpha" in text
     trainer = (REPO / "scripts" / "training" / "distill" / "trainer.py").read_text(encoding="utf-8")
     assert "TrajectoryDataCollator" in trainer
     assert 'getattr(self.args, "trajectory_mode", False)' in trainer

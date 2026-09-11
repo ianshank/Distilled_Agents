@@ -33,13 +33,14 @@ def _parse_json(text: str, allowed: set[str]) -> tuple[str, dict[str, Any]]:
     if not isinstance(payload, dict):
         raise DispatchError("json action must be an object")
     tool_id = payload.get("tool")
-    args = payload["args"] if "args" in payload else {}
-    if args is None:
-        args = {}
+    raw_args: Any = payload["args"] if "args" in payload else {}
+    if raw_args is None:
+        raw_args = {}
     if not isinstance(tool_id, str) or not tool_id:
         raise DispatchError("json action missing tool")
-    if not isinstance(args, dict):
+    if not isinstance(raw_args, dict):
         raise DispatchError("args must be an object")
+    args: dict[str, Any] = {str(key): value for key, value in raw_args.items()}
     _ensure_allowed(tool_id, allowed)
     return tool_id, args
 
@@ -70,7 +71,12 @@ def _literal(node: ast.AST) -> Any:
     if isinstance(node, ast.List):
         return [_literal(item) for item in node.elts]
     if isinstance(node, ast.Dict):
-        return {_literal(key): _literal(value) for key, value in zip(node.keys, node.values)}
+        mapping: dict[Any, Any] = {}
+        for key, value in zip(node.keys, node.values):
+            if key is None:
+                raise DispatchError("only literal arguments are allowed")
+            mapping[_literal(key)] = _literal(value)
+        return mapping
     raise DispatchError("only literal arguments are allowed")
 
 

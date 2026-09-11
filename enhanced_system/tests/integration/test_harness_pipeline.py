@@ -29,3 +29,27 @@ def test_validator_runtime_convert_pipeline():
     assert row["prompt"] == result.trajectory.task
     assert "hello user" in result.final_answer
     assert row["prompt"] in text
+
+
+@pytest.mark.integration
+@pytest.mark.harness
+def test_tool_observation_quotes_do_not_abort():
+    from enhanced_system.harness.backends.echo import EchoBackend
+    from enhanced_system.harness.registry import load_spec
+    from enhanced_system.harness.runtime import AgentRuntime
+
+    spec = load_spec("swe_codeact")
+    spec.policy.teacher = False
+    spec.planning.first_thought_prefix = False
+    runtime = AgentRuntime(
+        EchoBackend(
+            [
+                '{"tool": "json_schema", "args": {"required": ["a"], "document": {"a": 1}}}',
+                '{"tool": "final_answer", "args": {"text": "ok"}}',
+            ]
+        ),
+        spec=spec,
+    )
+    result = runtime.run("Write a short greeting")
+    assert result.final_answer == "ok"
+    assert "{" in result.trajectory.steps[0].observation

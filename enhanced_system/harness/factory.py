@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from enhanced_system.core.input_validator import InputValidator
 from enhanced_system.harness.backends.echo import EchoBackend
 from enhanced_system.harness.backends.transformers import TransformersBackend
 from enhanced_system.harness.registry import load_spec
@@ -44,11 +45,21 @@ class HarnessFactory:
         spec = payload.get("spec")
         if spec is None and harness_id:
             spec = load_spec(harness_id, settings)
+        validator = payload.get("validator")
+        if validator is None:
+            validator = InputValidator(
+                {
+                    "max_length": settings.harness_max_length,
+                    "enable_pii_detection": False,
+                    "enable_injection_detection": bool(payload.get("strict_injection", True)),
+                }
+            )
         backend = _resolve_backend(payload, settings, spec)
         return AgentRuntime(
             backend,
             spec=spec,
             settings=settings,
+            validator=validator,
             teacher=payload.get("teacher"),
             store=payload.get("store"),
         )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from enhanced_system.core.input_validator import InputValidator
@@ -13,6 +14,8 @@ from enhanced_system.harness.registry import load_spec
 from enhanced_system.harness.tools.registry import get_tool
 from enhanced_system.harness.types import HarnessRunResult, HarnessSpec, Step, Trajectory
 from enhanced_system.ops.settings import MangoMASSettings, get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class AgentRuntime:
@@ -46,7 +49,10 @@ class AgentRuntime:
         validation = self.validator.validate_task_input(task)
         if not validation.is_valid:
             raise ValueError(validation.error_message or "invalid task")
-        sanitized = validation.sanitized_input or task
+        # Keep original text when PII is off so CodeAct collect does not flatten newlines.
+        recorded = (
+            validation.sanitized_input or task if self.validator.enable_pii_detection else task
+        )
         spec_id = harness_id or self.settings.harness_id
         spec = self.spec or load_spec(spec_id, self.settings)
         if spec_id and spec.id != spec_id:
@@ -55,17 +61,23 @@ class AgentRuntime:
         teacher = self.teacher if self.teacher is not None else spec.policy.teacher
         prefix = maybe_prefix(
             self.backend,
-            sanitized,
+            recorded,
             enabled=spec.planning.first_thought_prefix,
             teacher=teacher,
         )
-        trajectory = Trajectory(harness_id=spec.id, task=sanitized)
+        trajectory = Trajectory(harness_id=spec.id, task=recorded)
         max_steps = spec.planning.max_steps or self.settings.harness_max_steps
         window = spec.memory.window_turns or self.settings.harness_memory_window
-        messages = [{"role": "user", "content": sanitized}]
+        messages = [{"role": "user", "content": recorded}]
         truncated = True
         final_answer = ""
-        for _ in range(max_steps):
+        logger.info(
+            "harness start harness_id=%s seed=%s max_steps=%s",
+            spec.id,
+            self.settings.harness_seed,
+            max_steps,
+        )
+        for step_idx in range(max_steps):
             try:
                 raw, _tool_name = generate_action(
                     self.backend,
@@ -76,7 +88,6 @@ class AgentRuntime:
                     prefix=prefix,
                 )
                 thought = prefix or ""
-                prefix = None
                 tool_id, args = parse_action(raw, allowed)
                 observation = get_tool(tool_id).run(args)
                 step = Step(
@@ -86,6 +97,12 @@ class AgentRuntime:
                     tool_id=tool_id,
                 )
                 trajectory.steps.append(step)
+                logger.info(
+                    "harness step=%s harness_id=%s tool=%s",
+                    step_idx,
+                    spec.id,
+                    tool_id,
+                )
                 if tool_id == "final_answer":
                     final_answer = observation
                     truncated = False
@@ -98,7 +115,10 @@ class AgentRuntime:
                 fault = "parse_error" if isinstance(exc, DispatchError) else "tool_error"
                 trajectory.faults.append(fault)
                 trajectory.steps.append(Step(action="", observation=str(exc), fault=fault))
+                logger.warning("harness step=%s harness_id=%s fault=%s", step_idx, spec.id, fault)
                 messages.append({"role": "user", "content": f"{fault}: {exc}"})
+            finally:
+                prefix = None
         if truncated:
             trajectory.faults.append("loop")
         result = HarnessRunResult(
@@ -106,6 +126,13 @@ class AgentRuntime:
             trajectory=trajectory,
             harness_id=spec.id,
             truncated=truncated,
+            metadata={"harness_seed": self.settings.harness_seed},
+        )
+        logger.info(
+            "harness done harness_id=%s truncated=%s steps=%s",
+            spec.id,
+            truncated,
+            len(trajectory.steps),
         )
         if self.store is not None:
             self.store.append(trajectory)

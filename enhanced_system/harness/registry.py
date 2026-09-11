@@ -63,7 +63,7 @@ def load_spec(harness_id: str, settings: Optional[MangoMASSettings] = None) -> H
     return apply_settings(spec, settings)
 
 
-def validate_payload(raw: dict[str, Any], schema: dict[str, Any], path: str = "$") -> None:
+def validate_payload(raw: Any, schema: dict[str, Any], path: str = "$") -> None:
     """Validate a YAML mapping against the checked-in JSON Schema (no jsonschema dep)."""
     _check_schema(raw, schema, path)
 
@@ -89,12 +89,15 @@ def apply_settings(spec: HarnessSpec, settings: Optional[MangoMASSettings] = Non
     return filled
 
 
-def load_schema() -> dict:
+def load_schema() -> dict[str, Any]:
     """Return the checked-in JSON Schema mapping."""
     for directory in harness_search_dirs():
         candidate = directory / "schema.json"
         if candidate.is_file():
-            return json.loads(candidate.read_text(encoding="utf-8"))
+            payload: Any = json.loads(candidate.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict):
+                raise ValueError(f"harness schema must be an object: {candidate}")
+            return payload
     raise FileNotFoundError("harness schema.json not found")
 
 

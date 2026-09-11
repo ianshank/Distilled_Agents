@@ -94,7 +94,10 @@ Thumbs.db
 # Generated local reports
 sagemaker_training_results.json
 security_report.json
+gitleaks-report.json
 
 # Harness rollouts (local collection)
 data/training/trajectories/
 configs/harnesses/archive/
+*.raw.jsonl
+*.raw.traces.jsonl

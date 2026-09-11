@@ -1,0 +1,24 @@
+# MangoMAS Gitleaks config (extends the default rule set).
+title = "MangoMAS"
+
+[extend]
+useDefault = true
+
+# Fictional credentials in the env template and checked-in training fixtures.
+# New JSONL under data/training/ is scanned; add a path only for known fixtures.
+[allowlist]
+description = "Example env template and checked-in training JSONL fixtures"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)data/training/architect_agent\.jsonl$''',
+  '''(^|/)data/training/architect_agent_real_data\.jsonl$''',
+  '''(^|/)data/training/devops_agent\.jsonl$''',
+  '''(^|/)data/training/product_manager_agent_real_data\.jsonl$''',
+  '''(^|/)data/training/sample_training_data\.jsonl$''',
+  '''(^|/)data/training/sqe_agent\.jsonl$''',
+  '''(^|/)data/training/sqe_agent_real_data\.jsonl$''',
+  '''(^|/)data/training/swe_agent\.jsonl$''',
+  '''(^|/)data/training/swe_agent_real_data\.jsonl$''',
+  '''(^|/)data/training/tools_agent\.jsonl$''',
+  '''(^|/)data/training/vp_product_agent\.jsonl$''',
+]

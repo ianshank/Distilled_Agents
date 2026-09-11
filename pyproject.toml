@@ -180,11 +180,13 @@ ignore = [
 quote-style = "double"
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
 check_untyped_defs = true
+# Silent (not skip): listed packages still fail the gate; untyped god files do not.
+follow_imports = "silent"
 
 [tool.bandit]
 exclude_dirs = ["tests", "enhanced_system/tests", ".venv", "enhanced_system/examples"]
