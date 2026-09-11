@@ -6,10 +6,12 @@ import ast
 import json
 import logging
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from datasets import Dataset
 from enhanced_system.config import load_config
 from enhanced_system.harness.adapters import RouterAdapter, SkillEvalAdapter, harness_id_for_agent
 from enhanced_system.harness.backends.echo import EchoBackend
@@ -32,7 +34,12 @@ from enhanced_system.harness.types import HarnessSpec, Step, Trajectory
 from enhanced_system.ops.sagemaker_launcher import MangoMASSageMakerLauncher
 from enhanced_system.ops.settings import get_settings
 from scripts.training.distill.sagemaker_io import texts_from_examples
-from scripts.training.distill.trajectory_collator import TrajectoryDataCollator, encode_row
+from scripts.training.distill.trainer import AgentDistillationTrainer
+from scripts.training.distill.trajectory_collator import (
+    TrajectoryDataCollator,
+    encode_row,
+    has_supervised_tokens,
+)
 
 REPO = Path(__file__).resolve().parents[3]
 HARNESS_ROOT = REPO / "enhanced_system" / "harness"
@@ -46,11 +53,58 @@ FORBIDDEN = (
 )
 
 
+@dataclass
+class _TokenizerStub:
+    pad_token_id: int = 0
+
+    def encode(self, text, add_special_tokens=False):
+        return [ord(ch) % 20 + 1 for ch in text] if text else []
+
+    def save_pretrained(self, _path):
+        return None
+
+
 @pytest.fixture(autouse=True)
 def _clear_settings():
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+
+
+def _trainer_args(**overrides):
+    base = {
+        "use_wandb": False,
+        "teacher_model_name": "teacher",
+        "student_model_name": "student",
+        "train_file": "train.jsonl",
+        "eval_file": None,
+        "max_length": 16,
+        "output_dir": "/tmp/out",
+        "num_train_epochs": 1,
+        "per_device_train_batch_size": 1,
+        "per_device_eval_batch_size": 1,
+        "gradient_accumulation_steps": 1,
+        "learning_rate": 1e-4,
+        "weight_decay": 0.0,
+        "warmup_steps": 0,
+        "distillation_alpha": 0.5,
+        "temperature": 2.0,
+        "use_lora": False,
+        "lora_r": 8,
+        "lora_alpha": 16,
+        "lora_dropout": 0.0,
+        "lora_target_modules": "q_proj,v_proj",
+        "use_fp16": False,
+        "use_device_map": False,
+        "trust_remote_code": False,
+        "logging_steps": 1,
+        "save_steps": 1,
+        "save_total_limit": 1,
+        "eval_steps": 1,
+        "trajectory_mode": False,
+    }
+    base.update(overrides)
+    return SimpleNamespace(**base)
 
 
 @pytest.mark.unit
@@ -173,6 +227,20 @@ def test_ftp_prefix_only_for_teacher():
     assert backend.call_count >= 2
     assert result.final_answer == "done"
     assert backend.last_prefix == "first thought"
+    assert result.trajectory.steps[0].thought == "first thought"
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_explicit_teacher_false_overrides_spec_teacher():
+    spec = load_spec("swe_codeact")
+    backend = EchoBackend(['{"tool": "final_answer", "args": {"text": "done"}}'])
+    runtime = AgentRuntime(backend, spec=spec, teacher=False)
+    result = runtime.run("Explain a ping endpoint", harness_id="swe_codeact")
+    assert backend.call_count == 1
+    assert backend.last_prefix is None
+    assert result.final_answer == "done"
+    assert result.trajectory.steps[0].thought == ""
 
 
 @pytest.mark.unit
@@ -362,6 +430,15 @@ def test_transformers_backend_requires_inject():
         backend.generate([{"role": "user", "content": "x"}])
     backend = TransformersBackend(generate_fn=lambda messages, **kwargs: ["ok"])
     assert backend.generate([{"role": "user", "content": "x"}]) == ["ok"]
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_factory_uses_model_backend_without_scripted(monkeypatch):
+    monkeypatch.setenv("MANGOMAS_HARNESS_ID", "base_react")
+    get_settings.cache_clear()
+    runtime = HarnessFactory.create()
+    assert isinstance(runtime.backend, TransformersBackend)
 
 
 @pytest.mark.unit
@@ -668,7 +745,12 @@ def test_factory_settings_store_and_adapters(tmp_path, monkeypatch):
     monkeypatch.setenv("MANGOMAS_HARNESS_ID", "base_react")
     get_settings.cache_clear()
     store = JsonlTraceStore(tmp_path / "s.jsonl")
-    runtime = HarnessFactory.create({"store": store})
+    runtime = HarnessFactory.create(
+        {
+            "store": store,
+            "scripted": ['{"tool": "final_answer", "args": {"text": "stored"}}'],
+        }
+    )
     assert runtime.spec.id == "base_react"
     runtime.run("Write a short greeting")
     assert (tmp_path / "s.jsonl").is_file()
@@ -697,6 +779,102 @@ def test_collator_empty_and_non_trajectory():
     assert "labels" in empty
     encoded = encode_row(Tok(), {"prompt": "p", "completion": "c", "trajectory": []}, max_length=8)
     assert encoded["labels"][-1] != -100 or encoded["input_ids"]
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_collator_detects_all_masked_trajectory():
+    class Tok:
+        def encode(self, text, add_special_tokens=False):
+            return [7] if text else []
+
+    row = {
+        "prompt": "p",
+        "completion": "",
+        "trajectory": {"steps": [{"thought": "", "action": "", "observation": "fault"}]},
+    }
+    assert has_supervised_tokens(Tok(), row, max_length=8) is False
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_trajectory_mode_filters_unsupervised_rows(monkeypatch):
+    dataset = Dataset.from_list(
+        [
+            {
+                "prompt": "p",
+                "completion": "",
+                "trajectory": {"steps": [{"thought": "", "action": "", "observation": "fault"}]},
+            },
+            {"prompt": "p", "completion": "c", "trajectory": {"steps": []}},
+        ]
+    )
+    monkeypatch.setattr(
+        "scripts.training.distill.trainer.load_dataset",
+        lambda *args, **kwargs: {"train": dataset, "eval": dataset},
+    )
+    monkeypatch.setattr(
+        "scripts.training.distill.trainer.resolve_train_file",
+        lambda train_file=None: train_file or "train.jsonl",
+    )
+    monkeypatch.setattr("scripts.training.distill.trainer.load_tokenizer", lambda *args, **kwargs: _TokenizerStub())
+    trainer = AgentDistillationTrainer(_trainer_args(trajectory_mode=True))
+    prepared = trainer.prepare_dataset()
+    assert len(prepared) == 1
+    assert set(prepared.column_names) >= {"prompt", "completion", "trajectory"}
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_trajectory_eval_keeps_raw_rows(monkeypatch):
+    dataset = Dataset.from_list(
+        [{"prompt": "p", "completion": "c", "trajectory": {"steps": [{"action": "a"}]}}]
+    )
+    monkeypatch.setattr(
+        "scripts.training.distill.trainer.load_dataset",
+        lambda *args, **kwargs: {"eval": dataset},
+    )
+    monkeypatch.setattr("scripts.training.distill.trainer.load_tokenizer", lambda *args, **kwargs: _TokenizerStub())
+    trainer = AgentDistillationTrainer(_trainer_args(trajectory_mode=True, eval_file="eval.jsonl"))
+    prepared = trainer.prepare_eval_dataset()
+    assert prepared is not None
+    assert set(prepared.column_names) >= {"prompt", "completion", "trajectory"}
+    assert "input_ids" not in prepared.column_names
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_trajectory_mode_skips_teacher_load(monkeypatch, tmp_path):
+    captured = {}
+
+    class FakeTrainingArguments:
+        def __init__(self, **kwargs):
+            captured["training_args"] = kwargs
+
+    class FakeTrainer:
+        def __init__(self, *args, **kwargs):
+            captured["teacher_model"] = kwargs["teacher_model"]
+
+        def train(self):
+            captured["trained"] = True
+
+        def save_model(self, output_dir):
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr("scripts.training.distill.trainer.TrainingArguments", FakeTrainingArguments)
+    monkeypatch.setattr("scripts.training.distill.trainer.DistillationTrainer", FakeTrainer)
+    monkeypatch.setattr("scripts.training.distill.trainer.load_tokenizer", lambda *args, **kwargs: _TokenizerStub())
+    trainer = AgentDistillationTrainer(
+        _trainer_args(trajectory_mode=True, distillation_alpha=0.0, output_dir=str(tmp_path))
+    )
+    trainer.load_teacher_model = lambda: pytest.fail("teacher model should not load in trajectory mode")
+    trainer.load_student_model = lambda: object()
+    trainer.prepare_dataset = lambda: [{"prompt": "p", "completion": "c", "trajectory": {"steps": []}}]
+    trainer.prepare_eval_dataset = lambda: None
+    trainer.save_training_metadata = lambda _output_dir: None
+    trainer.train()
+    assert captured["teacher_model"] is None
+    assert captured["trained"] is True
 
 
 @pytest.mark.unit

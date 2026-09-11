@@ -26,7 +26,7 @@ class AgentRuntime:
         settings: Optional[MangoMASSettings] = None,
         validator: Optional[InputValidator] = None,
         store: Optional[TraceStore] = None,
-        teacher: bool = False,
+        teacher: Optional[bool] = None,
     ) -> None:
         self.backend = backend
         self.spec = spec
@@ -52,7 +52,7 @@ class AgentRuntime:
         if spec_id and spec.id != spec_id:
             spec = load_spec(spec_id, self.settings)
         allowed = allowed_tools(spec.action.tool_ids)
-        teacher = self.teacher or spec.policy.teacher
+        teacher = self.teacher if self.teacher is not None else spec.policy.teacher
         prefix = maybe_prefix(
             self.backend,
             sanitized,
@@ -75,11 +75,12 @@ class AgentRuntime:
                     temperature=spec.policy.sag_temperature,
                     prefix=prefix,
                 )
+                thought = prefix or ""
                 prefix = None
                 tool_id, args = parse_action(raw, allowed)
                 observation = get_tool(tool_id).run(args)
                 step = Step(
-                    thought="",
+                    thought=thought,
                     action=raw,
                     observation=observation if spec.memory.write_observations else "",
                     tool_id=tool_id,

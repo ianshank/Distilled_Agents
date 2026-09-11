@@ -77,8 +77,15 @@ class AgentDistillationTrainer:
         train_file = resolve_train_file(train_file=getattr(self.args, "train_file", None))
         dataset = load_dataset("json", data_files={"train": train_file})  # nosec B615
         if getattr(self.args, "trajectory_mode", False):
+            from .trajectory_collator import has_supervised_tokens
+
             logger.info("Trajectory mode: keeping raw columns for masked collator")
-            return dataset["train"]
+            tokenizer = load_tokenizer(self.args.student_model_name, self.args)
+            filtered = dataset["train"].filter(
+                lambda row: has_supervised_tokens(tokenizer, row, self.args.max_length)
+            )
+            logger.info("Trajectory mode: filtered %s -> %s rows", len(dataset["train"]), len(filtered))
+            return filtered
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
 
         def tokenize_function(examples):
@@ -99,7 +106,9 @@ class AgentDistillationTrainer:
 
     def train(self):
         logger.info("Starting agent distillation training")
-        teacher_model = self.load_teacher_model()
+        teacher_model = None
+        if self.args.distillation_alpha > 0 and not getattr(self.args, "trajectory_mode", False):
+            teacher_model = self.load_teacher_model()
         student_model = self.load_student_model()
         if self.args.use_lora:
             student_model = get_peft_model(student_model, self.setup_lora_config())
@@ -157,6 +166,15 @@ class AgentDistillationTrainer:
         if not self.args.eval_file:
             return None
         dataset = load_dataset("json", data_files={"eval": self.args.eval_file})  # nosec B615
+        if getattr(self.args, "trajectory_mode", False):
+            from .trajectory_collator import has_supervised_tokens
+
+            tokenizer = load_tokenizer(self.args.student_model_name, self.args)
+            filtered = dataset["eval"].filter(
+                lambda row: has_supervised_tokens(tokenizer, row, self.args.max_length)
+            )
+            logger.info("Trajectory eval: filtered %s -> %s rows", len(dataset["eval"]), len(filtered))
+            return filtered
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
 
         def tokenize_function(examples):
@@ -195,8 +213,10 @@ class DistillationTrainer(Trainer):
 
     def compute_loss(self, model, inputs, return_outputs=False):
         student_outputs = model(**inputs)
-        with torch.no_grad():
-            teacher_outputs = self.teacher_model(**inputs)
+        teacher_outputs = None
+        if self.teacher_model is not None and self.distillation_alpha > 0:
+            with torch.no_grad():
+                teacher_outputs = self.teacher_model(**inputs)
         loss = self.create_distillation_loss(student_outputs, teacher_outputs, inputs.get("labels"))
         return (loss, student_outputs) if return_outputs else loss
 
@@ -206,7 +226,7 @@ class DistillationTrainer(Trainer):
             labels.view(-1),
             ignore_index=-100,
         )
-        if self.distillation_alpha > 0:
+        if self.distillation_alpha > 0 and teacher_outputs is not None:
             student_logits = student_outputs.logits / self.temperature
             teacher_logits = teacher_outputs.logits / self.temperature
             distillation_loss = torch.nn.functional.kl_div(

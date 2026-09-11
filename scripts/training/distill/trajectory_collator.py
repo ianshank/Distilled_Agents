@@ -41,6 +41,11 @@ def encode_row(tokenizer: Any, row: dict[str, Any], max_length: int) -> dict[str
     return {"input_ids": input_ids, "labels": labels}
 
 
+def has_supervised_tokens(tokenizer: Any, row: dict[str, Any], max_length: int) -> bool:
+    encoded = encode_row(tokenizer, row, max_length)
+    return any(label != -100 for label in encoded["labels"])
+
+
 class TrajectoryDataCollator:
     """Preserve observation masks; do not clone labels from input_ids."""
 
