@@ -1,0 +1,10 @@
+id: sqe_validate
+schema_version: "1"
+planning:
+  style: react
+action:
+  tool_ids:
+    - sqe_checklist
+    - final_answer
+memory:
+  write_observations: true

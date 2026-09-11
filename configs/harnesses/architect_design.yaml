@@ -1,0 +1,10 @@
+id: architect_design
+schema_version: "1"
+planning:
+  style: plan_and_solve
+action:
+  tool_ids:
+    - architect_structure
+    - final_answer
+memory:
+  write_observations: true

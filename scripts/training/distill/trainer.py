@@ -76,6 +76,9 @@ class AgentDistillationTrainer:
     def prepare_dataset(self) -> Dataset:
         train_file = resolve_train_file(train_file=getattr(self.args, "train_file", None))
         dataset = load_dataset("json", data_files={"train": train_file})  # nosec B615
+        if getattr(self.args, "trajectory_mode", False):
+            logger.info("Trajectory mode: keeping raw columns for masked collator")
+            return dataset["train"]
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
 
         def tokenize_function(examples):
@@ -103,7 +106,12 @@ class AgentDistillationTrainer:
             student_model.print_trainable_parameters()
         train_dataset = self.prepare_dataset()
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
-        data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+        if getattr(self.args, "trajectory_mode", False):
+            from .trajectory_collator import TrajectoryDataCollator
+
+            data_collator = TrajectoryDataCollator(tokenizer, max_length=self.args.max_length)
+        else:
+            data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
         training_args = TrainingArguments(
             output_dir=self.args.output_dir,
             overwrite_output_dir=True,

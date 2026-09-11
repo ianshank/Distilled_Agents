@@ -1,0 +1,14 @@
+id: swe_codeact
+schema_version: "1"
+planning:
+  style: codeact
+  first_thought_prefix: true
+action:
+  tool_ids:
+    - json_schema
+    - pytest_runner
+    - final_answer
+memory:
+  write_observations: true
+policy:
+  teacher: true

@@ -1,0 +1,21 @@
+[run]
+source = enhanced_system/harness
+omit =
+    */tests/*
+    */__pycache__/*
+    */site-packages/*
+    */protocols.py
+
+[report]
+precision = 2
+show_missing = true
+skip_covered = false
+fail_under = 90
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod

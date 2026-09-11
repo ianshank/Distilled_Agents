@@ -68,6 +68,7 @@ def main():
     parser.add_argument("--save_total_limit", type=int, default=2)
     parser.add_argument("--eval_steps", type=int, default=500)
     parser.add_argument("--use_wandb", type=str, default="False")
+    parser.add_argument("--trajectory_mode", type=str, default="False")
     parser.add_argument("--adapter_type", type=str, default="default_alora")
     parser.add_argument("--agent_name", type=str, default="default-agent")
     parser.add_argument("--agent_role", type=str, default="Default")
@@ -79,6 +80,9 @@ def main():
     args.use_wandb = args.use_wandb.lower() == "true"
     args.use_lora = args.use_lora.lower() == "true"
     args.trust_remote_code = args.trust_remote_code.lower() == "true"
+    args.trajectory_mode = args.trajectory_mode.lower() == "true"
+    if args.trajectory_mode:
+        args.distillation_alpha = 0.0
     os.makedirs(args.output_dir, exist_ok=True)
     logger.info("Starting distillation for agent=%s", args.agent_name)
     AgentDistillationTrainer(args).train()

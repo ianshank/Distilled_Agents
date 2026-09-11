@@ -38,6 +38,16 @@ class MangoMASSettings(BaseSettings):
     evaluation_threshold: float = Field(default=85.0)
     max_concurrent_jobs: int = Field(default=3)
     bind_port: int = Field(default=8080)
+    harness_id: str = Field(default="")
+    harness_dir: str = Field(default="")
+    harness_max_steps: int = Field(default=8)
+    harness_memory_window: int = Field(default=6)
+    harness_sag_samples: int = Field(default=1)
+    harness_sag_temperature: float = Field(default=0.0)
+    harness_max_length: int = Field(default=512)
+    harness_seed: int = Field(default=0)
+    trajectory_distill_alpha: float = Field(default=0.0)
+    harness_apply_patches: bool = Field(default=False)
 
     def role_arn(self, account_id: str) -> str:
         return f"arn:aws:iam::{account_id}:role/{self.execution_role_name}"
