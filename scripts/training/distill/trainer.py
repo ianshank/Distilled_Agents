@@ -221,9 +221,11 @@ class DistillationTrainer(Trainer):
         return (loss, student_outputs) if return_outputs else loss
 
     def create_distillation_loss(self, student_outputs, teacher_outputs, labels):
+        shifted_logits = student_outputs.logits[:, :-1, :].contiguous()
+        shifted_labels = labels[:, 1:].contiguous()
         task_loss = torch.nn.functional.cross_entropy(
-            student_outputs.logits.view(-1, student_outputs.logits.size(-1)),
-            labels.view(-1),
+            shifted_logits.view(-1, shifted_logits.size(-1)),
+            shifted_labels.view(-1),
             ignore_index=-100,
         )
         if self.distillation_alpha > 0 and teacher_outputs is not None:
