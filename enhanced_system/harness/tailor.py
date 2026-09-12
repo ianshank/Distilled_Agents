@@ -23,7 +23,7 @@ class HarnessTailor:
         if any("loop" in traj.faults for traj in trajectories):
             cap = settings.harness_max_steps
             planning.max_steps = cap
-        tool_errors = Counter()
+        tool_errors: Counter[str] = Counter()
         for traj in trajectories:
             for step in traj.steps:
                 if step.fault == "tool_error" and step.tool_id:

@@ -30,10 +30,6 @@ EXPOSE 8080 9090
 ENV PYTHONUNBUFFERED=1 \
     ENHANCED_SYSTEM_ENV=production
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
-
-# Run application
+# Run application (basic_inference has no :8080/health endpoint)
 CMD ["python", "-m", "enhanced_system.examples.basic_inference"]
 

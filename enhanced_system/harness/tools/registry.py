@@ -103,7 +103,7 @@ class FinalAnswerTool:
         return text.strip()
 
 
-TOOL_REGISTRY: dict[str, type] = {
+TOOL_REGISTRY: dict[str, type[Any]] = {
     JsonSchemaTool.tool_id: JsonSchemaTool,
     PytestRunnerTool.tool_id: PytestRunnerTool,
     SqeChecklistTool.tool_id: SqeChecklistTool,
@@ -113,7 +113,7 @@ TOOL_REGISTRY: dict[str, type] = {
 }
 
 
-def get_tool(tool_id: str):
+def get_tool(tool_id: str) -> Any:
     """Instantiate a registered tool or raise KeyError."""
     cls = TOOL_REGISTRY.get(tool_id)
     if cls is None:

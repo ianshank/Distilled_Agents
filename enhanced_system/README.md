@@ -38,11 +38,14 @@ enhanced_system/
 ├── evaluation/             # Evaluation & testing
 │   ├── skill_evaluator.py
 │   └── ab_testing.py
+├── harness/                # Local agent runtime H (YAML, tools, AgentRuntime)
+├── ops/                    # Shared SageMaker launcher + MangoMASSettings
 ├── config/                 # Configuration files
 │   ├── default.yaml
 │   ├── production.yaml
 │   ├── development.yaml
-│   └── agent_profiles.json
+│   ├── agent_profiles.json
+│   └── harnesses/          # Packaged harness YAML (keep in sync with configs/harnesses/)
 └── infrastructure/         # Infrastructure configs
     ├── docker/
     ├── redis/
@@ -397,44 +400,23 @@ Grafana dashboards available for visualization.
 
 ## 🧪 Testing
 
-The system includes comprehensive test coverage (80%+ target):
-
-### Quick Test Commands
+From the **repository root** (nested `enhanced_system/pytest.ini` would miss `tests/harness/`):
 
 ```bash
-# Run all tests
-pytest
-
-# Run unit tests only
+make validate
+pytest -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness
 pytest -m unit
-
-# Run integration tests only
 pytest -m integration
-
-# Run with coverage
-pytest --cov=enhanced_system --cov-report=html --cov-report=term
-
-# Run specific test file
-pytest tests/unit/test_cache_manager.py -v
 ```
 
-### Test Organization
-
-- **Unit Tests** (80%+ coverage): Test individual components in isolation
-- **Integration Tests** (70%+ coverage): Test component interactions
-- **E2E Tests** (60%+ coverage): Test complete workflows
-- **Performance Tests**: Benchmark critical paths
+Coverage gates: global `fail_under=60` (do not raise to 65 on harness-inflated totals) and harness package `.coveragerc.harness` `fail_under=90`. Local Echo harness pipelines are `integration` + `harness`. `e2e` / `slow` / `benchmark` stay unused for live AWS.
 
 ### Multi-Environment Testing with Tox
 
 ```bash
-# Test across Python 3.9, 3.10, 3.11
 tox
-
-# Run coverage check
 tox -e coverage
-
-# Run linters
+tox -e harness
 tox -e lint
 ```
 

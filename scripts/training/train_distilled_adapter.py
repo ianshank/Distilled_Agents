@@ -15,10 +15,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 try:
+    from scripts.training.distill.alpha import parse_trajectory_distill_alpha
     from scripts.training.distill.trainer import AgentDistillationTrainer, DistillationTrainer
 except ImportError:
     # SageMaker copies source_dir (scripts/training) onto PYTHONPATH.
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from distill.alpha import parse_trajectory_distill_alpha
     from distill.trainer import AgentDistillationTrainer, DistillationTrainer
 
 
@@ -82,7 +84,13 @@ def main():
     args.trust_remote_code = args.trust_remote_code.lower() == "true"
     args.trajectory_mode = args.trajectory_mode.lower() == "true"
     if args.trajectory_mode:
-        args.distillation_alpha = 0.0
+        try:
+            args.distillation_alpha = parse_trajectory_distill_alpha(
+                os.getenv("MANGOMAS_TRAJECTORY_DISTILL_ALPHA", "0.0")
+            )
+        except ValueError as exc:
+            logger.error("%s", exc)
+            raise SystemExit(1) from exc
     os.makedirs(args.output_dir, exist_ok=True)
     logger.info("Starting distillation for agent=%s", args.agent_name)
     AgentDistillationTrainer(args).train()

@@ -27,7 +27,7 @@ class L2Cache(BaseCache):
         self.config = config
         self.enabled = config.get("enabled", True) and REDIS_AVAILABLE
         self.ttl = config.get("ttl", 86400)
-        self.redis_client = None
+        self.redis_client: Any = None
         self._hits = 0
         self._misses = 0
 
@@ -56,7 +56,9 @@ class L2Cache(BaseCache):
             value = self.redis_client.get(key)
             if value:
                 self._hits += 1
-                return loads(value)
+                if isinstance(value, str):
+                    return loads(value.encode("utf-8"))
+                return loads(bytes(value))
             self._misses += 1
             return None
         except Exception as exc:
@@ -109,13 +111,14 @@ class L2Cache(BaseCache):
         if self.enabled and self.redis_client:
             try:
                 info = self.redis_client.info()
-                stats.update(
-                    {
-                        "used_memory": info.get("used_memory_human"),
-                        "connected_clients": info.get("connected_clients"),
-                        "total_commands_processed": info.get("total_commands_processed"),
-                    }
-                )
+                if isinstance(info, dict):
+                    stats.update(
+                        {
+                            "used_memory": info.get("used_memory_human"),
+                            "connected_clients": info.get("connected_clients"),
+                            "total_commands_processed": info.get("total_commands_processed"),
+                        }
+                    )
             except Exception as exc:
                 logger.error("Failed to get Redis stats: %s", exc)
         return stats

@@ -84,7 +84,9 @@ class AgentDistillationTrainer:
             filtered = dataset["train"].filter(
                 lambda row: has_supervised_tokens(tokenizer, row, self.args.max_length)
             )
-            logger.info("Trajectory mode: filtered %s -> %s rows", len(dataset["train"]), len(filtered))
+            logger.info(
+                "Trajectory mode: filtered %s -> %s rows", len(dataset["train"]), len(filtered)
+            )
             return filtered
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
 
@@ -173,7 +175,9 @@ class AgentDistillationTrainer:
             filtered = dataset["eval"].filter(
                 lambda row: has_supervised_tokens(tokenizer, row, self.args.max_length)
             )
-            logger.info("Trajectory eval: filtered %s -> %s rows", len(dataset["eval"]), len(filtered))
+            logger.info(
+                "Trajectory eval: filtered %s -> %s rows", len(dataset["eval"]), len(filtered)
+            )
             return filtered
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
 

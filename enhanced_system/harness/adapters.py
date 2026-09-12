@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from enhanced_system.core.adaptive_router import AdaptiveRouter
 from enhanced_system.harness.runtime import AgentRuntime
@@ -46,10 +46,11 @@ class RouterAdapter:
         self.router = AdaptiveRouter({"enabled": True, "agent_profiles_path": self.profiles_path})
 
     def resolve(self, task: str) -> str:
-        decision = self.router.route_task(task)
-        if not decision.selected_agents:
+        decision: Any = self.router.route_task(task)
+        selected = getattr(decision, "selected_agents", None) or []
+        if not selected:
             return get_settings().harness_id
-        return harness_id_for_agent(decision.selected_agents[0], self.profiles_path)
+        return harness_id_for_agent(str(selected[0]), self.profiles_path)
 
 
 class SkillEvalAdapter:
