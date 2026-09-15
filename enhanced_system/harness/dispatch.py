@@ -35,18 +35,16 @@ def split_thought_action(text: str, allowed: set[str]) -> tuple[str, str]:
         return "", stripped
     except DispatchError:
         pass
-    json_split = _split_json_action(stripped)
+    json_split = _split_json_action(stripped, allowed)
     if json_split is not None:
-        thought, action = json_split
-        parse_action(action, allowed)
-        return thought, action
+        return json_split
     call_split = _split_call_action(stripped, allowed)
     if call_split is not None:
         return call_split
     raise DispatchError("no parseable JSON or Call action")
 
 
-def _split_json_action(text: str) -> tuple[str, str] | None:
+def _split_json_action(text: str, allowed: set[str]) -> tuple[str, str] | None:
     decoder = json.JSONDecoder()
     for index, char in enumerate(text):
         if char != "{":
@@ -55,8 +53,14 @@ def _split_json_action(text: str) -> tuple[str, str] | None:
             payload, end = decoder.raw_decode(text[index:])
         except json.JSONDecodeError:
             continue
-        if isinstance(payload, dict) and payload.get("tool"):
-            return text[:index].strip(), text[index : index + end].strip()
+        if not isinstance(payload, dict) or not payload.get("tool"):
+            continue
+        action = text[index : index + end].strip()
+        try:
+            parse_action(action, allowed)
+        except DispatchError:
+            continue
+        return text[:index].strip(), action
     return None
 
 

@@ -20,6 +20,6 @@ python scripts/harness/eval_harness.py \
   --harness-id "${MANGOMAS_HARNESS_ID:-base_react}"
 ```
 
-Pass `--strict` to fail on bad JSON or empty prompts instead of skipping. The `--threshold` gate applies whenever the file has at least one evaluated row (labeled exact-match or unlabeled completion rate).
+Pass `--strict` to fail on bad JSON or empty prompts instead of skipping. The `--threshold` gate uses labeled exact-match plus unlabeled completion (not truncated) over every evaluated row.
 
 Trusted JSONL: injection detection is off. Interactive tasks stay on `run_agent.py`.

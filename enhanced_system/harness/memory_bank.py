@@ -50,13 +50,15 @@ def workflow_hint(bank: Optional[MemoryBank], task: str, *, limit: int = 1) -> s
     if bank is None or not bank.workflows:
         return ""
     task_tokens = _tokens(task)
-    ranked = sorted(
-        bank.workflows,
-        key=lambda item: len(task_tokens & _tokens(item.get("task", ""))),
-        reverse=True,
-    )
-    hints = [item.get("strategy", "") for item in ranked[:limit] if item.get("strategy")]
-    return "\n".join(hints)
+    scored: list[tuple[int, str]] = []
+    for item in bank.workflows:
+        overlap = len(task_tokens & _tokens(item.get("task", "")))
+        strategy = item.get("strategy", "")
+        if overlap <= 0 or not strategy:
+            continue
+        scored.append((overlap, strategy))
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return "\n".join(strategy for _overlap, strategy in scored[:limit])
 
 
 def function_hint(bank: Optional[MemoryBank], tool_id: str, *, limit: int = 4) -> str:

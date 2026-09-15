@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("%s", exc)
         return 1
     written = 0
-    unmatched = 0
+    unmatched = len(set(second_rows) - set(first_rows))
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as handle:
@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
             handle.write(json.dumps(composed, ensure_ascii=True) + "\n")
             written += 1
     if unmatched:
-        logger.warning("%s prompts unmatched in %s", unmatched, args.second)
+        logger.warning("%s unmatched prompts across teacher files", unmatched)
     logger.info("wrote %s composed rows to %s", written, out_path)
     return 0
 

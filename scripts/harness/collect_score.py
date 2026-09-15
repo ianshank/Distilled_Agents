@@ -140,7 +140,8 @@ def _score_one_row(
 ) -> None:
     prompt = str(payload["prompt"])
     expected = payload.get("expected")
-    expected_text = str(expected) if expected is not None else None
+    expected_text = str(expected).strip() if expected is not None else ""
+    expected_text = expected_text or None
     student_result = student.run(prompt, harness_id=harness_id)  # type: ignore[attr-defined]
     index = earliest_error_index(student_result.trajectory, expected_text)
     if index is None:

@@ -73,6 +73,13 @@ def test_split_thought_action_json_and_call():
         split_thought_action("", allowed)
     with pytest.raises(DispatchError, match="no parseable"):
         split_thought_action("not an action", allowed)
+    thought, action = split_thought_action(
+        'example {"tool": "json_schema", "args": {}}\n'
+        '{"tool": "final_answer", "args": {"text": "ok"}}',
+        {"final_answer"},
+    )
+    assert parse_action(action, {"final_answer"})[0] == "final_answer"
+    assert "example" in thought
 
 
 @pytest.mark.unit
@@ -103,6 +110,29 @@ def test_collator_matches_runtime_messages():
     assert encoded["input_ids"] == Tok().encode(rendered)[:256]
     prompt = TransformersBackend(generate_fn=lambda *_a, **_k: ["x"])._render_prompt(messages, None)
     assert prompt == f"{rendered}\nassistant:"
+
+    class OffsetTok:
+        pad_token_id = 0
+
+        def encode(self, text, add_special_tokens=False):
+            return [ord(ch) % 20 + 1 for ch in text]
+
+        def __call__(
+            self,
+            text,
+            add_special_tokens=False,
+            truncation=True,
+            max_length=None,
+            **_kwargs,
+        ):
+            ids = self.encode(text)
+            if max_length:
+                ids = ids[:max_length]
+            offsets = [(index, index + 1) for index in range(len(ids))]
+            return {"input_ids": ids, "offset_mapping": offsets}
+
+    offset_encoded = encode_row(OffsetTok(), row, max_length=256)
+    assert offset_encoded["input_ids"] == Tok().encode(rendered)[:256]
 
 
 @pytest.mark.unit
@@ -141,6 +171,7 @@ def test_resume_and_inject_action():
     )
     assert result.final_answer == "patched"
     assert result.trajectory.steps[0].fault == "parse_error"
+    assert "parse_error" in result.trajectory.faults
 
 
 @pytest.mark.unit
@@ -160,6 +191,7 @@ def test_memory_bank_workflow_and_function_hints(tmp_path):
     bank.save(path)
     loaded = MemoryBank.load(path)
     assert workflow_hint(loaded, "Write a short greeting")
+    assert workflow_hint(loaded, "Completely unrelated calculus homework") == ""
     assert "avoid" in function_hint(loaded, "json_schema")
     assert workflow_hint(None, "x") == ""
     assert function_hint(loaded, "missing") == ""
@@ -207,6 +239,8 @@ def test_memory_bank_workflow_and_function_hints(tmp_path):
         memory_bank=loaded,
     ).run("Write a short greeting")
     assert "Function memory" in hinted.trajectory.steps[0].observation
+    assert hinted.trajectory.steps[0].tool_id == "json_schema"
+    assert hinted.trajectory.steps[0].fault == "tool_error"
 
 
 @pytest.mark.unit
@@ -505,6 +539,32 @@ def test_eval_skips_unlabeled_threshold_and_strict(tmp_path, caplog, capsys, mon
         assert summary["total"] == 1
         assert summary["with_expected"] == 0
         assert summary["truncated"] == 1
+
+        mixed_gate = tmp_path / "mix.jsonl"
+        mixed_gate.write_text(
+            json.dumps({"prompt": "Write a short greeting", "expected": "hi"})
+            + "\n"
+            + json.dumps({"prompt": "Write a short greeting"})
+            + "\n",
+            encoding="utf-8",
+        )
+        mix_code = eval_main(
+            [
+                "--input",
+                str(mixed_gate),
+                "--harness-id",
+                "base_react",
+                "--scripted",
+                json.dumps(['{"tool": "final_answer", "args": {"text": "hi"}}', "not-json"]),
+                "--threshold",
+                "85",
+            ]
+        )
+        assert mix_code == 1
+        mix_summary = json.loads(capsys.readouterr().out)
+        assert mix_summary["total"] == 2
+        assert mix_summary["with_expected"] == 1
+        assert mix_summary["pass_rate"] == 50.0
     finally:
         monkeypatch.undo()
         get_settings.cache_clear()
@@ -512,6 +572,14 @@ def test_eval_skips_unlabeled_threshold_and_strict(tmp_path, caplog, capsys, mon
     bad = tmp_path / "bad.jsonl"
     bad.write_text("not-json\n", encoding="utf-8")
     assert eval_main(["--input", str(bad), "--harness-id", "base_react", "--strict"]) == 1
+
+    def _boom(*_args, **_kwargs):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr("scripts.harness.eval_harness.iter_jsonl_dicts", _boom)
+    readable = tmp_path / "readable.jsonl"
+    readable.write_text(json.dumps({"prompt": "Write a short greeting"}) + "\n", encoding="utf-8")
+    assert eval_main(["--input", str(readable), "--harness-id", "base_react"]) == 1
 
 
 @pytest.mark.unit
@@ -568,6 +636,31 @@ def test_score_empty_generate_strict_and_non_dict(tmp_path, caplog):
         == 0
     )
     assert json.loads(kept.read_text(encoding="utf-8"))["expected"] == "hi"
+
+    blank = tmp_path / "blank.jsonl"
+    blank.write_text(
+        json.dumps({"prompt": "Write a short greeting", "expected": "   "}) + "\n",
+        encoding="utf-8",
+    )
+    blank_out = tmp_path / "blank-out.jsonl"
+    assert (
+        score_main(
+            [
+                "--input",
+                str(blank),
+                "--output",
+                str(blank_out),
+                "--harness-id",
+                "base_react",
+                "--student-scripted",
+                '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"hi\\"}}"]',
+                "--teacher-scripted",
+                '[""]',
+            ]
+        )
+        == 0
+    )
+    assert json.loads(blank_out.read_text(encoding="utf-8"))["trajectory"]["final_answer"] == "hi"
 
     prompts.write_text("not-json\n", encoding="utf-8")
     assert (

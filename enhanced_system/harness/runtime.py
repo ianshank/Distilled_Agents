@@ -74,11 +74,13 @@ class AgentRuntime:
             teacher=teacher,
             instruction=instruction,
         )
+        resumed = list(resume_steps or [])
         trajectory = Trajectory(
             harness_id=spec.id,
             task=recorded,
             instruction=instruction,
-            steps=list(resume_steps or []),
+            steps=resumed,
+            faults=[step.fault for step in resumed if step.fault],
         )
         max_steps = spec.planning.max_steps or self.settings.harness_max_steps
         window = (
@@ -147,7 +149,14 @@ class AgentRuntime:
                     if hint:
                         observation = f"{observation}\n{hint}"
                 trajectory.faults.append(fault)
-                trajectory.steps.append(Step(action="", observation=observation, fault=fault))
+                trajectory.steps.append(
+                    Step(
+                        action="",
+                        observation=observation,
+                        fault=fault,
+                        tool_id=tool_id if fault == "tool_error" else "",
+                    )
+                )
                 logger.warning(
                     "harness step=%s harness_id=%s fault=%s",
                     len(trajectory.steps) - 1,

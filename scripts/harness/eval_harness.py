@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         summary = _evaluate_file(runtime, Path(args.input), args.harness_id, strict=args.strict)
-    except JsonlRowError as exc:
+    except (JsonlRowError, OSError) as exc:
         logger.error("%s", exc)
         return 1
     json.dump(summary, sys.stdout)
@@ -84,43 +84,32 @@ def _evaluate_file(
     with_faults = 0
     valid_tools = 0
     tool_steps = 0
-    try:
-        rows = iter_jsonl_dicts(path, require_prompt=True, strict=strict)
-        for _line_no, payload in rows:
-            result = runtime.run(str(payload["prompt"]), harness_id=harness_id)  # type: ignore[attr-defined]
-            total += 1
-            if result.truncated:
-                truncated += 1
-            if result.trajectory.faults:
-                with_faults += 1
-            for step in result.trajectory.steps:
-                if not step.action or step.fault:
-                    continue
-                tool_steps += 1
-                if step.tool_id:
-                    valid_tools += 1
-            expected = payload.get("expected")
-            if expected is not None and str(expected).strip():
-                with_expected += 1
-                if answers_match(result.final_answer, str(expected)):
-                    exact += 1
-    except OSError as exc:
-        logger.error("%s", exc)
-        return {
-            "total": 0,
-            "with_expected": 0,
-            "exact_match": 0,
-            "truncated": 0,
-            "with_faults": 0,
-            "valid_tool_steps": 0,
-            "tool_steps": 0,
-            "pass_rate": 0.0,
-        }
-    pass_rate = 0.0
-    if with_expected:
-        pass_rate = 100.0 * exact / with_expected
-    elif total:
-        pass_rate = 100.0 * (total - truncated) / total
+    successes = 0
+    rows = iter_jsonl_dicts(path, require_prompt=True, strict=strict)
+    for _line_no, payload in rows:
+        result = runtime.run(str(payload["prompt"]), harness_id=harness_id)  # type: ignore[attr-defined]
+        total += 1
+        if result.truncated:
+            truncated += 1
+        if result.trajectory.faults:
+            with_faults += 1
+        for step in result.trajectory.steps:
+            if not step.action or step.fault:
+                continue
+            tool_steps += 1
+            if step.tool_id:
+                valid_tools += 1
+        expected = payload.get("expected")
+        labeled = expected is not None and bool(str(expected).strip())
+        if labeled:
+            with_expected += 1
+            matched = answers_match(result.final_answer, str(expected))
+            if matched:
+                exact += 1
+                successes += 1
+        elif not result.truncated:
+            successes += 1
+    pass_rate = 100.0 * successes / total if total else 0.0
     return {
         "total": total,
         "with_expected": with_expected,

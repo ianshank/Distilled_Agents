@@ -456,11 +456,11 @@ def test_collator_without_trajectory_uses_completion():
         pad_token_id = 0
 
         def encode(self, text, add_special_tokens=False):
-            return [1, 2] if text else []
+            return [ord(ch) % 20 + 1 for ch in text]
 
-    encoded = encode_row(Tok(), {"prompt": "p", "completion": "c"}, max_length=16)
+    encoded = encode_row(Tok(), {"prompt": "p", "completion": "c"}, max_length=64)
     assert -100 in encoded["labels"]
-    assert 1 in encoded["labels"] or 2 in encoded["labels"]
+    assert any(label != -100 for label in encoded["labels"])
 
 
 @pytest.mark.unit
