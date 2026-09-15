@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     with out_path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=True) + "\n")
-    if args.prefs and prefs:
+    if args.prefs:
         prefs_path = Path(args.prefs)
         prefs_path.parent.mkdir(parents=True, exist_ok=True)
         with prefs_path.open("w", encoding="utf-8") as handle:
@@ -159,10 +159,21 @@ def _score_one_row(
         resume_steps=prefix,
         inject_action=generated[0],
     )
+    if not _injected_action_ok(patched.trajectory, index):
+        logger.warning("teacher correction failed at line %s", line_no)
+        return
     rows.append(trajectory_to_legacy(patched.trajectory, expected=expected))
     pair = preference_pair(student_result.trajectory, patched.trajectory, index)
     if pair is not None:
         prefs.append(pair)
+
+
+def _injected_action_ok(trajectory: object, index: int) -> bool:
+    steps = getattr(trajectory, "steps", ())
+    if index < 0 or index >= len(steps):
+        return False
+    step = steps[index]
+    return bool(getattr(step, "action", "")) and not getattr(step, "fault", "")
 
 
 if __name__ == "__main__":

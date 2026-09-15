@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         summary = _evaluate_file(runtime, Path(args.input), args.harness_id, strict=args.strict)
-    except (JsonlRowError, OSError) as exc:
+    except (JsonlRowError, OSError, ValueError) as exc:
         logger.error("%s", exc)
         return 1
     json.dump(summary, sys.stdout)
@@ -86,8 +86,17 @@ def _evaluate_file(
     tool_steps = 0
     successes = 0
     rows = iter_jsonl_dicts(path, require_prompt=True, strict=strict)
-    for _line_no, payload in rows:
-        result = runtime.run(str(payload["prompt"]), harness_id=harness_id)  # type: ignore[attr-defined]
+    for line_no, payload in rows:
+        try:
+            result = runtime.run(  # type: ignore[attr-defined]
+                str(payload["prompt"]),
+                harness_id=harness_id,
+            )
+        except ValueError as exc:
+            logger.warning("skipping line %s: %s", line_no, exc)
+            if strict:
+                raise
+            continue
         total += 1
         if result.truncated:
             truncated += 1

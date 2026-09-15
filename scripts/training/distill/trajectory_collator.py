@@ -92,7 +92,7 @@ def _tokenize_body(
             max_length=max_length,
             return_offsets_mapping=True,
         )
-    except TypeError:
+    except (TypeError, NotImplementedError, ValueError):
         return _encode(tokenizer, body)[:max_length], None
     ids = list(encoded["input_ids"])[:max_length]
     raw_offsets = None
@@ -126,6 +126,10 @@ def _labels_from_spans(
         return labels
     if len(input_ids) <= len(mask) and len(input_ids) == min(len(body), max_length):
         return [token_id if mask[index] else -100 for index, token_id in enumerate(input_ids)]
+    if any(mask):
+        raise ValueError(
+            "tokenizer must provide offset_mapping (use a Hugging Face fast tokenizer)"
+        )
     return [-100] * len(input_ids)
 
 

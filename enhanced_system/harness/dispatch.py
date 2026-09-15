@@ -66,9 +66,9 @@ def _split_json_action(text: str, allowed: set[str]) -> tuple[str, str] | None:
 
 def _split_call_action(text: str, allowed: set[str]) -> tuple[str, str] | None:
     for index, char in enumerate(text):
-        if index > 0 and (char.isalpha() or char == "_") and text[index - 1].isalnum():
+        if index > 0 and _is_ident_char(char) and _is_ident_char(text[index - 1]):
             continue
-        if not (char.isalpha() or char == "_"):
+        if not _is_ident_char(char):
             continue
         snippet = text[index:]
         try:
@@ -77,6 +77,10 @@ def _split_call_action(text: str, allowed: set[str]) -> tuple[str, str] | None:
             continue
         return text[:index].strip(), snippet.strip()
     return None
+
+
+def _is_ident_char(char: str) -> bool:
+    return char.isalnum() or char == "_"
 
 
 def _parse_json(text: str, allowed: set[str]) -> tuple[str, dict[str, Any]]:

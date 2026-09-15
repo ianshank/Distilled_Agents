@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from enhanced_system.harness.convert import serialize_thought_action
 from enhanced_system.harness.score import answers_match
 from enhanced_system.harness.types import Step, Trajectory
 
@@ -40,7 +41,7 @@ def compose_pair(
         return None
     if grade_first and not grade_second:
         kept = dict(first)
-        kept.setdefault("expected", expected)
+        kept["expected"] = expected
         return kept
     if not grade_first and grade_second:
         return _stitch(first, second, TRANSITION_FIX, expected)
@@ -62,11 +63,11 @@ def _stitch(
         instruction=left.instruction or right.instruction,
         steps=steps,
         final_answer=right.final_answer or left.final_answer,
-        faults=[],
+        faults=list(left.faults) + list(right.faults),
     )
     return {
         "prompt": merged.task,
-        "completion": transition,
+        "completion": serialize_thought_action(merged) or merged.final_answer,
         "expected": expected,
         "trajectory": merged.model_dump(),
     }

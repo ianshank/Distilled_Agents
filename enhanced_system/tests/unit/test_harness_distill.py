@@ -80,6 +80,8 @@ def test_split_thought_action_json_and_call():
     )
     assert parse_action(action, {"final_answer"})[0] == "final_answer"
     assert "example" in thought
+    with pytest.raises(DispatchError, match="no parseable"):
+        split_thought_action('not_final_answer(text="x")', {"final_answer"})
 
 
 @pytest.mark.unit
@@ -133,6 +135,23 @@ def test_collator_matches_runtime_messages():
 
     offset_encoded = encode_row(OffsetTok(), row, max_length=256)
     assert offset_encoded["input_ids"] == Tok().encode(rendered)[:256]
+
+    class SubwordTok:
+        def encode(self, text, add_special_tokens=False):
+            return [1, 2, 3] if text else []
+
+    with pytest.raises(ValueError, match="offset_mapping"):
+        encode_row(SubwordTok(), row, max_length=256)
+
+    class SlowTok:
+        def encode(self, text, add_special_tokens=False):
+            return [ord(ch) % 20 + 1 for ch in text]
+
+        def __call__(self, *_args, **_kwargs):
+            raise NotImplementedError("offset mapping")
+
+    slow_encoded = encode_row(SlowTok(), row, max_length=256)
+    assert slow_encoded["input_ids"] == Tok().encode(rendered)[:256]
 
 
 @pytest.mark.unit
@@ -330,14 +349,27 @@ def test_dualdistill_compose_table():
     }
     composed = compose_pair(bad, good, expected=expected)
     assert composed is not None
-    assert TRANSITION_FIX in json.dumps(composed)
+    assert TRANSITION_FIX in composed["completion"]
+    assert "x" in composed["completion"]
+    assert "y" in composed["completion"]
     assert compose_pair(bad, bad, expected=expected) is None
     kept = compose_pair(good, bad, expected=expected)
     assert kept is not None
     assert kept["trajectory"]["final_answer"] == "ok"
+    unlabeled_good = dict(good)
+    unlabeled_good["expected"] = ""
+    relabeled = compose_pair(unlabeled_good, bad, expected=expected)
+    assert relabeled is not None
+    assert relabeled["expected"] == expected
+    faulty = dict(bad)
+    faulty["trajectory"] = dict(bad["trajectory"])
+    faulty["trajectory"]["faults"] = ["parse_error"]
+    stitched = compose_pair(faulty, good, expected=expected)
+    assert stitched is not None
+    assert "parse_error" in stitched["trajectory"]["faults"]
     both = compose_pair(good, good, expected=expected)
     assert both is not None
-    assert TRANSITION_BOTH in json.dumps(both)
+    assert TRANSITION_BOTH in both["completion"]
     legacy = compose_pair(
         {"prompt": "p", "completion": "ok", "expected": expected},
         {"prompt": "p", "completion": "ok", "expected": expected},
@@ -816,3 +848,64 @@ def test_factory_logs_skipped_memory_bank(tmp_path, caplog):
             }
         )
     assert "memory bank skipped" in caplog.text
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_score_skips_failed_inject_and_truncates_prefs(tmp_path, monkeypatch):
+    from enhanced_system.ops.settings import get_settings
+    from scripts.harness.collect_score import main as score_main
+
+    monkeypatch.setenv("MANGOMAS_HARNESS_MAX_STEPS", "1")
+    get_settings.cache_clear()
+    prompts = tmp_path / "in.jsonl"
+    prompts.write_text(
+        json.dumps({"prompt": "Write a short greeting", "expected": "ok"}) + "\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    prefs = tmp_path / "prefs.jsonl"
+    prefs.write_text('{"stale": true}\n', encoding="utf-8")
+    try:
+        code = score_main(
+            [
+                "--input",
+                str(prompts),
+                "--output",
+                str(out),
+                "--harness-id",
+                "base_react",
+                "--student-scripted",
+                '["not-json"]',
+                "--teacher-scripted",
+                '["not-json"]',
+                "--prefs",
+                str(prefs),
+            ]
+        )
+    finally:
+        monkeypatch.undo()
+        get_settings.cache_clear()
+    assert code == 0
+    assert out.read_text(encoding="utf-8").strip() == ""
+    assert prefs.read_text(encoding="utf-8") == ""
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_eval_skips_runtime_value_error(tmp_path, monkeypatch, capsys):
+    from scripts.harness.eval_harness import main as eval_main
+
+    source = tmp_path / "in.jsonl"
+    source.write_text(json.dumps({"prompt": "Write a short greeting"}) + "\n", encoding="utf-8")
+
+    def _boom(self, *_args, **_kwargs):
+        raise ValueError("too long")
+
+    monkeypatch.setattr("enhanced_system.harness.runtime.AgentRuntime.run", _boom)
+    assert (
+        eval_main(["--input", str(source), "--harness-id", "base_react", "--threshold", "0"]) == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["total"] == 0
+    assert eval_main(["--input", str(source), "--harness-id", "base_react", "--strict"]) == 1

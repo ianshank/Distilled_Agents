@@ -19,7 +19,7 @@ Harness generate and masked SFT now share one renderer:
 - `enhanced_system/harness/prompt_render.py` (runtime)
 - `scripts/training/distill/prompt_render.py` (SageMaker `source_dir`; **no** `enhanced_system` import)
 
-Keep those two files in sync. Labels sit on assistant thought+action spans only. User turns, observations, and `parse_error:` / `tool_error:` messages are unlabeled. The collator encodes that rendered body **once** (same string as `TransformersBackend`) and masks assistant spans from character/token offsets so BPE/SentencePiece context matches inference. `predict_fn` stays single-shot (ADR 0006): a CodeAct student on the endpoint still does not see the harness string.
+Keep those two files in sync. Labels sit on assistant thought+action spans only. User turns, observations, and `parse_error:` / `tool_error:` messages are unlabeled. The collator encodes that rendered body **once** (same string as `TransformersBackend`) and masks assistant spans from character/token offsets so BPE/SentencePiece context matches inference. Trajectory SFT needs a Hugging Face **fast** tokenizer (`offset_mapping`); a slow tokenizer raises instead of dropping every row. `predict_fn` stays single-shot (ADR 0006): a CodeAct student on the endpoint still does not see the harness string.
 
 ```text
 system: {planning.instruction}          # unlabeled (Kang I_agent)

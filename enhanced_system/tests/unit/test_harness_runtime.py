@@ -902,8 +902,8 @@ def test_collator_empty_and_non_trajectory():
     collator = TrajectoryDataCollator(Tok(), max_length=8)
     empty = collator([])
     assert "labels" in empty
-    encoded = encode_row(Tok(), {"prompt": "p", "completion": "c", "trajectory": []}, max_length=8)
-    assert encoded["labels"][-1] != -100 or encoded["input_ids"]
+    with pytest.raises(ValueError, match="offset_mapping"):
+        encode_row(Tok(), {"prompt": "p", "completion": "c", "trajectory": []}, max_length=8)
 
 
 @pytest.mark.unit
