@@ -7,6 +7,7 @@ from typing import Any, Optional
 from enhanced_system.core.input_validator import InputValidator
 from enhanced_system.harness.backends.echo import EchoBackend
 from enhanced_system.harness.backends.transformers import TransformersBackend
+from enhanced_system.harness.memory_bank import MemoryBank
 from enhanced_system.harness.registry import load_spec
 from enhanced_system.harness.runtime import AgentRuntime
 from enhanced_system.harness.types import HarnessSpec
@@ -55,6 +56,17 @@ class HarnessFactory:
                 }
             )
         backend = _resolve_backend(payload, settings, spec)
+        bank = payload.get("memory_bank")
+        if bank is None:
+            bank_path = ""
+            if spec is not None:
+                bank_path = spec.memory.bank_path
+            bank_path = str(payload.get("bank_path") or bank_path or settings.harness_memory_bank)
+            if bank_path:
+                try:
+                    bank = MemoryBank.load(bank_path)
+                except (OSError, ValueError):
+                    bank = None
         return AgentRuntime(
             backend,
             spec=spec,
@@ -62,4 +74,5 @@ class HarnessFactory:
             validator=validator,
             teacher=payload.get("teacher"),
             store=payload.get("store"),
+            memory_bank=bank,
         )

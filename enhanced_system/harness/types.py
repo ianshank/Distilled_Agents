@@ -13,6 +13,7 @@ class PlanConfig(BaseModel):
     style: str = "react"
     max_steps: Optional[int] = None
     first_thought_prefix: bool = False
+    instruction: str = ""
 
 
 class ActionConfig(BaseModel):
@@ -26,6 +27,7 @@ class MemoryConfig(BaseModel):
 
     window_turns: Optional[int] = None
     write_observations: bool = True
+    bank_path: str = ""
 
 
 class PolicyConfig(BaseModel):
@@ -63,6 +65,7 @@ class Trajectory(BaseModel):
     schema_version: str = "1"
     harness_id: str = ""
     task: str = ""
+    instruction: str = ""
     steps: list[Step] = Field(default_factory=list)
     final_answer: str = ""
     faults: list[str] = Field(default_factory=list)

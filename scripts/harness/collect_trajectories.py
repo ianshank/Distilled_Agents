@@ -10,18 +10,11 @@ from pathlib import Path
 
 from enhanced_system.harness.convert import trajectory_to_legacy
 from enhanced_system.harness.factory import HarnessFactory
-from enhanced_system.harness.traces import JsonlTraceStore
+from enhanced_system.harness.score import answers_match
+from enhanced_system.harness.traces import JsonlTraceStore, raw_store_path
 from enhanced_system.ops.settings import get_settings
 
 logger = logging.getLogger(__name__)
-
-
-def raw_store_path(out_path: Path) -> Path:
-    """Return a distinct raw-trace path so collect never truncates its own store."""
-    if out_path.name.endswith(".raw.jsonl"):
-        stem = out_path.name[: -len(".raw.jsonl")]
-        return out_path.with_name(f"{stem}.raw.traces.jsonl")
-    return out_path.with_suffix(".raw.jsonl")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,6 +25,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", required=True)
     parser.add_argument("--harness-id", default=settings.harness_id or "base_react")
     parser.add_argument("--scripted", default="")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--teacher",
+        dest="student",
+        action="store_false",
+        help="Collect with the teacher model (default)",
+    )
+    mode.add_argument(
+        "--student",
+        dest="student",
+        action="store_true",
+        help="Collect with the student model",
+    )
+    parser.set_defaults(student=False)
     parser.add_argument(
         "--strict",
         action="store_true",
@@ -51,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "harness_id": args.harness_id,
                 "scripted": scripted,
-                "teacher": True,
+                "teacher": not args.student,
                 "store": store,
                 "strict_injection": False,
             }
@@ -80,6 +87,13 @@ def main(argv: list[str] | None = None) -> int:
                         return 1
                     continue
                 result = runtime.run(prompt, harness_id=args.harness_id)
+                expected = payload.get("expected")
+                if expected is not None and str(expected).strip():
+                    if not answers_match(result.final_answer, str(expected)):
+                        logger.warning("skipping outcome mismatch at line %s", line_no)
+                        if args.strict:
+                            return 1
+                        continue
                 rows.append(trajectory_to_legacy(result.trajectory))
             except (json.JSONDecodeError, ValueError, FileNotFoundError, OSError) as exc:
                 logger.warning("skipping line %s: %s", line_no, exc)

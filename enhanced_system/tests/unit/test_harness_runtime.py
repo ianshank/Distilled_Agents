@@ -34,6 +34,7 @@ from enhanced_system.harness.traces import JsonlTraceStore
 from enhanced_system.harness.types import HarnessSpec, Step, Trajectory
 from enhanced_system.ops.sagemaker_launcher import MangoMASSageMakerLauncher
 from enhanced_system.ops.settings import get_settings
+from scripts.training.distill.prompt_render import supervised_spans
 from scripts.training.distill.sagemaker_io import texts_from_examples
 from scripts.training.distill.trajectory_collator import (
     TrajectoryDataCollator,
@@ -429,13 +430,20 @@ def test_collator_masks_observations():
         },
     }
     encoded = encode_row(Tok(), row, max_length=64)
-    obs_ids = Tok().encode("OBS")
     labeled = Tok().encode("T A")
-    # observation ids appear after prompt + labeled
-    assert encoded["labels"][-len(obs_ids) :] == [-100] * len(obs_ids)
-    assert (
-        encoded["labels"][len(Tok().encode("P")) : len(Tok().encode("P")) + len(labeled)] == labeled
+    obs_ids = Tok().encode("OBS")
+    rendered = "".join(
+        text
+        for text, _supervised in supervised_spans(
+            "P",
+            [{"thought": "T", "action": "A", "observation": "OBS", "tool_id": "json_schema"}],
+        )
     )
+    assert encoded["input_ids"] == Tok().encode(rendered)[:64]
+    start = rendered.index("T A")
+    assert encoded["labels"][start : start + len(labeled)] == labeled
+    obs_start = rendered.index("OBS")
+    assert encoded["labels"][obs_start : obs_start + len(obs_ids)] == [-100] * len(obs_ids)
     collator = TrajectoryDataCollator(Tok(), max_length=64)
     batch = collator([row])
     assert "labels" in batch

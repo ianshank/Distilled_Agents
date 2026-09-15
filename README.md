@@ -27,7 +27,7 @@ Distilled_Agents/
 │   ├── ops/                       # Shared SageMaker launcher + settings
 │   └── tests/
 ├── scripts/                       # Thin CLIs over shared modules
-│   └── harness/                   # run_agent, collect_trajectories, tailor_harness
+│   └── harness/                   # run_agent, collect, eval, tailor, memory, dualdistill, score
 └── tests/                         # Root pytest (skills contract, training-data smoke)
 ```
 
@@ -75,7 +75,7 @@ python scripts/deployment/simple_launch_sagemaker.py
 | Serve | SageMaker `predict_fn` in `scripts/inference.py` | No (single-shot) |
 | Harness H | `scripts/harness/run_agent.py` | Yes (local loop) |
 
-Collect trusted JSONL with `scripts/harness/collect_trajectories.py` (injection detection off). Interactive tasks use `run_agent` (injection on).
+Collect trusted JSONL with `scripts/harness/collect_trajectories.py` (injection detection off; `--teacher` default, `--student` for student rollouts). Interactive tasks use `run_agent` (injection on). Harness pass rate: `scripts/harness/eval_harness.py` (not `evaluate_agent_skill`). Format contract: [docs/README_AGENT_DISTILLATION.md](docs/README_AGENT_DISTILLATION.md).
 
 ## Documentation
 
@@ -128,7 +128,7 @@ Organized by function:
 - **training/**: Model training and distillation
 - **evaluation/**: Agent skill evaluation and registration
 - **infrastructure/**: Setup, security, and verification
-- **harness/**: Local agent runtime (`run_agent`, collect, tailor)
+- **harness/**: Local agent runtime (`run_agent`, collect, eval, tailor, memory, dualdistill, score)
 
 ## Contributing
 

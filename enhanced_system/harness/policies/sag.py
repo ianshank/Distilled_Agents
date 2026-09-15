@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Optional, Sequence
 
-from enhanced_system.harness.dispatch import DispatchError, parse_action
+from enhanced_system.harness.dispatch import DispatchError, parse_action, split_thought_action
 from enhanced_system.harness.protocols import ModelBackend
 
 
@@ -22,14 +22,18 @@ def generate_action(
     count = samples if samples and samples > 0 else 1
     raw_list = backend.generate(messages, prefix=prefix, n=count, temperature=temperature)
     valid: list[str] = []
+    actions: list[str] = []
     for item in raw_list:
         try:
-            parse_action(item, allowed)
+            _thought, action = split_thought_action(item, allowed)
+            parse_action(action, allowed)
             valid.append(item)
+            actions.append(action)
         except DispatchError:
             continue
     if not valid:
         raise DispatchError("no parse-valid action among samples")
-    winner, _ = Counter(valid).most_common(1)[0]
-    tool_id, _ = parse_action(winner, allowed)
+    winner_action, _ = Counter(actions).most_common(1)[0]
+    winner = valid[actions.index(winner_action)]
+    tool_id, _ = parse_action(winner_action, allowed)
     return winner, tool_id

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .prompt_render import supervised_spans
+
 
 def _encode(tokenizer: Any, text: str) -> list[int]:
     if not text:
@@ -13,29 +15,30 @@ def _encode(tokenizer: Any, text: str) -> list[int]:
 
 
 def encode_row(tokenizer: Any, row: dict[str, Any], max_length: int) -> dict[str, list[int]]:
-    """Build input_ids and labels; observations and prompt are unlabeled."""
+    """Build input_ids and labels; user/obs/fault turns unlabeled, assistant labeled."""
     prompt = str(row.get("prompt") or "")
     completion = str(row.get("completion") or "")
     trajectory = row.get("trajectory") or {}
     steps = trajectory.get("steps") if isinstance(trajectory, dict) else None
-    input_ids = _encode(tokenizer, prompt)
-    labels = [-100] * len(input_ids)
+    instruction = str(row.get("instruction") or "")
+    if isinstance(trajectory, dict) and not instruction:
+        instruction = str(trajectory.get("instruction") or "")
+    input_ids: list[int] = []
+    labels: list[int] = []
     if steps:
-        for step in steps:
-            thought = str(step.get("thought") or "")
-            action = str(step.get("action") or "")
-            labeled = " ".join(part for part in (thought, action) if part).strip()
-            labeled_ids = _encode(tokenizer, labeled)
-            input_ids.extend(labeled_ids)
-            labels.extend(labeled_ids)
-            observation = str(step.get("observation") or "")
-            obs_ids = _encode(tokenizer, observation)
-            input_ids.extend(obs_ids)
-            labels.extend([-100] * len(obs_ids))
+        for text, supervised in supervised_spans(prompt, steps, instruction=instruction):
+            token_ids = _encode(tokenizer, text)
+            input_ids.extend(token_ids)
+            labels.extend(token_ids if supervised else [-100] * len(token_ids))
     else:
-        labeled_ids = _encode(tokenizer, completion)
-        input_ids.extend(labeled_ids)
-        labels.extend(labeled_ids)
+        for text, supervised in supervised_spans(
+            prompt,
+            [{"thought": "", "action": completion, "observation": "", "tool_id": "final_answer"}],
+            instruction=instruction,
+        ):
+            token_ids = _encode(tokenizer, text)
+            input_ids.extend(token_ids)
+            labels.extend(token_ids if supervised else [-100] * len(token_ids))
     input_ids = input_ids[:max_length]
     labels = labels[:max_length]
     return {"input_ids": input_ids, "labels": labels}

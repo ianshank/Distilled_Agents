@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from enhanced_system.core.input_validator import InputValidator
-from enhanced_system.harness.dispatch import DispatchError, allowed_tools, parse_action
+from enhanced_system.harness.dispatch import (
+    DispatchError,
+    allowed_tools,
+    parse_action,
+    split_thought_action,
+)
+from enhanced_system.harness.memory_bank import MemoryBank, function_hint, workflow_hint
 from enhanced_system.harness.policies.ftp import maybe_prefix
 from enhanced_system.harness.policies.sag import generate_action
+from enhanced_system.harness.prompt_render import messages_from_steps
 from enhanced_system.harness.protocols import ModelBackend, TraceStore
 from enhanced_system.harness.registry import load_spec
 from enhanced_system.harness.tools.registry import get_tool
@@ -30,6 +37,7 @@ class AgentRuntime:
         validator: Optional[InputValidator] = None,
         store: Optional[TraceStore] = None,
         teacher: Optional[bool] = None,
+        memory_bank: Optional[MemoryBank] = None,
     ) -> None:
         self.backend = backend
         self.spec = spec
@@ -43,32 +51,36 @@ class AgentRuntime:
         )
         self.store = store
         self.teacher = teacher
+        self.memory_bank = memory_bank
 
-    def run(self, task: str, *, harness_id: Optional[str] = None) -> HarnessRunResult:
+    def run(
+        self,
+        task: str,
+        *,
+        harness_id: Optional[str] = None,
+        resume_steps: Optional[list[Step]] = None,
+        inject_action: Optional[str] = None,
+    ) -> HarnessRunResult:
         """Validate the user task, then loop until final_answer or max_steps."""
-        validation = self.validator.validate_task_input(task)
-        if not validation.is_valid:
-            raise ValueError(validation.error_message or "invalid task")
-        # Keep original text when PII is off so CodeAct collect does not flatten newlines.
-        recorded = (
-            validation.sanitized_input or task if self.validator.enable_pii_detection else task
-        )
-        spec_id = harness_id or self.settings.harness_id
-        spec = self.spec or load_spec(spec_id, self.settings)
-        if spec_id and spec.id != spec_id:
-            spec = load_spec(spec_id, self.settings)
+        recorded, spec, teacher = self._prepare(task, harness_id=harness_id)
+        bank = self._load_bank(spec)
+        instruction = self._instruction(spec, recorded, teacher, bank)
         allowed = allowed_tools(spec.action.tool_ids)
-        teacher = self.teacher if self.teacher is not None else spec.policy.teacher
         prefix = maybe_prefix(
             self.backend,
             recorded,
-            enabled=spec.planning.first_thought_prefix,
+            enabled=spec.planning.first_thought_prefix and not resume_steps,
             teacher=teacher,
         )
-        trajectory = Trajectory(harness_id=spec.id, task=recorded)
+        trajectory = Trajectory(
+            harness_id=spec.id,
+            task=recorded,
+            instruction=instruction,
+            steps=list(resume_steps or []),
+        )
         max_steps = spec.planning.max_steps or self.settings.harness_max_steps
         window = spec.memory.window_turns or self.settings.harness_memory_window
-        messages = [{"role": "user", "content": recorded}]
+        pending = inject_action
         truncated = True
         final_answer = ""
         logger.info(
@@ -77,46 +89,63 @@ class AgentRuntime:
             self.settings.harness_seed,
             max_steps,
         )
-        for step_idx in range(max_steps):
+        while len(trajectory.steps) < max_steps:
+            messages = _trim_window(
+                messages_from_steps(
+                    recorded,
+                    [step.model_dump() for step in trajectory.steps],
+                    instruction=instruction,
+                ),
+                window,
+            )
+            tool_id = ""
             try:
-                raw, _tool_name = generate_action(
-                    self.backend,
-                    messages,
-                    allowed,
-                    samples=spec.policy.sag_samples or 1,
-                    temperature=spec.policy.sag_temperature,
-                    prefix=prefix,
-                )
-                thought = prefix or ""
-                tool_id, args = parse_action(raw, allowed)
-                observation = get_tool(tool_id).run(args)
+                raw = pending
+                pending = None
+                if raw is None:
+                    raw, _name = generate_action(
+                        self.backend,
+                        messages,
+                        allowed,
+                        samples=spec.policy.sag_samples or 1,
+                        temperature=spec.policy.sag_temperature,
+                        prefix=prefix,
+                    )
+                thought, action, tool_id, args = self._parse_generation(raw, prefix, allowed)
+                live_obs = get_tool(tool_id).run(args)
+                stored = live_obs if spec.memory.write_observations else ""
                 step = Step(
                     thought=thought,
-                    action=raw,
-                    observation=observation if spec.memory.write_observations else "",
+                    action=action,
+                    observation=stored,
                     tool_id=tool_id,
                 )
                 trajectory.steps.append(step)
                 logger.info(
                     "harness step=%s harness_id=%s tool=%s",
-                    step_idx,
+                    len(trajectory.steps) - 1,
                     spec.id,
-                    tool_id,
+                    step.tool_id,
                 )
-                if tool_id == "final_answer":
-                    final_answer = observation
+                if step.tool_id == "final_answer":
+                    final_answer = live_obs
                     truncated = False
                     break
-                if spec.memory.write_observations:
-                    messages.append({"role": "assistant", "content": raw})
-                    messages.append({"role": "user", "content": observation})
-                    messages = _trim_window(messages, window)
             except (DispatchError, ValueError, KeyError) as exc:
                 fault = "parse_error" if isinstance(exc, DispatchError) else "tool_error"
+                observation = str(exc)
+                if fault == "tool_error" and not teacher:
+                    hint = function_hint(bank, tool_id)
+                    if hint:
+                        observation = f"{observation}\n{hint}"
                 trajectory.faults.append(fault)
-                trajectory.steps.append(Step(action="", observation=str(exc), fault=fault))
-                logger.warning("harness step=%s harness_id=%s fault=%s", step_idx, spec.id, fault)
-                messages.append({"role": "user", "content": f"{fault}: {exc}"})
+                trajectory.steps.append(Step(action="", observation=observation, fault=fault))
+                logger.warning(
+                    "harness step=%s harness_id=%s fault=%s",
+                    len(trajectory.steps) - 1,
+                    spec.id,
+                    fault,
+                )
             finally:
                 prefix = None
         if truncated:
@@ -138,11 +167,66 @@ class AgentRuntime:
             self.store.append(trajectory)
         return result
 
+    def _prepare(self, task: str, *, harness_id: Optional[str]) -> tuple[str, HarnessSpec, bool]:
+        validation = self.validator.validate_task_input(task)
+        if not validation.is_valid:
+            raise ValueError(validation.error_message or "invalid task")
+        recorded = (
+            validation.sanitized_input or task if self.validator.enable_pii_detection else task
+        )
+        spec_id = harness_id or self.settings.harness_id
+        spec = self.spec or load_spec(spec_id, self.settings)
+        if spec_id and spec.id != spec_id:
+            spec = load_spec(spec_id, self.settings)
+        teacher = self.teacher if self.teacher is not None else spec.policy.teacher
+        return recorded, spec, teacher
+
+    def _instruction(
+        self,
+        spec: HarnessSpec,
+        task: str,
+        teacher: bool,
+        bank: Optional[MemoryBank],
+    ) -> str:
+        parts = [spec.planning.instruction.strip()]
+        if bank is not None and not teacher:
+            hint = workflow_hint(bank, task)
+            if hint:
+                parts.append(f"Workflow: {hint}")
+        return "\n".join(part for part in parts if part)
+
+    def _load_bank(self, spec: HarnessSpec) -> Optional[MemoryBank]:
+        if self.memory_bank is not None:
+            return self.memory_bank
+        path = spec.memory.bank_path or self.settings.harness_memory_bank
+        if not path:
+            return None
+        try:
+            return MemoryBank.load(path)
+        except (OSError, ValueError) as exc:
+            logger.warning("memory bank skipped: %s", exc)
+            return None
+
+    def _parse_generation(
+        self,
+        raw: str,
+        prefix: Optional[str],
+        allowed: set[str],
+    ) -> tuple[str, str, str, dict[str, Any]]:
+        thought_tail, action = split_thought_action(raw, allowed)
+        thought = " ".join(part for part in ((prefix or "").strip(), thought_tail) if part)
+        tool_id, args = parse_action(action, allowed)
+        return thought, action, tool_id, args
+
 
 def _trim_window(messages: list[dict[str, str]], window_turns: int) -> list[dict[str, str]]:
     if window_turns <= 0:
         return messages
-    head = messages[:1]
-    tail = messages[1:]
+    head: list[dict[str, str]] = []
+    rest = list(messages)
+    while rest and rest[0].get("role") == "system":
+        head.append(rest.pop(0))
+    if rest:
+        head.append(rest.pop(0))
     keep = window_turns * 2
-    return head + tail[-keep:]
+    return head + rest[-keep:]

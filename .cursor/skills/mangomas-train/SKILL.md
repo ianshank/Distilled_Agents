@@ -31,3 +31,5 @@ python scripts/training/train_agent_skill.py \
 ```
 
 Settings come from `enhanced_system.ops.settings.get_settings()` (`MANGOMAS_` env prefix). Mock training runs when AWS is unavailable. Never pass `--trust_remote_code` unless operators explicitly set `MANGOMAS_TRUST_REMOTE_CODE=true`.
+
+Role LoRAs go through this SageMaker CLI (`create_job_spec` has no `trajectory_mode`). Local Kang BC is `scripts/training/train_distilled_adapter.py --trajectory_mode True` after `collect_trajectories.py`. See `docs/README_AGENT_DISTILLATION.md`.

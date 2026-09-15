@@ -39,6 +39,22 @@ CLI_REQUIRED_FLAGS = {
         "--output",
         "--harness-id",
         "--strict",
+        "--student",
+        "--teacher",
+    },
+    "scripts/harness/eval_harness.py": {
+        "--input",
+        "--harness-id",
+        "--threshold",
+        "--student",
+    },
+    "scripts/harness/build_memory.py": {"--traces", "--output"},
+    "scripts/harness/compose_dualdistill.py": {"--first", "--second", "--output"},
+    "scripts/harness/collect_score.py": {
+        "--input",
+        "--output",
+        "--harness-id",
+        "--prefs",
     },
     "scripts/harness/tailor_harness.py": {"--harness-id", "--traces", "--archive-dir"},
 }
@@ -98,10 +114,14 @@ def test_skills_frontmatter_and_cli_paths():
     assert names == skill_dirs
     for required in (
         "mangomas-collect",
+        "mangomas-dualdistill",
+        "mangomas-eval-harness",
         "mangomas-evaluate",
         "mangomas-harness",
         "mangomas-launch",
+        "mangomas-memory",
         "mangomas-scan",
+        "mangomas-score",
         "mangomas-tailor",
         "mangomas-train",
         "mangomas-validate",

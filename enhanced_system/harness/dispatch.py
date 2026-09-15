@@ -25,6 +25,57 @@ def parse_action(text: str, allowed: set[str]) -> tuple[str, dict[str, Any]]:
     return _parse_ast_call(stripped, allowed)
 
 
+def split_thought_action(text: str, allowed: set[str]) -> tuple[str, str]:
+    """Split optional leading thought from a parseable JSON or Call action."""
+    stripped = (text or "").strip()
+    if not stripped:
+        raise DispatchError("empty action")
+    try:
+        parse_action(stripped, allowed)
+        return "", stripped
+    except DispatchError:
+        pass
+    json_split = _split_json_action(stripped)
+    if json_split is not None:
+        thought, action = json_split
+        parse_action(action, allowed)
+        return thought, action
+    call_split = _split_call_action(stripped, allowed)
+    if call_split is not None:
+        return call_split
+    parse_action(stripped, allowed)
+    return "", stripped
+
+
+def _split_json_action(text: str) -> tuple[str, str] | None:
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
+        try:
+            payload, end = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict) and payload.get("tool"):
+            return text[:index].strip(), text[index : index + end].strip()
+    return None
+
+
+def _split_call_action(text: str, allowed: set[str]) -> tuple[str, str] | None:
+    for index, char in enumerate(text):
+        if index > 0 and (char.isalpha() or char == "_") and text[index - 1].isalnum():
+            continue
+        if not (char.isalpha() or char == "_"):
+            continue
+        snippet = text[index:]
+        try:
+            parse_action(snippet, allowed)
+        except DispatchError:
+            continue
+        return text[:index].strip(), snippet.strip()
+    return None
+
+
 def _parse_json(text: str, allowed: set[str]) -> tuple[str, dict[str, Any]]:
     try:
         payload = json.loads(text)
