@@ -9,6 +9,14 @@ from pathlib import Path
 from enhanced_system.harness.types import Trajectory
 
 
+def raw_store_path(out_path: Path) -> Path:
+    """Return a distinct raw-trace path so collect never truncates its own store."""
+    if out_path.name.endswith(".raw.jsonl"):
+        stem = out_path.name[: -len(".raw.jsonl")]
+        return out_path.with_name(f"{stem}.raw.traces.jsonl")
+    return out_path.with_suffix(".raw.jsonl")
+
+
 class JsonlTraceStore:
     """Append one JSON object per line (in-process lock only)."""
 

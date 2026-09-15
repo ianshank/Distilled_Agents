@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from enhanced_system.harness.prompt_render import join_thought_action
 from enhanced_system.harness.types import Trajectory
 from enhanced_system.ops.settings import get_settings
 
@@ -15,19 +16,25 @@ def serialize_thought_action(trajectory: Trajectory) -> str:
     """Join thought+action for each step (observations excluded)."""
     parts: list[str] = []
     for step in trajectory.steps:
-        chunk = " ".join(part for part in (step.thought, step.action) if part).strip()
+        chunk = join_thought_action(step.thought, step.action)
         if chunk:
             parts.append(chunk)
     return "\n".join(parts)
 
 
-def trajectory_to_legacy(trajectory: Trajectory) -> dict[str, Any]:
-    """Always emit prompt/completion; attach trajectory when present."""
-    row = {
+def trajectory_to_legacy(
+    trajectory: Trajectory,
+    *,
+    expected: Any = None,
+) -> dict[str, Any]:
+    """Always emit prompt/completion; copy ``expected`` when the source had it."""
+    row: dict[str, Any] = {
         "prompt": trajectory.task,
         "completion": serialize_thought_action(trajectory) or trajectory.final_answer,
         "trajectory": trajectory.model_dump(),
     }
+    if expected is not None:
+        row["expected"] = expected
     max_length = get_settings().harness_max_length
     serialized_len = len(row["prompt"]) + len(row["completion"])
     if max_length and serialized_len > max_length:

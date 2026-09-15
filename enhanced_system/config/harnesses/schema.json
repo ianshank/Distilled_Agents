@@ -13,7 +13,8 @@
       "properties": {
         "style": { "enum": ["react", "codeact", "plan_and_solve"] },
         "max_steps": { "type": "integer", "minimum": 1 },
-        "first_thought_prefix": { "type": "boolean" }
+        "first_thought_prefix": { "type": "boolean" },
+        "instruction": { "type": "string" }
       }
     },
     "action": {
@@ -32,7 +33,8 @@
       "additionalProperties": false,
       "properties": {
         "window_turns": { "type": "integer", "minimum": 1 },
-        "write_observations": { "type": "boolean" }
+        "write_observations": { "type": "boolean" },
+        "bank_path": { "type": "string" }
       }
     },
     "policy": {

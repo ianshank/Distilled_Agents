@@ -13,12 +13,18 @@ def maybe_prefix(
     *,
     enabled: bool,
     teacher: bool,
+    instruction: str = "",
 ) -> Optional[str]:
     """Ask the teacher for a CoT seed; students skip this call."""
     if not enabled or not teacher:
         return None
+    messages: list[dict[str, str]] = []
+    text = instruction.strip()
+    if text:
+        messages.append({"role": "system", "content": text})
+    messages.append({"role": "user", "content": task})
     seeds = backend.generate(
-        [{"role": "user", "content": task}],
+        messages,
         prefix=None,
         n=1,
         temperature=None,

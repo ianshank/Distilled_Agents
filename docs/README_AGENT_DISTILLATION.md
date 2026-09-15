@@ -1,460 +1,135 @@
-# 🧠 MangoMAS Agent Distillation System
+# MangoMAS agent distillation
 
-## Overview
+Papers (Kang, SCoRe, DualDistill, TRL-on-traces) assume the **student is trained on the same token string the agent loop feeds at test time**. Until that is true, adopting those recipes is theater.
 
-The MangoMAS Agent Distillation System enables knowledge transfer from large, powerful teacher models to smaller, specialized student models. This approach allows for efficient deployment of AI agents while maintaining high performance through knowledge distillation techniques.
+This document is the source of truth for that constraint. ADR 0006 is the harness–policy decision; this file is how distillation maps onto it.
 
-## Trajectory SFT (local)
+## Format triangle
 
-`python scripts/training/train_distilled_adapter.py --trajectory_mode True` uses `scripts/training/distill/trajectory_collator.py` (observation masking) and sets `distillation_alpha` from `MANGOMAS_TRAJECTORY_DISTILL_ALPHA` (default `0.0`). Collect traces with `scripts/harness/collect_trajectories.py`. SageMaker `create_job_spec` does not take trajectory keys until argparse and the launcher change together.
+Three surfaces used to speak three different strings:
 
-## 🎯 Key Features
+| Surface | Entry | String |
+| --- | --- | --- |
+| Harness generate | `TransformersBackend._render_prompt` | `system:` / `user:` / `assistant:` turns, then a trailing `assistant:` (optional FTP prefix) |
+| Trajectory collator | `scripts/training/distill/trajectory_collator.py` | **Same role-tagged body** via `prompt_render.supervised_spans` (SageMaker copy under `scripts/training/distill/prompt_render.py`) |
+| SageMaker `predict_fn` | `scripts/inference.py` | Raw `input_data["prompt"]`, sampling decode, **no tools** |
 
-- **Knowledge Distillation**: Transfer knowledge from large models to smaller, efficient ones
-- **LoRA Integration**: Efficient fine-tuning with Low-Rank Adaptation
-- **SageMaker Compatibility**: Full AWS SageMaker integration for scalable training
-- **Multi-Stage Pipelines**: Progressive distillation for optimal results
-- **Comprehensive Monitoring**: Weights & Biases integration for experiment tracking
-- **Production Ready**: Inference endpoints and deployment automation
+Harness generate and masked SFT now share one renderer:
 
-## 🏗️ Architecture
+- `enhanced_system/harness/prompt_render.py` (runtime)
+- `scripts/training/distill/prompt_render.py` (SageMaker `source_dir`; **no** `enhanced_system` import)
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Teacher Model │    │  Distillation   │    │  Student Model  │
-│   (Large)       │───▶│   Process       │───▶│   (Small)       │
-│                 │    │                 │    │                 │
-│ - Mistral-7B    │    │ - KL Divergence │    │ - DialoGPT      │
-│ - GPT-4         │    │ - Temperature   │    │ - Custom        │
-│ - Claude        │    │ - LoRA          │    │ - Specialized   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+Keep those two files in sync. Labels sit on assistant thought+action spans only. User turns, observations, and `parse_error:` / `tool_error:` messages are unlabeled. The collator encodes that rendered body **once** (same string as `TransformersBackend`) and masks assistant spans from character/token offsets so BPE/SentencePiece context matches inference. Trajectory SFT needs a Hugging Face **fast** tokenizer (`offset_mapping`); a slow tokenizer raises instead of dropping every row. `predict_fn` stays single-shot (ADR 0006): a CodeAct student on the endpoint still does not see the harness string.
 
-## 📁 File Structure
-
-```
-training/
-├── train_distilled_adapter.py      # Main training script
-├── sagemaker_distillation_job.py   # SageMaker job manager
-├── inference.py                    # Inference script
-├── requirements.txt                # Dependencies
-├── README_AGENT_DISTILLATION.md    # This file
-└── examples/
-    ├── local_training.py           # Local training example
-    ├── sagemaker_example.py        # SageMaker example
-    └── inference_example.py        # Inference example
+```text
+system: {planning.instruction}          # unlabeled (Kang I_agent)
+user: {task}                            # unlabeled
+assistant: {thought} {action}           # labeled
+user: {observation | fault: message}    # unlabeled
+...
 ```
 
-## 🛠️ Installation
+Thought vs action is split with `split_thought_action` (text before the parsed JSON/Call). Teacher-only FTP still seeds `steps[0].thought`. Student thought is empty unless the generation contains a remainder before the action.
 
-### **Prerequisites**
-- Python 3.8+
-- PyTorch 1.13+
-- Transformers 4.26+
-- AWS SageMaker access
-- HuggingFace account (optional)
+## Two training stacks
 
-### **Setup**
-```bash
-# Clone the repository
-git clone <repository-url>
-cd MangoMAS
+Do not mix them.
 
-# Install dependencies
-pip install -r training/requirements.txt
+### 1. SageMaker prompt/completion (role LoRAs)
 
-# Configure AWS credentials
-aws configure
-```
+`scripts/training/train_agent_skill.py` → `create_job_spec` → estimator `transformers_version=4.26.0`, `pytorch_version=1.13.1`, `peft==0.4.0`. Checked-in `data/training/*.jsonl` is Distilled_Agents **prompt/completion** (FastAPI snippets, not traces). Classic KD (`distillation_alpha` > 0) is **unsafe** on the default pair (Mistral teacher vs DialoGPT student: vocab mismatch; unshifted KL on all positions). DialoGPT is a unit-test stub; LoRA `q_proj,...gate_proj` does not match `c_attn`.
 
-## 🚀 Quick Start
+Do **not** add `trajectory_mode` to `create_job_spec` until argparse and the launcher change together. That image cannot run Qwen2.5-Instruct trajectory SFT.
 
-### 1. Local Training
-
-```python
-from train_distilled_adapter import AgentDistillationTrainer
-import argparse
-
-# Setup arguments
-args = argparse.Namespace(
-    teacher_model_name='mistralai/Mistral-7B-v0.1',
-    student_model_name='microsoft/DialoGPT-medium',
-    train_file='data/train.jsonl',
-    output_dir='./distilled_model',
-    num_train_epochs=3,
-    distillation_alpha=0.5,
-    temperature=2.0,
-    use_lora=True,
-    use_fp16=True
-)
-
-# Initialize trainer and start training
-trainer = AgentDistillationTrainer(args)
-trainer.train()
-```
-
-### 2. SageMaker Training
-
-```python
-from sagemaker_distillation_job import AgentDistillationJob
-
-# Initialize job manager
-job_manager = AgentDistillationJob(region='us-east-1')
-
-# Create training job
-job_name = job_manager.create_training_job(
-    job_name="mangomas-distillation-20250730",
-    teacher_model='mistralai/Mistral-7B-v0.1',
-    student_model='microsoft/DialoGPT-medium',
-    train_data_s3="s3://your-bucket/training-data/train.jsonl",
-    eval_data_s3="s3://your-bucket/training-data/eval.jsonl",
-    instance_type='ml.g5.2xlarge',
-    hyperparameters={
-        'distillation_alpha': 0.5,
-        'temperature': 2.0,
-        'use_lora': True
-    }
-)
-
-# Monitor training
-job_manager.monitor_training_job(job_name)
-```
-
-### 3. Inference
-
-```python
-from inference import DistilledAgentInference
-
-# Initialize inference handler
-inference = DistilledAgentInference()
-inference.model_fn("/path/to/distilled/model")
-
-# Generate response
-input_data = {
-    "prompt": "What is the best approach for software architecture?",
-    "max_length": 256,
-    "temperature": 0.7
-}
-
-result = inference.predict_fn(input_data)
-print(result["responses"][0])
-```
-
-## 📊 Training Configuration
-
-### Model Configuration
-
-| Parameter | Description | Default | Range |
-|-----------|-------------|---------|-------|
-| `teacher_model_name` | Large model for knowledge transfer | `mistralai/Mistral-7B-v0.1` | Any HuggingFace model |
-| `student_model_name` | Target model for distillation | `microsoft/DialoGPT-medium` | Smaller model |
-| `distillation_alpha` | Weight for distillation loss | `0.5` | `0.0 - 1.0` |
-| `temperature` | Temperature for knowledge distillation | `2.0` | `0.1 - 10.0` |
-
-### LoRA Configuration
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `use_lora` | Enable LoRA fine-tuning | `True` |
-| `lora_r` | LoRA rank | `16` |
-| `lora_alpha` | LoRA alpha | `32` |
-| `lora_dropout` | LoRA dropout | `0.1` |
-
-### Training Configuration
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `num_train_epochs` | Number of training epochs | `3` |
-| `per_device_train_batch_size` | Training batch size | `2` |
-| `learning_rate` | Learning rate | `5e-5` |
-| `gradient_accumulation_steps` | Gradient accumulation | `4` |
-
-## 🔧 Advanced Usage
-
-### Multi-Stage Distillation Pipeline
-
-```python
-# Create multi-stage pipeline
-pipeline_name = job_manager.create_distillation_pipeline(
-    pipeline_name="mangomas-advanced-distillation",
-    teacher_model='mistralai/Mistral-7B-v0.1',
-    student_model='microsoft/DialoGPT-medium',
-    train_data_s3="s3://your-bucket/training-data/train.jsonl",
-    eval_data_s3="s3://your-bucket/training-data/eval.jsonl"
-)
-```
-
-### Custom Loss Functions
-
-```python
-# Custom distillation loss
-def custom_distillation_loss(student_outputs, teacher_outputs, labels):
-    # Task loss
-    task_loss = torch.nn.functional.cross_entropy(
-        student_outputs.logits.view(-1, student_outputs.logits.size(-1)),
-        labels.view(-1),
-        ignore_index=-100
-    )
-    
-    # Custom distillation loss
-    distillation_loss = torch.nn.functional.mse_loss(
-        student_outputs.logits,
-        teacher_outputs.logits
-    )
-    
-    return 0.7 * task_loss + 0.3 * distillation_loss
-```
-
-### Experiment Tracking
-
-```python
-# Enable Weights & Biases
-args.use_wandb = True
-
-# Custom experiment name
-wandb.init(
-    project="mangomas-agent-distillation",
-    name="custom-experiment",
-    config={
-        "teacher_model": "mistralai/Mistral-7B-v0.1",
-        "student_model": "microsoft/DialoGPT-medium",
-        "distillation_alpha": 0.5,
-        "temperature": 2.0
-    }
-)
-```
-
-## 📈 Performance Optimization
-
-### Memory Optimization
-
-```python
-# Enable FP16 training
-args.use_fp16 = True
-
-# Use device map for large models
-args.use_device_map = True
-
-# Gradient checkpointing
-training_args.gradient_checkpointing = True
-```
-
-### Speed Optimization
-
-```python
-# Use spot instances for cost efficiency
-use_spot_instances = True
-
-# Optimize batch size
-per_device_train_batch_size = 4
-gradient_accumulation_steps = 2
-
-# Use mixed precision
-fp16 = True
-```
-
-## 🧪 Testing and Validation
-
-### Local Testing
+### 2. Local trajectory BC (Kang spine)
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run local training test
-python train_distilled_adapter.py \
-    --teacher_model_name mistralai/Mistral-7B-v0.1 \
-    --student_model_name microsoft/DialoGPT-medium \
-    --train_file test_data.jsonl \
-    --num_train_epochs 1 \
-    --use_lora
+python scripts/harness/collect_trajectories.py --input prompts.jsonl --output traces.jsonl
+python scripts/training/train_distilled_adapter.py --trajectory_mode True
 ```
 
-### SageMaker Testing
+Collect copies `expected` from the prompt JSONL onto each trace when present. `compose_dualdistill.py` skips unlabeled rows, so collect → DualDistill is a dead pipeline without that field.
+
+`--trajectory_mode` unloads the teacher. `distillation_alpha` comes from `MANGOMAS_TRAJECTORY_DISTILL_ALPHA` (default `0.0`). Collect JSONL is trusted (`strict_injection=False`). Interactive `scripts/harness/run_agent.py` keeps injection on.
+
+Local training rule: occasional runs, ≤10k traces, privacy-sensitive data → **local** SFT, not the 4.26/1.13 SageMaker image. Real students: Qwen2.5-Instruct 0.5B–3B.
+
+**512-token trap:** collator `max_length=512`, backend `max_input_length=512`, `max_new_tokens=128`. The prompt is encoded first and unlabeled; a long prompt zeros out labels and `has_supervised_tokens` **drops the row**.
+
+## What `planning.style` does (and does not)
+
+Schema allows `react` / `codeact` / `plan_and_solve`. `AgentRuntime.run` does **not** read `spec.planning.style`. Every harness is one loop + different `tool_ids`. `style: codeact` is not CodeAct (no interpreter, no `exec`). DualDistill cannot be “collect codeact vs plan_and_solve.”
+
+Kang `I_agent` is `planning.instruction` (YAML + schema; `additionalProperties: false` means both `configs/harnesses/` and `enhanced_system/config/harnesses/` must change together).
+
+## Paper false-friends (do not vendor)
+
+| Recipe | Honest mapping here | Not this |
+| --- | --- | --- |
+| Kang / Nardien | Shared renderer + instruction + outcome-filtered teacher traces + masked SFT | smolagents; execution SAG; subprocess CodeAct sandbox |
+| EasyDistill operators | Collect `--input`; exact-match on `final_answer`; optional prefs dump | LangGraph `agentkd`; `trust_remote_code: true`; live web search |
+| DualDistill | `compose_dualdistill.py`: same `x`, two teachers, grader `G(y,a)`, `y1 ⊕ t ⊕ y2`, drop `(0,0)` | Concatenating architect vs SWE JSONL (that is multi-task SFT) |
+| SCoRe-SFT | `collect_score.py`: student rollout, teacher **review prompt** on the full chain, resume prefix, prefs byproduct | Treating `step.fault` as the task failure; GRPO / SCoRe-RL |
+| AMD-lite | `build_memory.py`: student workflow prefix + function memory on `tool_error` | `HarnessTailor` dropping tools after two errors |
+| SDAR / AgentArk PAD / TRL GKD | Deferred. SDPO with observations as `privileged_context` is the honest TRL mapping | Launcher hyperparams; gated OPSD on GRPO |
+| AgentDistill MCP | Frozen `TOOL_REGISTRY`; human-reviewed tool ids only | Autoload / `exec` |
+
+SAG is parse/schema majority vote. Defaults `harness_sag_samples=1`, `harness_sag_temperature=0.0`. It is **not** execute-and-vote-on-observation.
+
+Tools are checklists (`pytest_runner` does not run pytest). Kang’s “small models retrieve/code instead of memorizing” does not apply until a sandbox exists.
+
+`evaluate_agent_skill` counts pre-filled `passed` / `actual==expected` in a JSON file. It does **not** run a model. Harness quality is `scripts/harness/eval_harness.py` (`AgentRuntime`, Echo in tests): exact-match `final_answer`, tool-id validity, truncation, faults.
+
+`DataCurator` is prompt/completion quality heuristics, not traces.
+
+## Collect, filter, eval
 
 ```bash
-# Test SageMaker job creation
-python sagemaker_distillation_job.py
+# Teacher traces (default). Outcome filter only when the row has expected.
+python scripts/harness/collect_trajectories.py \
+  --input prompts.jsonl --output traces.jsonl --harness-id swe_codeact --teacher
 
-# Monitor training jobs
-python -c "
-from sagemaker_distillation_job import AgentDistillationJob
-job_manager = AgentDistillationJob()
-job_manager.list_training_jobs('mangomas')
-"
+# Student rollouts (same loop, student weights).
+python scripts/harness/collect_trajectories.py \
+  --input prompts.jsonl --output student.jsonl --student
+
+# Runtime eval (not skill-fixture pass rate)
+python scripts/harness/eval_harness.py --input prompts.jsonl --harness-id base_react
 ```
 
-## 📊 Monitoring and Metrics
+Outcome filter skips a row when `expected` is present **and** `final_answer` misses it. Intermediate `parse_error` / `tool_error` are **kept** when the outcome matches — recovery is the point. No `expected` ⇒ no outcome skip. Kept rows still carry `expected` so compose can grade.
 
-### Training Metrics
-
-- **Loss**: Combined task and distillation loss
-- **Accuracy**: Task-specific accuracy metrics
-- **Perplexity**: Language modeling perplexity
-- **BLEU Score**: Text generation quality
-- **ROUGE Score**: Summarization quality
-
-### Resource Metrics
-
-- **GPU Utilization**: GPU usage during training
-- **Memory Usage**: Peak memory consumption
-- **Training Time**: Total training duration
-- **Cost**: AWS SageMaker costs
-
-## 🚀 Deployment
-
-### SageMaker Endpoint
-
-```python
-# Create inference endpoint
-predictor = job_manager.create_inference_endpoint(
-    model_name="mangomas-distillation-20250730",
-    endpoint_name="mangomas-distilled-agent",
-    instance_type="ml.m5.large"
-)
-
-# Test endpoint
-response = predictor.predict({
-    "prompt": "Explain software architecture",
-    "max_length": 256,
-    "temperature": 0.7
-})
-```
-
-### Local Deployment
+## AMD-lite (after format + eval)
 
 ```bash
-# Start local inference server
-python inference.py
-
-# Test with curl
-curl -X POST http://localhost:8080/invocations \
-    -H "Content-Type: application/json" \
-    -d '{
-        "prompt": "What is the best approach for software architecture?",
-        "max_length": 256,
-        "temperature": 0.7
-    }'
+python scripts/harness/build_memory.py --traces traces.jsonl --output memory.json
+# YAML memory.bank_path or MANGOMAS_HARNESS_MEMORY_BANK
 ```
 
-## 🔍 Troubleshooting
+Successful teacher traces (has `final_answer`, no `loop`) contribute a workflow hint (keyword overlap on the task) and per-tool call guides. On student `tool_error`, a function-memory hint is appended to the observation. This is the **opposite** of tailor drop-tool. Checklist tools will show small lift; do not claim AMD paper numbers.
 
-### Common Issues
+## DualDistill compose (labeled same-task suite only)
 
-1. **Out of Memory**: Reduce batch size or enable gradient checkpointing
-2. **Slow Training**: Use spot instances or optimize hyperparameters
-3. **Poor Quality**: Adjust distillation alpha and temperature
-4. **Model Loading**: Check model compatibility and dependencies
+Needs the same prompt `x`, reference `a`, two heterogeneous teachers, second solution **conditioned on the first**, grader `G(y,a)`, compose `y1 ⊕ t ⊕ y2`, drop `(0,0)`. Mixing harness JSONL by role is multi-task SFT.
 
-### Debug Mode
-
-```python
-# Enable debug logging
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-# Verbose training
-training_args.logging_steps = 10
-training_args.save_steps = 100
+```bash
+python scripts/harness/compose_dualdistill.py \
+  --first teacher_a.jsonl --second teacher_b.jsonl --output composed.jsonl
 ```
 
-## 📚 Examples
+Rows without `expected` are skipped. Collect must preserve `expected` on traces (`trajectory_to_legacy(..., expected=...)`). Their agentic teacher is OpenHands+interpreter; checklist tools cannot play `\pi_A`.
 
-### **Basic Training Example**
-```python
-from train_distilled_adapter import AgentDistillationTrainer
+## SCoRe-SFT collect (after BC, not instead of it)
 
-# Initialize trainer
-trainer = AgentDistillationTrainer(
-    teacher_model='mistralai/Mistral-7B-v0.1',
-    student_model='microsoft/DialoGPT-medium',
-    train_file='training/swe_agent.jsonl'
-)
+Cold-start BC on successful teacher traces first. Then:
 
-# Start training
-trainer.train()
+```bash
+python scripts/harness/collect_score.py \
+  --input prompts.jsonl --output corrected.jsonl --prefs prefs.jsonl
 ```
 
-### **SageMaker Training Example**
-```python
-from sagemaker_distillation_job import AgentDistillationJob
+Student explores; teacher `generate`s a review of the **full chain** and the corrected action is injected at the first **semantic** miss (wrong/missing final answer), not `DispatchError` recovered on the way. Resume from the verified prefix. Preference pairs (`σ_k` vs `σ'_k`) are a byproduct for later DPO/GRPO — not a separate EasyDistill job. Defer SCoRe-RL, GRPO, SDAR.
 
-# Create training job
-job = AgentDistillationJob()
-job_name = job.create_training_job(
-    agent_type="software_engineer",
-    training_data_s3_uri="s3://bucket/training-data.jsonl"
-)
+## Still deferred
 
-# Monitor progress
-job.monitor_training_job(job_name)
-```
-
-### **Custom Agent Training Example**
-```python
-# Train custom agent with specific configuration
-config = {
-    "model_name": "microsoft/DialoGPT-medium",
-    "training_data": "custom_training_data.jsonl",
-    "epochs": 5,
-    "learning_rate": 1e-4
-}
-
-python train_distilled_adapter.py --config config.json
-```
-
-### **Inference Example**
-```python
-from inference import DistilledAgentInference
-
-# Load trained model
-inference = DistilledAgentInference(
-    model_path="s3://bucket/trained-model"
-)
-
-# Generate response
-response = inference.predict("Write a Python function for sorting")
-print(response)
-```
-
-## 📚 Best Practices
-
-### Model Selection
-
-- **Teacher**: Choose large, high-quality models (Mistral-7B, GPT-4, Claude)
-- **Student**: Select smaller, efficient models (DialoGPT, GPT-2, BERT)
-- **Domain**: Match teacher and student domains when possible
-
-### Hyperparameter Tuning
-
-- **Distillation Alpha**: Start with 0.5, tune based on task
-- **Temperature**: Higher values (2-4) for softer knowledge transfer
-- **Learning Rate**: Lower rates (1e-5 to 5e-5) for stable training
-
-### Data Preparation
-
-- **Quality**: Use high-quality, diverse training data
-- **Format**: JSONL format with 'prompt' field
-- **Size**: 10K-100K examples for good results
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- HuggingFace Transformers team
-- AWS SageMaker team
-- PEFT (Parameter-Efficient Fine-Tuning) contributors
-- Weights & Biases for experiment tracking
-
----
-
-**MangoMAS Agent Distillation System** - Efficient knowledge transfer for AI agents 
+Execution-consistent SAG; CodeAct subprocess sandbox; SageMaker `trajectory_mode`; TRL/peft pin + SDPO/GKD; live search; MCP autotools; `InputValidator` regex edits; turning on `distillation_alpha` in trajectory mode before KL is label-masked and vocab-aligned.

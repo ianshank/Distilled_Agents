@@ -46,4 +46,9 @@ def load_tokenizer(model_name: str, args: Any):
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    if getattr(tokenizer, "is_fast", True) is False:
+        logger.warning(
+            "slow tokenizer %s has no offset mapping; trajectory SFT needs a fast tokenizer",
+            model_name,
+        )
     return tokenizer

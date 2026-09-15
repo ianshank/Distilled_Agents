@@ -3,6 +3,7 @@ schema_version: "1"
 planning:
   style: codeact
   first_thought_prefix: true
+  instruction: "Solve the task in thought-then-action steps. Emit JSON tool calls or final_answer."
 action:
   tool_ids:
     - json_schema

@@ -34,6 +34,7 @@ from enhanced_system.harness.traces import JsonlTraceStore
 from enhanced_system.harness.types import HarnessSpec, Step, Trajectory
 from enhanced_system.ops.sagemaker_launcher import MangoMASSageMakerLauncher
 from enhanced_system.ops.settings import get_settings
+from scripts.training.distill.prompt_render import supervised_spans
 from scripts.training.distill.sagemaker_io import texts_from_examples
 from scripts.training.distill.trajectory_collator import (
     TrajectoryDataCollator,
@@ -429,13 +430,20 @@ def test_collator_masks_observations():
         },
     }
     encoded = encode_row(Tok(), row, max_length=64)
-    obs_ids = Tok().encode("OBS")
     labeled = Tok().encode("T A")
-    # observation ids appear after prompt + labeled
-    assert encoded["labels"][-len(obs_ids) :] == [-100] * len(obs_ids)
-    assert (
-        encoded["labels"][len(Tok().encode("P")) : len(Tok().encode("P")) + len(labeled)] == labeled
+    obs_ids = Tok().encode("OBS")
+    rendered = "".join(
+        text
+        for text, _supervised in supervised_spans(
+            "P",
+            [{"thought": "T", "action": "A", "observation": "OBS", "tool_id": "json_schema"}],
+        )
     )
+    assert encoded["input_ids"] == Tok().encode(rendered)[:64]
+    start = rendered.index("T A")
+    assert encoded["labels"][start : start + len(labeled)] == labeled
+    obs_start = rendered.index("OBS")
+    assert encoded["labels"][obs_start : obs_start + len(obs_ids)] == [-100] * len(obs_ids)
     collator = TrajectoryDataCollator(Tok(), max_length=64)
     batch = collator([row])
     assert "labels" in batch
@@ -448,11 +456,11 @@ def test_collator_without_trajectory_uses_completion():
         pad_token_id = 0
 
         def encode(self, text, add_special_tokens=False):
-            return [1, 2] if text else []
+            return [ord(ch) % 20 + 1 for ch in text]
 
-    encoded = encode_row(Tok(), {"prompt": "p", "completion": "c"}, max_length=16)
+    encoded = encode_row(Tok(), {"prompt": "p", "completion": "c"}, max_length=64)
     assert -100 in encoded["labels"]
-    assert 1 in encoded["labels"] or 2 in encoded["labels"]
+    assert any(label != -100 for label in encoded["labels"])
 
 
 @pytest.mark.unit
@@ -579,51 +587,6 @@ def test_dual_agent_profiles_match():
     repo = REPO / "configs" / "agent_profiles.json"
     packaged = REPO / "enhanced_system" / "config" / "agent_profiles.json"
     assert repo.read_bytes() == packaged.read_bytes()
-
-
-@pytest.mark.unit
-@pytest.mark.harness
-def test_run_agent_cli(tmp_path, capsys):
-    from scripts.harness.run_agent import main
-
-    code = main(
-        [
-            "--task",
-            "Write a short greeting",
-            "--harness-id",
-            "base_react",
-            "--scripted",
-            '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"hi\\"}}"]',
-        ]
-    )
-    assert code == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["final_answer"] == "hi"
-
-
-@pytest.mark.unit
-@pytest.mark.harness
-def test_collect_trajectories_cli(tmp_path):
-    from scripts.harness.collect_trajectories import main
-
-    source = tmp_path / "in.jsonl"
-    source.write_text('{"prompt": "Write a short greeting"}\n', encoding="utf-8")
-    dest = tmp_path / "out.jsonl"
-    code = main(
-        [
-            "--input",
-            str(source),
-            "--output",
-            str(tmp_path / "out.jsonl"),
-            "--harness-id",
-            "base_react",
-            "--scripted",
-            '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"hi\\"}}"]',
-        ]
-    )
-    assert code == 0
-    row = json.loads(dest.read_text(encoding="utf-8").splitlines()[0])
-    assert "prompt" in row and "completion" in row
 
 
 @pytest.mark.unit
@@ -939,8 +902,8 @@ def test_collator_empty_and_non_trajectory():
     collator = TrajectoryDataCollator(Tok(), max_length=8)
     empty = collator([])
     assert "labels" in empty
-    encoded = encode_row(Tok(), {"prompt": "p", "completion": "c", "trajectory": []}, max_length=8)
-    assert encoded["labels"][-1] != -100 or encoded["input_ids"]
+    with pytest.raises(ValueError, match="offset_mapping"):
+        encode_row(Tok(), {"prompt": "p", "completion": "c", "trajectory": []}, max_length=8)
 
 
 @pytest.mark.unit

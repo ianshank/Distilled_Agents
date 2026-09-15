@@ -2,6 +2,7 @@ id: sqe_validate
 schema_version: "1"
 planning:
   style: react
+  instruction: "Solve the task in thought-then-action steps. Emit JSON tool calls or final_answer."
 action:
   tool_ids:
     - sqe_checklist

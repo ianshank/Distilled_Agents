@@ -74,12 +74,9 @@ class TransformersBackend:
         return self._generate_fn, self._tokenizer, self._device
 
     def _render_prompt(self, messages: Sequence[dict[str, str]], prefix: Optional[str]) -> str:
-        parts = [f"{item.get('role', 'user')}: {item.get('content', '')}" for item in messages]
-        tail = "assistant:"
-        if prefix:
-            tail = f"{tail} {prefix}"
-        parts.append(tail)
-        return "\n".join(parts)
+        from enhanced_system.harness.prompt_render import render_prompt
+
+        return render_prompt(messages, prefix=prefix)
 
     def generate(
         self,

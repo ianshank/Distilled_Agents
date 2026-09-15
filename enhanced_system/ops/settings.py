@@ -48,6 +48,7 @@ class MangoMASSettings(BaseSettings):
     harness_seed: int = Field(default=0)
     trajectory_distill_alpha: float = Field(default=0.0)
     harness_apply_patches: bool = Field(default=False)
+    harness_memory_bank: str = Field(default="")
 
     def role_arn(self, account_id: str) -> str:
         return f"arn:aws:iam::{account_id}:role/{self.execution_role_name}"

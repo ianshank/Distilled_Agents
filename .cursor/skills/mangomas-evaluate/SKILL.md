@@ -1,6 +1,6 @@
 ---
 name: mangomas-evaluate
-description: Evaluate a MangoMAS agent skill pass rate with the existing CLI. Use when asked to score or evaluate a role.
+description: Count pre-filled pass/fail rows in a skill JSON suite. Use when asked to score a role fixture file. Does not run AgentRuntime or a model.
 cli: scripts/evaluation/evaluate_agent_skill.py
 inputs:
   role: Agent role name (CLI --role)
@@ -9,7 +9,11 @@ inputs:
   region: AWS region from MANGOMAS_AWS_REGION
 ---
 
-# Evaluate a MangoMAS agent skill
+# Evaluate a MangoMAS agent skill fixture
+
+This CLI counts `passed` / `actual==expected` already stored in a JSON suite. It does **not** load a model or call `AgentRuntime`.
+
+Harness-loop quality (final_answer, tool ids, truncation, faults) is `scripts/harness/eval_harness.py` (`mangomas-eval-harness`).
 
 ```bash
 python scripts/evaluation/evaluate_agent_skill.py \

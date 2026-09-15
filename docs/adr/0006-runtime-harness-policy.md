@@ -11,7 +11,7 @@ Distilled_Agents distilled role LoRAs as prompt/completion pairs with no reason-
 ## Decision
 
 1. Runtime `H` lives in `enhanced_system.harness` (YAML specs, frozen tool-id registry, AST/JSON dispatch, no `exec`).
-2. Policy `R_δ` remains the existing LoRA student. Trajectory collection is a local CLI. Masked collator lives in `scripts/training/distill/trajectory_collator.py`. `--trajectory_mode` on `train_distilled_adapter.py` sets `distillation_alpha` from `MANGOMAS_TRAJECTORY_DISTILL_ALPHA` (default `0.0`). `create_job_spec` is unchanged.
+2. Policy `R_δ` remains the existing LoRA student. Trajectory collection is a local CLI. Masked collator lives in `scripts/training/distill/trajectory_collator.py` and encodes the **same** role-tagged string as `TransformersBackend._render_prompt` (`prompt_render.py`, duplicated under `scripts/training/distill/` because SageMaker `source_dir` cannot import `enhanced_system`). `--trajectory_mode` on `train_distilled_adapter.py` sets `distillation_alpha` from `MANGOMAS_TRAJECTORY_DISTILL_ALPHA` (default `0.0`). `create_job_spec` is unchanged. Paper mappings, decorative `planning.style`, and false-friends: [docs/README_AGENT_DISTILLATION.md](../README_AGENT_DISTILLATION.md).
 3. Operator skills (ADR 0004) are a separate layer from the runtime harness.
 4. SageMaker `predict_fn` stays single-shot; local `scripts/harness/run_agent.py` is the tool loop.
 5. Numeric knobs (`max_steps`, memory window, SAG) come from `get_settings()` (`MANGOMAS_*`). `Config.harness` is a pointer (`enabled` / `default_id`) only; the runtime does not read `Config.harness` for limits.
@@ -22,4 +22,4 @@ Distilled_Agents distilled role LoRAs as prompt/completion pairs with no reason-
 
 ## Consequences
 
-A CodeAct-distilled student on today's endpoint will not run tools until a later endpoint handler is added. YAML omitted fields inherit `MangoMASSettings`. Rule-based YAML tailor archives patches unless `MANGOMAS_HARNESS_APPLY_PATCHES` is true. In-process `JsonlTraceStore` uses `threading.Lock` only; multiprocess collect needs `fcntl` later.
+A CodeAct-distilled student on today's endpoint will not run tools until a later endpoint handler is added: train and harness share one chat string, **serve still does not**. YAML omitted fields inherit `MangoMASSettings`. `planning.style` is schema-only; the loop does not branch on it. `planning.instruction` is Kang `I_agent`. Rule-based YAML tailor archives patches unless `MANGOMAS_HARNESS_APPLY_PATCHES` is true. AMD-lite memory (`memory.bank_path` / `MANGOMAS_HARNESS_MEMORY_BANK`) injects workflow/function hints; it does not drop tools. In-process `JsonlTraceStore` uses `threading.Lock` only; multiprocess collect needs `fcntl` later.

@@ -25,6 +25,64 @@ def parse_action(text: str, allowed: set[str]) -> tuple[str, dict[str, Any]]:
     return _parse_ast_call(stripped, allowed)
 
 
+def split_thought_action(text: str, allowed: set[str]) -> tuple[str, str]:
+    """Split optional leading thought from a parseable JSON or Call action."""
+    stripped = (text or "").strip()
+    if not stripped:
+        raise DispatchError("empty action")
+    try:
+        parse_action(stripped, allowed)
+        return "", stripped
+    except DispatchError:
+        pass
+    json_split = _split_json_action(stripped, allowed)
+    if json_split is not None:
+        return json_split
+    call_split = _split_call_action(stripped, allowed)
+    if call_split is not None:
+        return call_split
+    raise DispatchError("no parseable JSON or Call action")
+
+
+def _split_json_action(text: str, allowed: set[str]) -> tuple[str, str] | None:
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
+        try:
+            payload, end = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict) or not payload.get("tool"):
+            continue
+        action = text[index : index + end].strip()
+        try:
+            parse_action(action, allowed)
+        except DispatchError:
+            continue
+        return text[:index].strip(), action
+    return None
+
+
+def _split_call_action(text: str, allowed: set[str]) -> tuple[str, str] | None:
+    for index, char in enumerate(text):
+        if index > 0 and _is_ident_char(char) and _is_ident_char(text[index - 1]):
+            continue
+        if not _is_ident_char(char):
+            continue
+        snippet = text[index:]
+        try:
+            parse_action(snippet, allowed)
+        except DispatchError:
+            continue
+        return text[:index].strip(), snippet.strip()
+    return None
+
+
+def _is_ident_char(char: str) -> bool:
+    return char.isalnum() or char == "_"
+
+
 def _parse_json(text: str, allowed: set[str]) -> tuple[str, dict[str, Any]]:
     try:
         payload = json.loads(text)
