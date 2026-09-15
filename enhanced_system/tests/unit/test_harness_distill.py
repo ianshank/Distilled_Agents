@@ -16,6 +16,7 @@ from enhanced_system.harness.prompt_render import (
     messages_from_steps,
     render_messages,
     render_prompt,
+    supervised_spans,
 )
 from enhanced_system.harness.registry import load_spec
 from enhanced_system.harness.runtime import AgentRuntime
@@ -42,6 +43,11 @@ def test_prompt_render_copies_match():
     left_msg = messages_from_steps("task", steps, instruction="inst")
     right_msg = distill_render.messages_from_steps("task", steps, instruction="inst")
     assert left_msg == right_msg
+    assert supervised_spans("task", steps, instruction="inst") == distill_render.supervised_spans(
+        "task", steps, instruction="inst"
+    )
+    fault_steps = [{"fault": "parse_error", "observation": "bad"}]
+    assert "parse_error: bad" in "".join(text for text, _s in supervised_spans("task", fault_steps))
     assert render_prompt([]) == "assistant:"
     assert render_prompt([], prefix="p") == "assistant: p"
 
@@ -154,6 +160,8 @@ def test_memory_bank_workflow_and_function_hints(tmp_path):
     assert "avoid" in function_hint(loaded, "json_schema")
     assert workflow_hint(None, "x") == ""
     assert function_hint(loaded, "missing") == ""
+    assert function_hint(loaded, "") == ""
+    assert function_hint(MemoryBank(functions={"json_schema": []}), "json_schema") == ""
     spec = load_spec("base_react")
     spec.policy.teacher = False
     spec.planning.first_thought_prefix = False
@@ -167,6 +175,20 @@ def test_memory_bank_workflow_and_function_hints(tmp_path):
     assert "Workflow:" in result.trajectory.instruction
     skipped = build_bank([Trajectory(task="t", final_answer="", faults=["loop"])])
     assert skipped.workflows == []
+    action_only = build_bank(
+        [
+            Trajectory(
+                task="other task",
+                final_answer="x",
+                steps=[Step(action="final_answer(text='x')", tool_id="final_answer")],
+            )
+        ]
+    )
+    assert action_only.workflows
+    empty_steps = build_bank(
+        [Trajectory(task="t", final_answer="x", steps=[Step(fault="parse_error")])]
+    )
+    assert empty_steps.workflows == []
     spec_swe = load_spec("swe_codeact")
     spec_swe.policy.teacher = False
     spec_swe.planning.first_thought_prefix = False
@@ -238,6 +260,13 @@ def test_runtime_loads_bank_from_spec_path(tmp_path):
         teacher=False,
     ).run("Write a short greeting", harness_id="base_react")
     assert "Workflow:" in result.trajectory.instruction
+    spec.memory.bank_path = str(tmp_path / "missing.json")
+    skipped_bank = AgentRuntime(
+        EchoBackend(['{"tool": "final_answer", "args": {"text": "hi"}}']),
+        spec=spec,
+        teacher=False,
+    ).run("Write a short greeting", harness_id="base_react")
+    assert skipped_bank.final_answer == "hi"
 
 
 @pytest.mark.unit
@@ -323,3 +352,9 @@ def test_score_earliest_error_and_prefs():
     assert preference_pair(student, corrected, 99) is None
     looped = Trajectory(task="t", final_answer="", faults=["loop"], steps=[])
     assert earliest_error_index(looped) is None
+    assert (
+        earliest_error_index(Trajectory(task="t", final_answer="ok", steps=[Step(action="x")]))
+        is None
+    )
+    only_fault = Trajectory(task="t", final_answer="", steps=[Step(fault="parse_error")])
+    assert earliest_error_index(only_fault, expected="ok") == 0

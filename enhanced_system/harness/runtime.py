@@ -79,7 +79,11 @@ class AgentRuntime:
             steps=list(resume_steps or []),
         )
         max_steps = spec.planning.max_steps or self.settings.harness_max_steps
-        window = spec.memory.window_turns or self.settings.harness_memory_window
+        window = (
+            spec.memory.window_turns
+            if spec.memory.window_turns is not None
+            else self.settings.harness_memory_window
+        )
         pending = inject_action
         truncated = True
         final_answer = ""
@@ -150,6 +154,7 @@ class AgentRuntime:
                 prefix = None
         if truncated:
             trajectory.faults.append("loop")
+        trajectory.final_answer = final_answer
         result = HarnessRunResult(
             final_answer=final_answer,
             trajectory=trajectory,
