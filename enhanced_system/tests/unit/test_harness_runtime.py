@@ -591,51 +591,6 @@ def test_dual_agent_profiles_match():
 
 @pytest.mark.unit
 @pytest.mark.harness
-def test_run_agent_cli(tmp_path, capsys):
-    from scripts.harness.run_agent import main
-
-    code = main(
-        [
-            "--task",
-            "Write a short greeting",
-            "--harness-id",
-            "base_react",
-            "--scripted",
-            '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"hi\\"}}"]',
-        ]
-    )
-    assert code == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["final_answer"] == "hi"
-
-
-@pytest.mark.unit
-@pytest.mark.harness
-def test_collect_trajectories_cli(tmp_path):
-    from scripts.harness.collect_trajectories import main
-
-    source = tmp_path / "in.jsonl"
-    source.write_text('{"prompt": "Write a short greeting"}\n', encoding="utf-8")
-    dest = tmp_path / "out.jsonl"
-    code = main(
-        [
-            "--input",
-            str(source),
-            "--output",
-            str(tmp_path / "out.jsonl"),
-            "--harness-id",
-            "base_react",
-            "--scripted",
-            '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"hi\\"}}"]',
-        ]
-    )
-    assert code == 0
-    row = json.loads(dest.read_text(encoding="utf-8").splitlines()[0])
-    assert "prompt" in row and "completion" in row
-
-
-@pytest.mark.unit
-@pytest.mark.harness
 def test_validator_rejects_empty_task():
     runtime = HarnessFactory.create({"harness_id": "base_react"})
     with pytest.raises(ValueError):

@@ -47,6 +47,7 @@ CLI_REQUIRED_FLAGS = {
         "--harness-id",
         "--threshold",
         "--student",
+        "--strict",
     },
     "scripts/harness/build_memory.py": {"--traces", "--output"},
     "scripts/harness/compose_dualdistill.py": {"--first", "--second", "--output"},
@@ -55,6 +56,7 @@ CLI_REQUIRED_FLAGS = {
         "--output",
         "--harness-id",
         "--prefs",
+        "--strict",
     },
     "scripts/harness/tailor_harness.py": {"--harness-id", "--traces", "--archive-dir"},
 }

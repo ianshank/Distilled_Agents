@@ -24,7 +24,7 @@ Harness package gate stays `.coveragerc.harness` `fail_under=90`. Do not omit `p
 
 ## Harness follow-ups
 
-Train and harness now share `prompt_render` (see [README_AGENT_DISTILLATION.md](README_AGENT_DISTILLATION.md)). Remaining:
+Train and harness now share `prompt_render` (see [README_AGENT_DISTILLATION.md](README_AGENT_DISTILLATION.md)). JSONL skip/strict helper, expected-preserve on collect/score, and FTP resume/inject skip landed. Defer splitting `test_harness_runtime.py`. Remaining:
 
 - Wire an endpoint handler if distilled CodeAct students should run tools in SageMaker (`predict_fn` stays single-shot until then). That is the last vertex of the format triangle.
 - Add `trajectory_mode` to `create_job_spec` only together with launcher argparse (SageMaker `source_dir` cannot import `enhanced_system`; the 4.26/1.13 image is the wrong stack for Qwen trajectory SFT).

@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from enhanced_system.harness.factory import HarnessFactory
+from enhanced_system.harness.jsonl import JsonlRowError, iter_jsonl_dicts
 from enhanced_system.harness.score import answers_match
 from enhanced_system.ops.settings import get_settings
 
@@ -29,6 +30,12 @@ def main(argv: list[str] | None = None) -> int:
         type=float,
         default=settings.evaluation_threshold,
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        default=False,
+        help="fail on malformed JSONL rows instead of skipping",
+    )
     args = parser.parse_args(argv)
     try:
         scripted = json.loads(args.scripted) if args.scripted else None
@@ -46,15 +53,30 @@ def main(argv: list[str] | None = None) -> int:
     if not Path(args.input).is_file():
         logger.error("input not found: %s", args.input)
         return 1
-    summary = _evaluate_file(runtime, Path(args.input), args.harness_id)
+    try:
+        summary = _evaluate_file(runtime, Path(args.input), args.harness_id, strict=args.strict)
+    except JsonlRowError as exc:
+        logger.error("%s", exc)
+        return 1
     json.dump(summary, sys.stdout)
     sys.stdout.write("\n")
-    if summary["with_expected"] and summary["pass_rate"] < args.threshold:
+    if summary["total"] and summary["pass_rate"] < args.threshold:
+        logger.error(
+            "pass_rate %s below threshold %s",
+            summary["pass_rate"],
+            args.threshold,
+        )
         return 1
     return 0
 
 
-def _evaluate_file(runtime: object, path: Path, harness_id: str) -> dict[str, float | int]:
+def _evaluate_file(
+    runtime: object,
+    path: Path,
+    harness_id: str,
+    *,
+    strict: bool,
+) -> dict[str, float | int]:
     total = 0
     with_expected = 0
     exact = 0
@@ -63,33 +85,9 @@ def _evaluate_file(runtime: object, path: Path, harness_id: str) -> dict[str, fl
     valid_tools = 0
     tool_steps = 0
     try:
-        handle = path.open(encoding="utf-8")
-    except OSError as exc:
-        logger.error("%s", exc)
-        return {
-            "total": 0,
-            "with_expected": 0,
-            "exact_match": 0,
-            "truncated": 0,
-            "with_faults": 0,
-            "valid_tool_steps": 0,
-            "tool_steps": 0,
-            "pass_rate": 0.0,
-        }
-    with handle:
-        for line in handle:
-            if not line.strip():
-                continue
-            try:
-                payload = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(payload, dict):
-                continue
-            prompt = str(payload.get("prompt") or "")
-            if not prompt.strip():
-                continue
-            result = runtime.run(prompt, harness_id=harness_id)  # type: ignore[attr-defined]
+        rows = iter_jsonl_dicts(path, require_prompt=True, strict=strict)
+        for _line_no, payload in rows:
+            result = runtime.run(str(payload["prompt"]), harness_id=harness_id)  # type: ignore[attr-defined]
             total += 1
             if result.truncated:
                 truncated += 1
@@ -106,6 +104,18 @@ def _evaluate_file(runtime: object, path: Path, harness_id: str) -> dict[str, fl
                 with_expected += 1
                 if answers_match(result.final_answer, str(expected)):
                     exact += 1
+    except OSError as exc:
+        logger.error("%s", exc)
+        return {
+            "total": 0,
+            "with_expected": 0,
+            "exact_match": 0,
+            "truncated": 0,
+            "with_faults": 0,
+            "valid_tool_steps": 0,
+            "tool_steps": 0,
+            "pass_rate": 0.0,
+        }
     pass_rate = 0.0
     if with_expected:
         pass_rate = 100.0 * exact / with_expected

@@ -15,7 +15,7 @@ Version Cursor skills under `.cursor/skills/mangomas-*/SKILL.md` with YAML front
 Deterministic tests in `tests/harness/test_skills_contract.py`:
 
 - Frontmatter keys present and `cli` path exists
-- Public CLI `--help` flag allowlists (including collect `--input/--output/--harness-id/--strict`)
+- Public CLI `--help` flag allowlists (collect `--input/--output/--harness-id/--strict/--teacher/--student`; eval `--input/--harness-id/--threshold/--student/--strict`; score `--input/--output/--harness-id/--prefs/--strict`)
 - AGENTS.md skill paths and CLI column match `.cursor/skills/*` names and frontmatter `cli`
 - `mangomas-validate` points at `Makefile` (`make validate`); scan `cli:` stays `security_scan.py`
 - `get_settings()` defaults (`trust_remote_code is False`, `bind_host == "127.0.0.1"`)

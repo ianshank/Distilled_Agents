@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 from pathlib import Path
 
+from enhanced_system.harness.jsonl import JsonlRowError, iter_jsonl_dicts
 from enhanced_system.harness.memory_bank import build_bank
 from enhanced_system.harness.types import Trajectory
 
@@ -22,7 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         trajectories = _load_traces(Path(args.traces))
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
+    except (OSError, JsonlRowError, ValueError) as exc:
         logger.error("%s", exc)
         return 1
     bank = build_bank(trajectories)
@@ -42,16 +42,10 @@ def main(argv: list[str] | None = None) -> int:
 
 def _load_traces(path: Path) -> list[Trajectory]:
     traces: list[Trajectory] = []
-    with path.open(encoding="utf-8") as handle:
-        for line_no, line in enumerate(handle, start=1):
-            if not line.strip():
-                continue
-            payload = json.loads(line)
-            if not isinstance(payload, dict):
-                raise ValueError(f"row {line_no} must be a JSON object")
-            if "trajectory" in payload and isinstance(payload["trajectory"], dict):
-                payload = payload["trajectory"]
-            traces.append(Trajectory.model_validate(payload))
+    for _line_no, payload in iter_jsonl_dicts(path, require_prompt=False, strict=True):
+        if "trajectory" in payload and isinstance(payload["trajectory"], dict):
+            payload = payload["trajectory"]
+        traces.append(Trajectory.model_validate(payload))
     return traces
 
 

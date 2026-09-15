@@ -48,6 +48,8 @@ python scripts/harness/collect_trajectories.py --input prompts.jsonl --output tr
 python scripts/training/train_distilled_adapter.py --trajectory_mode True
 ```
 
+Collect copies `expected` from the prompt JSONL onto each trace when present. `compose_dualdistill.py` skips unlabeled rows, so collect → DualDistill is a dead pipeline without that field.
+
 `--trajectory_mode` unloads the teacher. `distillation_alpha` comes from `MANGOMAS_TRAJECTORY_DISTILL_ALPHA` (default `0.0`). Collect JSONL is trusted (`strict_injection=False`). Interactive `scripts/harness/run_agent.py` keeps injection on.
 
 Local training rule: occasional runs, ≤10k traces, privacy-sensitive data → **local** SFT, not the 4.26/1.13 SageMaker image. Real students: Qwen2.5-Instruct 0.5B–3B.
@@ -95,7 +97,7 @@ python scripts/harness/collect_trajectories.py \
 python scripts/harness/eval_harness.py --input prompts.jsonl --harness-id base_react
 ```
 
-Outcome filter skips a row when `expected` is present **and** `final_answer` misses it. Intermediate `parse_error` / `tool_error` are **kept** when the outcome matches — recovery is the point. No `expected` ⇒ no outcome skip.
+Outcome filter skips a row when `expected` is present **and** `final_answer` misses it. Intermediate `parse_error` / `tool_error` are **kept** when the outcome matches — recovery is the point. No `expected` ⇒ no outcome skip. Kept rows still carry `expected` so compose can grade.
 
 ## AMD-lite (after format + eval)
 
@@ -115,7 +117,7 @@ python scripts/harness/compose_dualdistill.py \
   --first teacher_a.jsonl --second teacher_b.jsonl --output composed.jsonl
 ```
 
-Rows without `expected` are skipped. Their agentic teacher is OpenHands+interpreter; checklist tools cannot play `\pi_A`.
+Rows without `expected` are skipped. Collect must preserve `expected` on traces (`trajectory_to_legacy(..., expected=...)`). Their agentic teacher is OpenHands+interpreter; checklist tools cannot play `\pi_A`.
 
 ## SCoRe-SFT collect (after BC, not instead of it)
 

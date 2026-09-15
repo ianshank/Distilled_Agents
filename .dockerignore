@@ -25,4 +25,6 @@ docs
 *.md
 *.raw.jsonl
 *.raw.traces.jsonl
+*.prefs.jsonl
+memory_bank.json
 gitleaks-report.json

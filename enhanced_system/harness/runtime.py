@@ -66,11 +66,13 @@ class AgentRuntime:
         bank = self._load_bank(spec)
         instruction = self._instruction(spec, recorded, teacher, bank)
         allowed = allowed_tools(spec.action.tool_ids)
+        fresh = resume_steps is None and inject_action is None
         prefix = maybe_prefix(
             self.backend,
             recorded,
-            enabled=spec.planning.first_thought_prefix and not resume_steps,
+            enabled=spec.planning.first_thought_prefix and fresh,
             teacher=teacher,
+            instruction=instruction,
         )
         trajectory = Trajectory(
             harness_id=spec.id,
@@ -88,10 +90,12 @@ class AgentRuntime:
         truncated = True
         final_answer = ""
         logger.info(
-            "harness start harness_id=%s seed=%s max_steps=%s",
+            "harness start harness_id=%s seed=%s max_steps=%s resume_steps=%s inject=%s",
             spec.id,
             self.settings.harness_seed,
             max_steps,
+            0 if resume_steps is None else len(resume_steps),
+            bool(inject_action),
         )
         while len(trajectory.steps) < max_steps:
             messages = _trim_window(

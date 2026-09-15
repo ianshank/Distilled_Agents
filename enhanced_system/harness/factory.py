@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from typing import Any, Optional
 
 from enhanced_system.core.input_validator import InputValidator
@@ -12,6 +14,8 @@ from enhanced_system.harness.registry import load_spec
 from enhanced_system.harness.runtime import AgentRuntime
 from enhanced_system.harness.types import HarnessSpec
 from enhanced_system.ops.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_backend(payload: dict[str, Any], settings, spec: Optional[HarnessSpec] = None) -> Any:
@@ -65,7 +69,8 @@ class HarnessFactory:
             if bank_path:
                 try:
                     bank = MemoryBank.load(bank_path)
-                except (OSError, ValueError):
+                except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+                    logger.warning("memory bank skipped: %s", exc)
                     bank = None
         return AgentRuntime(
             backend,

@@ -7,6 +7,7 @@ inputs:
   output: Corrected traces JSONL (CLI --output)
   harness_id: Harness YAML id (CLI --harness-id)
   prefs: Optional preference-pair JSONL (CLI --prefs)
+  strict: Fail on malformed JSONL rows instead of skipping (CLI --strict)
 ---
 
 # Collect SCoRe-SFT corrected traces
@@ -19,5 +20,7 @@ python scripts/harness/collect_score.py \
   --output "$OUTPUT_JSONL" \
   --prefs "$PREFS_JSONL"
 ```
+
+Pass `--strict` to fail on bad JSON or empty prompts. Empty teacher `generate` still skips that row. Source `expected` is copied onto output traces.
 
 Do not vendor SCoRe runtimes. Do not add launcher GRPO keys.

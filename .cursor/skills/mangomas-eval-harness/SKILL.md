@@ -7,6 +7,7 @@ inputs:
   harness_id: Harness YAML id (CLI --harness-id)
   student: Use the student model (CLI --student)
   threshold: Fail if pass_rate is below this (CLI --threshold)
+  strict: Fail on malformed JSONL rows instead of skipping (CLI --strict)
 ---
 
 # Evaluate the local harness
@@ -18,5 +19,7 @@ python scripts/harness/eval_harness.py \
   --input "$INPUT_JSONL" \
   --harness-id "${MANGOMAS_HARNESS_ID:-base_react}"
 ```
+
+Pass `--strict` to fail on bad JSON or empty prompts instead of skipping. The `--threshold` gate applies whenever the file has at least one evaluated row (labeled exact-match or unlabeled completion rate).
 
 Trusted JSONL: injection detection is off. Interactive tasks stay on `run_agent.py`.

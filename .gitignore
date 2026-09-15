@@ -101,3 +101,5 @@ data/training/trajectories/
 configs/harnesses/archive/
 *.raw.jsonl
 *.raw.traces.jsonl
+*.prefs.jsonl
+memory_bank.json

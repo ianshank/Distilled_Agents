@@ -16,4 +16,4 @@ C4Context
     Rel(mangomas, s3, "Upload data, store adapters")
 ```
 
-Serve does **not** call tools. The local harness (`enhanced_system.harness` + `scripts/harness/run_agent.py`) is the only v1 tool loop.
+Serve does **not** call tools. The local harness (`enhanced_system.harness` + `scripts/harness/run_agent.py`) is the only v1 tool loop. `eval_harness` is H quality on JSONL prompts; `evaluate_agent_skill` counts fixtures.

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from enhanced_system.harness.convert import trajectory_to_legacy
 from enhanced_system.harness.factory import HarnessFactory
+from enhanced_system.harness.jsonl import JsonlRowError, iter_jsonl_dicts
 from enhanced_system.harness.score import answers_match
 from enhanced_system.harness.traces import JsonlTraceStore, raw_store_path
 from enhanced_system.ops.settings import get_settings
@@ -66,45 +67,48 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, FileNotFoundError, OSError) as exc:
         logger.error("%s", exc)
         return 1
-    rows = []
     try:
-        handle = Path(args.input).open(encoding="utf-8")
+        rows = _collect_rows(runtime, Path(args.input), args.harness_id, args.strict)
+    except JsonlRowError as exc:
+        logger.error("%s", exc)
+        return 1
     except OSError as exc:
         logger.error("%s", exc)
         return 1
-    with handle:
-        for line_no, line in enumerate(handle, start=1):
-            if not line.strip():
-                continue
-            try:
-                payload = json.loads(line)
-                if not isinstance(payload, dict):
-                    raise ValueError(f"row must be a JSON object, got {type(payload).__name__}")
-                prompt = str(payload.get("prompt") or "")
-                if not prompt.strip():
-                    logger.warning("skipping empty prompt at line %s", line_no)
-                    if args.strict:
-                        return 1
-                    continue
-                result = runtime.run(prompt, harness_id=args.harness_id)
-                expected = payload.get("expected")
-                if expected is not None and str(expected).strip():
-                    if not answers_match(result.final_answer, str(expected)):
-                        logger.warning("skipping outcome mismatch at line %s", line_no)
-                        if args.strict:
-                            return 1
-                        continue
-                rows.append(trajectory_to_legacy(result.trajectory))
-            except (json.JSONDecodeError, ValueError, FileNotFoundError, OSError) as exc:
-                logger.warning("skipping line %s: %s", line_no, exc)
-                if args.strict:
-                    return 1
+    if rows is None:
+        return 1
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=True) + "\n")
     logger.info("wrote %s rows to %s", len(rows), out_path)
     return 0
+
+
+def _collect_rows(
+    runtime: object,
+    path: Path,
+    harness_id: str,
+    strict: bool,
+) -> list[dict[str, object]] | None:
+    rows: list[dict[str, object]] = []
+    for line_no, payload in iter_jsonl_dicts(path, require_prompt=True, strict=strict):
+        try:
+            prompt = str(payload["prompt"])
+            result = runtime.run(prompt, harness_id=harness_id)  # type: ignore[attr-defined]
+            expected = payload.get("expected")
+            if expected is not None and str(expected).strip():
+                if not answers_match(result.final_answer, str(expected)):
+                    logger.warning("skipping outcome mismatch at line %s", line_no)
+                    if strict:
+                        return None
+                    continue
+            rows.append(trajectory_to_legacy(result.trajectory, expected=expected))
+        except (ValueError, FileNotFoundError, OSError) as exc:
+            logger.warning("skipping line %s: %s", line_no, exc)
+            if strict:
+                return None
+    return rows
 
 
 if __name__ == "__main__":

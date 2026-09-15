@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -70,6 +71,8 @@ def test_split_thought_action_json_and_call():
     assert parse_action(action, allowed)[0] == "final_answer"
     with pytest.raises(DispatchError):
         split_thought_action("", allowed)
+    with pytest.raises(DispatchError, match="no parseable"):
+        split_thought_action("not an action", allowed)
 
 
 @pytest.mark.unit
@@ -358,3 +361,365 @@ def test_score_earliest_error_and_prefs():
     )
     only_fault = Trajectory(task="t", final_answer="", steps=[Step(fault="parse_error")])
     assert earliest_error_index(only_fault, expected="ok") == 0
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_iter_jsonl_dicts_skips_and_strict(tmp_path, caplog):
+    from enhanced_system.harness.jsonl import JsonlRowError, iter_jsonl_dicts
+
+    path = tmp_path / "rows.jsonl"
+    path.write_text(
+        "\n".join(
+            [
+                "",
+                "[1, 2]",
+                "{not json",
+                '{"prompt": ""}',
+                '{"prompt": "ok"}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with caplog.at_level(logging.WARNING):
+        rows = list(iter_jsonl_dicts(path, require_prompt=True, strict=False))
+    assert len(rows) == 1
+    assert rows[0][0] == 5
+    assert rows[0][1]["prompt"] == "ok"
+    assert "skipping line" in caplog.text
+    yielded = list(iter_jsonl_dicts(path, require_prompt=False, strict=False))
+    prompts = [row["prompt"] for _line, row in yielded]
+    assert prompts == ["", "ok"]
+    with pytest.raises(JsonlRowError, match="skipping line"):
+        list(iter_jsonl_dicts(path, require_prompt=True, strict=True))
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_collect_copies_expected_and_strict_mismatch(tmp_path):
+    from enhanced_system.harness.convert import trajectory_to_legacy
+    from scripts.harness.collect_trajectories import main as collect_main
+
+    traj = Trajectory(task="t", final_answer="hi", steps=[Step(action="a")])
+    assert trajectory_to_legacy(traj, expected="hi")["expected"] == "hi"
+    assert "expected" not in trajectory_to_legacy(traj)
+
+    source = tmp_path / "in.jsonl"
+    dest = tmp_path / "out.jsonl"
+    source.write_text(
+        json.dumps({"prompt": "Write a short greeting", "expected": "hi"}) + "\n",
+        encoding="utf-8",
+    )
+    code = collect_main(
+        [
+            "--input",
+            str(source),
+            "--output",
+            str(dest),
+            "--harness-id",
+            "base_react",
+            "--scripted",
+            '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"hi\\"}}"]',
+        ]
+    )
+    assert code == 0
+    row = json.loads(dest.read_text(encoding="utf-8").splitlines()[0])
+    assert row["expected"] == "hi"
+
+    source.write_text(
+        json.dumps({"prompt": "Write a short greeting", "expected": "nope"}) + "\n",
+        encoding="utf-8",
+    )
+    code = collect_main(
+        [
+            "--input",
+            str(source),
+            "--output",
+            str(tmp_path / "strict.jsonl"),
+            "--harness-id",
+            "base_react",
+            "--strict",
+            "--scripted",
+            '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"hi\\"}}"]',
+        ]
+    )
+    assert code == 1
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_eval_skips_unlabeled_threshold_and_strict(tmp_path, caplog, capsys, monkeypatch):
+    from enhanced_system.ops.settings import get_settings
+    from scripts.harness.eval_harness import main as eval_main
+
+    mixed = tmp_path / "mixed.jsonl"
+    mixed.write_text(
+        "\n".join(
+            [
+                '{"prompt": ""}',
+                "not-json",
+                json.dumps({"prompt": "Write a short greeting", "expected": "hi"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with caplog.at_level(logging.WARNING):
+        code = eval_main(
+            [
+                "--input",
+                str(mixed),
+                "--harness-id",
+                "base_react",
+                "--scripted",
+                '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"hi\\"}}"]',
+                "--threshold",
+                "50",
+            ]
+        )
+    assert code == 0
+    assert "skipping line" in caplog.text
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["total"] == 1
+
+    unlabeled = tmp_path / "unlabeled.jsonl"
+    unlabeled.write_text(json.dumps({"prompt": "Write a short greeting"}) + "\n", encoding="utf-8")
+    monkeypatch.setenv("MANGOMAS_HARNESS_MAX_STEPS", "1")
+    get_settings.cache_clear()
+    try:
+        code = eval_main(
+            [
+                "--input",
+                str(unlabeled),
+                "--harness-id",
+                "base_react",
+                "--scripted",
+                '["not-json"]',
+                "--threshold",
+                "85",
+            ]
+        )
+        assert code == 1
+        summary = json.loads(capsys.readouterr().out)
+        assert summary["total"] == 1
+        assert summary["with_expected"] == 0
+        assert summary["truncated"] == 1
+    finally:
+        monkeypatch.undo()
+        get_settings.cache_clear()
+
+    bad = tmp_path / "bad.jsonl"
+    bad.write_text("not-json\n", encoding="utf-8")
+    assert eval_main(["--input", str(bad), "--harness-id", "base_react", "--strict"]) == 1
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_score_empty_generate_strict_and_non_dict(tmp_path, caplog):
+    from scripts.harness.collect_score import main as score_main
+
+    prompts = tmp_path / "prompts.jsonl"
+    prompts.write_text(
+        json.dumps({"prompt": "Write a short greeting", "expected": "ok"}) + "\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "score.jsonl"
+    with caplog.at_level(logging.WARNING):
+        code = score_main(
+            [
+                "--input",
+                str(prompts),
+                "--output",
+                str(out),
+                "--harness-id",
+                "base_react",
+                "--student-scripted",
+                '["not-json"]',
+                "--teacher-scripted",
+                '[""]',
+            ]
+        )
+    assert code == 0
+    assert out.read_text(encoding="utf-8").strip() == ""
+    assert "teacher produced no correction" in caplog.text
+
+    success = tmp_path / "ok.jsonl"
+    success.write_text(
+        json.dumps({"prompt": "Write a short greeting", "expected": "hi"}) + "\n",
+        encoding="utf-8",
+    )
+    kept = tmp_path / "kept.jsonl"
+    assert (
+        score_main(
+            [
+                "--input",
+                str(success),
+                "--output",
+                str(kept),
+                "--harness-id",
+                "base_react",
+                "--student-scripted",
+                '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"hi\\"}}"]',
+                "--teacher-scripted",
+                '[""]',
+            ]
+        )
+        == 0
+    )
+    assert json.loads(kept.read_text(encoding="utf-8"))["expected"] == "hi"
+
+    prompts.write_text("not-json\n", encoding="utf-8")
+    assert (
+        score_main(
+            [
+                "--input",
+                str(prompts),
+                "--output",
+                str(tmp_path / "strict.jsonl"),
+                "--harness-id",
+                "base_react",
+                "--strict",
+            ]
+        )
+        == 1
+    )
+
+    prompts.write_text("[1, 2]\n", encoding="utf-8")
+    skipped = tmp_path / "skip.jsonl"
+    assert (
+        score_main(
+            [
+                "--input",
+                str(prompts),
+                "--output",
+                str(skipped),
+                "--harness-id",
+                "base_react",
+            ]
+        )
+        == 0
+    )
+    assert skipped.read_text(encoding="utf-8").strip() == ""
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_compose_mismatch_and_duplicate_prompt(tmp_path, caplog):
+    from scripts.harness.compose_dualdistill import main as compose_main
+
+    first = tmp_path / "a.jsonl"
+    second = tmp_path / "b.jsonl"
+    out = tmp_path / "c.jsonl"
+    first.write_text(json.dumps({"prompt": "a", "expected": "x", "trajectory": {}}) + "\n")
+    second.write_text(json.dumps({"prompt": "b", "expected": "x", "trajectory": {}}) + "\n")
+    with caplog.at_level(logging.WARNING):
+        assert (
+            compose_main(["--first", str(first), "--second", str(second), "--output", str(out)])
+            == 0
+        )
+    assert out.read_text(encoding="utf-8").strip() == ""
+    assert "unmatched" in caplog.text
+
+    row_bad = {
+        "prompt": "p",
+        "expected": "ok",
+        "trajectory": {
+            "task": "p",
+            "final_answer": "no",
+            "steps": [{"thought": "a", "action": "x"}],
+        },
+    }
+    row_good = {
+        "prompt": "p",
+        "expected": "ok",
+        "trajectory": {
+            "task": "p",
+            "final_answer": "ok",
+            "steps": [{"thought": "b", "action": "y"}],
+        },
+    }
+    first.write_text(json.dumps(row_bad) + "\n" + json.dumps(row_good) + "\n", encoding="utf-8")
+    second.write_text(json.dumps(row_good) + "\n", encoding="utf-8")
+    composed = tmp_path / "d.jsonl"
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        assert (
+            compose_main(
+                ["--first", str(first), "--second", str(second), "--output", str(composed)]
+            )
+            == 0
+        )
+    assert "duplicate prompt" in caplog.text
+    assert composed.read_text(encoding="utf-8").strip()
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_empty_instruction_ftp_resume_inject_and_parse_error():
+    spec = load_spec("base_react")
+    spec.policy.teacher = False
+    spec.planning.first_thought_prefix = False
+    spec.planning.instruction = ""
+    backend = EchoBackend(['{"tool": "final_answer", "args": {"text": "hi"}}'])
+    AgentRuntime(backend, spec=spec, teacher=False).run(
+        "Write a short greeting", harness_id="base_react"
+    )
+    assert backend.last_messages[0]["role"] == "user"
+
+    class CaptureEcho(EchoBackend):
+        def __init__(self) -> None:
+            super().__init__(
+                ["first thought", '{"tool": "final_answer", "args": {"text": "done"}}']
+            )
+            self.calls: list[list[dict[str, str]]] = []
+
+        def generate(self, messages, *, prefix=None, n=1, temperature=None):
+            self.calls.append([dict(item) for item in messages])
+            return super().generate(messages, prefix=prefix, n=n, temperature=temperature)
+
+    swe = load_spec("swe_codeact")
+    capture = CaptureEcho()
+    AgentRuntime(capture, spec=swe, teacher=True).run(
+        "Explain a ping endpoint", harness_id="swe_codeact"
+    )
+    assert capture.calls[0][0]["role"] == "system"
+    assert swe.planning.instruction.strip() in capture.calls[0][0]["content"]
+
+    ftp_spec = load_spec("swe_codeact")
+    ftp_spec.planning.first_thought_prefix = True
+    unused = EchoBackend(["SHOULD_NOT_BE_USED"])
+    injected = AgentRuntime(unused, spec=ftp_spec, teacher=True).run(
+        "Explain a ping endpoint",
+        harness_id="swe_codeact",
+        resume_steps=[],
+        inject_action='{"tool": "final_answer", "args": {"text": "from-inject"}}',
+    )
+    assert unused.call_count == 0
+    assert injected.final_answer == "from-inject"
+    assert injected.trajectory.steps[0].action == (
+        '{"tool": "final_answer", "args": {"text": "from-inject"}}'
+    )
+
+    recover = EchoBackend(['{"tool": "final_answer", "args": {"text": "ok"}}'])
+    parsed = AgentRuntime(recover, spec=spec, teacher=False).run(
+        "Write a short greeting",
+        harness_id="base_react",
+        inject_action="not-json",
+    )
+    assert parsed.trajectory.steps[0].fault == "parse_error"
+    assert parsed.final_answer == "ok"
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_factory_logs_skipped_memory_bank(tmp_path, caplog):
+    with caplog.at_level(logging.WARNING):
+        HarnessFactory.create(
+            {
+                "harness_id": "base_react",
+                "scripted": ['{"tool": "final_answer", "args": {"text": "hi"}}'],
+                "bank_path": str(tmp_path / "missing.json"),
+            }
+        )
+    assert "memory bank skipped" in caplog.text

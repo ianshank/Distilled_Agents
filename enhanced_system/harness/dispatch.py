@@ -43,8 +43,7 @@ def split_thought_action(text: str, allowed: set[str]) -> tuple[str, str]:
     call_split = _split_call_action(stripped, allowed)
     if call_split is not None:
         return call_split
-    parse_action(stripped, allowed)
-    return "", stripped
+    raise DispatchError("no parseable JSON or Call action")
 
 
 def _split_json_action(text: str) -> tuple[str, str] | None:

@@ -15,7 +15,7 @@ inputs:
 
 Input JSONL is **trusted operator data**. The CLI turns injection detection off (`strict_injection=False`) so coding prompts with `#`, quotes, or SQL-like text are collected. Empty prompts are skipped with a warning; pass `--strict` to fail-fast.
 
-Default is `--teacher`. Pass `--student` for student rollouts. When a row has `expected`, keep the trace only if `final_answer` matches; recovered `parse_error` / `tool_error` steps stay in the trace. No `expected` means no outcome skip.
+Default is `--teacher`. Pass `--student` for student rollouts. When a row has `expected`, keep the trace only if `final_answer` matches; recovered `parse_error` / `tool_error` steps stay in the trace. No `expected` means no outcome skip. Matching rows copy `expected` onto the output JSONL so DualDistill compose can grade.
 
 Do not point this CLI at untrusted user tasks — use `scripts/harness/run_agent.py` (injection on) for interactive runs.
 
