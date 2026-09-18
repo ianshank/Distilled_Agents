@@ -21,9 +21,9 @@ class DataSample:
     completion: str
     category: Optional[str] = None
     quality_score: float = 0.5
-    metadata: Dict[str, Any] = None
+    metadata: Optional[Dict[str, Any]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.metadata is None:
             self.metadata = {}
 
@@ -300,9 +300,10 @@ class DataCurator:
                 completion=sample.completion,
                 category=sample.category,
                 quality_score=sample.quality_score,
-                metadata=sample.metadata.copy(),
+                metadata=sample.metadata.copy() if sample.metadata else {},
             )
-            duplicate.metadata["is_duplicate"] = True
+            if duplicate.metadata is not None:
+                duplicate.metadata["is_duplicate"] = True
             result.append(duplicate)
 
         return result
@@ -346,10 +347,11 @@ class DataCurator:
                 completion=sample.completion,
                 category=sample.category,
                 quality_score=sample.quality_score * 0.9,  # Slightly lower
-                metadata=sample.metadata.copy(),
+                metadata=sample.metadata.copy() if sample.metadata else {},
             )
-            variation.metadata["is_augmented"] = True
-            variation.metadata["original_id"] = sample.id
+            if variation.metadata is not None:
+                variation.metadata["is_augmented"] = True
+                variation.metadata["original_id"] = sample.id
 
             variations.append(variation)
 

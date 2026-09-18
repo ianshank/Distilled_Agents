@@ -175,7 +175,9 @@ class ABTestFramework:
         else:
             return "control"
 
-    def record_metric(self, experiment_id: str, variant: str, metric_name: str, value: float):
+    def record_metric(
+        self, experiment_id: str, variant: str, metric_name: str, value: float
+    ) -> None:
         """
         Record metric for variant
 
@@ -358,7 +360,7 @@ class ABTestFramework:
                 "Recommend continuing experiment or increasing sample size."
             )
 
-    def stop_experiment(self, experiment_id: str):
+    def stop_experiment(self, experiment_id: str) -> None:
         """
         Stop running experiment
 
@@ -390,4 +392,5 @@ class ABTestFramework:
 
     def list_experiments(self) -> List[Dict[str, Any]]:
         """List all experiments"""
-        return [self.get_experiment_status(exp_id) for exp_id in self.experiments.keys()]
+        results = [self.get_experiment_status(exp_id) for exp_id in self.experiments.keys()]
+        return [r for r in results if r is not None]

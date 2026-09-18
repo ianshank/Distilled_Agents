@@ -213,6 +213,7 @@ def load_config(config_name: Optional[str] = None, config_path: Optional[str] = 
                 f"Configuration file not found: {filename} (searched {searched})"
             )
 
+    assert resolved is not None
     if not resolved.exists():
         raise FileNotFoundError(f"Configuration file not found: {resolved}")
 

@@ -214,7 +214,7 @@ class AdaptiveTrainingConfig:
                 self.lr_schedule.min_lr
                 + (self.lr_schedule.max_lr - self.lr_schedule.min_lr) * cosine_decay
             )
-            return lr
+            return float(lr)
 
         elif self.lr_schedule.strategy == "linear":
             progress = (step - self.lr_schedule.warmup_steps) / max(
@@ -224,15 +224,15 @@ class AdaptiveTrainingConfig:
                 self.lr_schedule.max_lr
                 - (self.lr_schedule.max_lr - self.lr_schedule.min_lr) * progress
             )
-            return max(lr, self.lr_schedule.min_lr)
+            return float(max(lr, self.lr_schedule.min_lr))
 
         elif self.lr_schedule.strategy == "exponential":
             decay_steps = total_steps - self.lr_schedule.warmup_steps
             decay_rate = (self.lr_schedule.min_lr / self.lr_schedule.max_lr) ** (1.0 / decay_steps)
             lr = self.lr_schedule.max_lr * (decay_rate ** (step - self.lr_schedule.warmup_steps))
-            return max(lr, self.lr_schedule.min_lr)
+            return float(max(lr, self.lr_schedule.min_lr))
 
-        return self.learning_rate
+        return float(self.learning_rate)
 
     def should_save_checkpoint(self, step: int) -> bool:
         """
@@ -249,7 +249,7 @@ class AdaptiveTrainingConfig:
 
         return False
 
-    def log_config(self):
+    def log_config(self) -> None:
         """Log configuration details"""
         logger.info("=== Adaptive Training Configuration ===")
         logger.info(f"Batch size: {self.batch_size} (effective: {self.get_effective_batch_size()})")

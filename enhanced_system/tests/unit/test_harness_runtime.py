@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import sys
+import tempfile
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -80,7 +81,7 @@ def _trainer_args(**overrides):
         "train_file": "train.jsonl",
         "eval_file": None,
         "max_length": 16,
-        "output_dir": "/tmp/out",
+        "output_dir": tempfile.gettempdir(),
         "num_train_epochs": 1,
         "per_device_train_batch_size": 1,
         "per_device_eval_batch_size": 1,
