@@ -10,7 +10,30 @@ logger = logging.getLogger(__name__)
 
 
 def resolve_trust_remote_code(args: Any) -> bool:
-    return bool(getattr(args, "trust_remote_code", False))
+    """Resolves trust_remote_code strictly.
+    
+    SDLC DevSecOps Guardrail: Remote code execution is disabled by default.
+    It can ONLY be enabled if MANGOMAS_OVERRIDE_TRUST_REMOTE_CODE=I_KNOW_THIS_IS_UNSAFE
+    is set in the environment, overriding args.
+    """
+    arg_trust = bool(getattr(args, "trust_remote_code", False))
+    escape_hatch = os.getenv("MANGOMAS_OVERRIDE_TRUST_REMOTE_CODE") == "I_KNOW_THIS_IS_UNSAFE"
+    
+    if arg_trust or escape_hatch:
+        if not escape_hatch:
+            logger.warning(
+                "SECURITY: trust_remote_code was requested via args, but is blocked by SDLC guardrails. "
+                "Set MANGOMAS_OVERRIDE_TRUST_REMOTE_CODE=I_KNOW_THIS_IS_UNSAFE to override."
+            )
+            return False
+            
+        logger.warning(
+            "SECURITY [DANGER]: trust_remote_code is ENABLED via override. "
+            "Arbitrary code from model repos will be executed on this machine!"
+        )
+        return True
+        
+    return False
 
 
 def resolve_model_revision(args: Any) -> Optional[str]:

@@ -34,17 +34,38 @@ def main(argv: list[str] | None = None) -> int:
         "--strict",
         action="store_true",
         default=False,
-        help="fail on malformed JSONL rows instead of skipping",
+        help="Fail on the first row error (default: skip and continue)",
+    )
+    parser.add_argument(
+        "--scan-security",
+        action="store_true",
+        default=False,
+        help="Run bandit/security scans on generated agent code. Fails the row if issues found.",
     )
     args = parser.parse_args(argv)
     try:
         scripted = json.loads(args.scripted) if args.scripted else None
+    except json.JSONDecodeError as exc:
+        logger.error("invalid --scripted JSON: %s", exc)
+        return 1
+    scanner = None
+    if args.scan_security:
+        try:
+            from enhanced_system.harness.security import SecurityScanner
+
+            scanner = SecurityScanner(fail_on_high=True)
+            logger.info("Security scanning (Bandit) enabled on agent outputs")
+        except ImportError as exc:
+            logger.error("Cannot enable security scanning: %s", exc)
+            return 1
+    try:
         runtime = HarnessFactory.create(
             {
                 "harness_id": args.harness_id,
                 "scripted": scripted,
                 "teacher": not args.student,
                 "strict_injection": False,
+                "security_scanner": scanner,
             }
         )
     except (json.JSONDecodeError, ValueError, FileNotFoundError, OSError) as exc:
@@ -54,7 +75,9 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("input not found: %s", args.input)
         return 1
     try:
-        summary = _evaluate_file(runtime, Path(args.input), args.harness_id, strict=args.strict)
+        summary = _evaluate_file(
+            runtime, Path(args.input), args.harness_id, strict=args.strict, scanner=scanner
+        )
     except (JsonlRowError, OSError, ValueError) as exc:
         logger.error("%s", exc)
         return 1
@@ -76,6 +99,7 @@ def _evaluate_file(
     harness_id: str,
     *,
     strict: bool,
+    scanner: object | None = None,
 ) -> dict[str, float | int]:
     total = 0
     with_expected = 0
@@ -97,7 +121,19 @@ def _evaluate_file(
             if strict:
                 raise
             continue
+            
         total += 1
+        
+        # Security scan
+        if scanner is not None:
+            findings = scanner.scan_trajectory(result.trajectory)
+            if findings:
+                logger.error("Line %s failed security scan: %s", line_no, findings)
+                if strict:
+                    raise ValueError(f"Security vulnerability generated at line {line_no}")
+                # Count as a fault if not strict
+                result.trajectory.faults.append(f"Security finding: {len(findings)} issues")
+                
         if result.truncated:
             truncated += 1
         if result.trajectory.faults:
