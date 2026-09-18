@@ -43,16 +43,16 @@ async def main():
     # Load configuration
     print("1. Loading configuration...")
     config = load_config("development")
-    print("   ✓ Configuration loaded\n")
+    print("   [SUCCESS] Configuration loaded\n")
 
     # Initialize components
     print("2. Initializing components...")
-    validator = InputValidator(config.input_validation.dict())
-    cache_manager = IntelligentCacheManager(config.caching.dict())
-    retry_handler = IntelligentRetryHandler(config.error_handling.dict())
-    calibrator = ConfidenceCalibrator(config.confidence.dict())
-    monitor = AgentMonitor(config.monitoring.dict())
-    print("   ✓ All components initialized\n")
+    validator = InputValidator(config.input_validation.model_dump())
+    cache_manager = IntelligentCacheManager(config.caching.model_dump())
+    retry_handler = IntelligentRetryHandler(config.error_handling.model_dump())
+    calibrator = ConfidenceCalibrator(config.confidence.model_dump())
+    monitor = AgentMonitor(config.monitoring.model_dump())
+    print("   [SUCCESS] All components initialized\n")
 
     # Example task
     task = "Write a Python function to calculate the Fibonacci sequence"
@@ -62,13 +62,13 @@ async def main():
     validation_result = validator.validate_task_input(task)
 
     if not validation_result.is_valid:
-        print(f"   ✗ Validation failed: {validation_result.error_message}")
+        print(f"   [FAIL] Validation failed: {validation_result.error_message}")
         return
 
-    print("   ✓ Input validated")
+    print("   [SUCCESS] Input validated")
     if validation_result.warnings:
         for warning in validation_result.warnings:
-            print(f"     ⚠ {warning}")
+            print(f"      {warning}")
     print()
 
     # Step 2: Check cache
@@ -77,12 +77,12 @@ async def main():
     print(f"   Cache key: {cache_key[:16]}...")
 
     # Try to get from cache (will miss first time)
-    cached_result = await cache_manager.l1_cache.get(cache_key)
+    cached_result = cache_manager.l1_cache.get(cache_key)
     if cached_result:
-        print("   ✓ Cache hit!")
+        print("   [SUCCESS] Cache hit!")
         result = cached_result
     else:
-        print("   ○ Cache miss, executing agent...")
+        print("    Cache miss, executing agent...")
 
         # Step 3: Execute with retry
         print("\n5. Executing agent with retry handler...")
@@ -97,11 +97,11 @@ async def main():
         latency_ms = (time.time() - start_time) * 1000
         result["latency_ms"] = latency_ms
 
-        print(f"   ✓ Agent executed successfully ({latency_ms:.0f}ms)")
+        print(f"   [SUCCESS] Agent executed successfully ({latency_ms:.0f}ms)")
 
         # Cache the result
         cache_manager.l1_cache.set(cache_key, result)
-        print("   ✓ Result cached\n")
+        print("   [SUCCESS] Result cached\n")
 
     # Step 4: Calibrate confidence
     print("6. Calibrating confidence...")
@@ -145,7 +145,7 @@ async def main():
     print()
 
     print("=" * 60)
-    print("✓ Demo completed successfully!")
+    print("[SUCCESS] Demo completed successfully!")
     print("=" * 60)
 
 

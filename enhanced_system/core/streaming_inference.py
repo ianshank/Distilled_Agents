@@ -19,7 +19,7 @@ class StreamToken:
     token: str
     position: int
     confidence: Optional[float] = None
-    metadata: Dict[str, Any] = None
+    metadata: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.metadata is None:
@@ -87,7 +87,7 @@ class StreamingInference:
             return
 
         # Buffer for error recovery
-        token_buffer = deque(maxlen=self.buffer_size)
+        token_buffer: deque[StreamToken] = deque(maxlen=self.buffer_size)
 
         position = 0
         try:

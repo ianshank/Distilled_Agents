@@ -7,7 +7,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,9 @@ class EvaluationResult:
     dimension_scores: Dict[str, float]
     test_results: List[Dict[str, Any]]
     baseline_comparison: Optional[Dict[str, float]] = None
-    recommendations: List[str] = None
+    recommendations: Optional[List[str]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.recommendations is None:
             self.recommendations = []
 
@@ -64,7 +64,7 @@ class SkillEvaluator:
         logger.info("SkillEvaluator initialized")
 
     def evaluate_agent(
-        self, agent_name: str, test_suite: List[Dict[str, Any]], agent_func: callable
+        self, agent_name: str, test_suite: List[Dict[str, Any]], agent_func: Callable[..., Any]
     ) -> EvaluationResult:
         """
         Evaluate agent across multiple dimensions
@@ -99,7 +99,7 @@ class SkillEvaluator:
         # Generate recommendations
         recommendations = self._generate_recommendations(dimension_scores, baseline_comparison)
 
-        result = EvaluationResult(
+        eval_result = EvaluationResult(
             agent_name=agent_name,
             timestamp=datetime.now(),
             overall_score=overall_score,
@@ -111,9 +111,11 @@ class SkillEvaluator:
 
         logger.info(f"Evaluation complete for {agent_name}: overall_score={overall_score:.3f}")
 
-        return result
+        return eval_result
 
-    def _run_test_case(self, agent_func: callable, test_case: Dict[str, Any]) -> Dict[str, Any]:
+    def _run_test_case(
+        self, agent_func: Callable[..., Any], test_case: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Run a single test case
 
@@ -281,7 +283,7 @@ class SkillEvaluator:
 
         return total_score / total_weight if total_weight > 0 else 0.0
 
-    def set_baseline(self, agent_name: str, result: EvaluationResult):
+    def set_baseline(self, agent_name: str, result: EvaluationResult) -> None:
         """
         Set baseline evaluation for agent
 

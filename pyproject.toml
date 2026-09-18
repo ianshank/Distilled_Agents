@@ -188,6 +188,19 @@ check_untyped_defs = true
 # Silent (not skip): listed packages still fail the gate; untyped god files do not.
 follow_imports = "silent"
 
+[[tool.mypy.overrides]]
+module = [
+    "enhanced_system.core.batch_processor",
+    "enhanced_system.core.confidence_calibrator",
+    "enhanced_system.core.input_validator",
+    "enhanced_system.evaluation.ab_testing",
+    "enhanced_system.evaluation.skill_evaluator",
+    "enhanced_system.training.adaptive_config",
+    "enhanced_system.training.data_curator",
+    "enhanced_system.training.training_orchestrator",
+]
+disallow_untyped_defs = true
+
 [tool.bandit]
 exclude_dirs = ["tests", "enhanced_system/tests", ".venv", "enhanced_system/examples"]
 skips = [

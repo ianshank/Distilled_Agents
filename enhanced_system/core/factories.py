@@ -13,10 +13,19 @@ This module follows 2025 Python coding standards:
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from .constants import *
 from .enums import *
+
+if TYPE_CHECKING:
+    from .adaptive_router import AdaptiveRouter
+    from .batch_processor import BatchProcessor
+    from .cache_manager import IntelligentCacheManager
+    from .confidence_calibrator import ConfidenceCalibrator
+    from .consensus_inference import ConsensusInference
+    from .input_validator import InputValidator
+    from .monitoring import AgentMonitor
 
 
 class ValidatorFactory:
@@ -81,7 +90,9 @@ class CacheManagerFactory:
         # Deep merge configs
         for key in ["l1", "l2", "l3", "semantic_similarity"]:
             if key in config:
-                full_config[key].update(config[key])
+                target_dict = cast(dict[str, Any], full_config[key])
+                source_dict = cast(dict[str, Any], config[key])
+                target_dict.update(source_dict)
 
         return IntelligentCacheManager(full_config)
 
@@ -245,7 +256,9 @@ class MonitorFactory:
 
         # Deep merge alerting config
         if "alerting" in config:
-            full_config["alerting"].update(config["alerting"])
+            alerting_target = cast(dict[str, Any], full_config["alerting"])
+            alerting_source = cast(dict[str, Any], config["alerting"])
+            alerting_target.update(alerting_source)
             config = {k: v for k, v in config.items() if k != "alerting"}
 
         full_config.update(config)

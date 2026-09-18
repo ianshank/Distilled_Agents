@@ -218,7 +218,7 @@ class ConfidenceCalibrator:
                 accuracies.extend([acc for _, acc in data_points])
 
         if accuracies:
-            return np.mean(accuracies)
+            return float(np.mean(accuracies))
         else:
             return 0.5
 

@@ -6,12 +6,12 @@ Core + ops remain the inference library. Harness H is a sibling package: it may 
 C4Component
     title Distill vs Serve vs Harness H
     Container_Boundary(core, "enhanced_system.core") {
-        Component(router, "Adaptive router", "adaptive_router.py")
+        Component(router, "Adaptive router", "adaptive_router.py\n(Tier A Strict Typed)")
         Component(cache, "Cache facade", "cache_manager.py + cache/")
         Component(validator, "Input validator", "input_validator.py")
     }
     Container_Boundary(ops, "enhanced_system.ops") {
-        Component(settings, "Settings", "settings.py")
+        Component(settings, "Settings", "settings.py\n(Tier A Strict Typed)")
         Component(launcher, "SageMaker launcher", "sagemaker_launcher.py")
     }
     Container_Boundary(harness, "enhanced_system.harness") {

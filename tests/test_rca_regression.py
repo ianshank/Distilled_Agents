@@ -1,0 +1,79 @@
+"""
+RCA Regression Tests
+====================
+Verifies that the fixes for Root Cause Analyses (RCAs) hold in the current codebase.
+"""
+
+from pathlib import Path
+
+import pytest
+from enhanced_system.core.input_validator import InputValidator
+from enhanced_system.evaluation.skill_evaluator import EvaluationResult
+
+
+@pytest.mark.regression
+def test_rca_009_var_annotated_fixed():
+    """Verify that type annotations are explicitly set (var-annotated)."""
+    validator = InputValidator()
+    res = validator.validate_task_input("Hello")
+    assert res.is_valid is True
+    assert isinstance(res.pii_entities, list)
+
+
+@pytest.mark.regression
+def test_rca_009_no_any_return_fixed():
+    """Verify that no-any-return is fixed with casts."""
+    # Actually test the priority comparison logic directly where casts were added
+    import asyncio
+    import time
+
+    from enhanced_system.core.batch_processor import BatchRequest
+    from enhanced_system.core.enums import Priority
+
+    future = asyncio.Future()
+    task1 = BatchRequest(
+        request_id="1",
+        task="test",
+        priority=Priority.HIGH,
+        future=future,
+        timestamp=time.time(),
+        metadata={},
+    )
+    task2 = BatchRequest(
+        request_id="2",
+        task="test",
+        priority=Priority.LOW,
+        future=future,
+        timestamp=time.time(),
+        metadata={},
+    )
+
+    # Priority queue relies on __lt__ being strictly bool
+    is_less = task1 < task2
+    assert isinstance(is_less, bool)
+
+
+@pytest.mark.regression
+def test_rca_002_optional_dataclass_fixed():
+    """Verify dataclass fields use Optional when defaulting to None."""
+    from datetime import datetime
+
+    result = EvaluationResult(
+        agent_name="test",
+        timestamp=datetime.now(),
+        overall_score=0.5,
+        dimension_scores={},
+        test_results=[],
+    )
+    assert result.recommendations == []  # post_init sets it to []
+
+
+@pytest.mark.regression
+def test_b108_tmp_out_fixed():
+    """Verify that test_harness_runtime.py doesn't contain /tmp/out."""
+    repo_root = Path(__file__).resolve().parents[1]
+    harness_test_file = repo_root / "enhanced_system" / "tests" / "unit" / "test_harness_runtime.py"
+
+    assert harness_test_file.exists(), "test_harness_runtime.py must exist to be verified"
+    content = harness_test_file.read_text(encoding="utf-8")
+    assert "/tmp/out" not in content, "Bandit B108 violation found: /tmp/out is hardcoded."

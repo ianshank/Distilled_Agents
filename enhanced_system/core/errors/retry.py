@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from enhanced_system.core.enums import ErrorType
 from enhanced_system.core.errors.learner import ErrorLearner
@@ -72,7 +72,7 @@ class IntelligentRetryHandler:
 
     def calculate_delay(self, attempt: int) -> float:
         delay = self.base_delay * (self.exponential_base**attempt)
-        return min(delay, self.max_delay)
+        return float(min(delay, self.max_delay))
 
     async def execute_with_retry(
         self,
@@ -82,7 +82,7 @@ class IntelligentRetryHandler:
         task: str = "",
         **kwargs,
     ) -> Any:
-        last_error = None
+        last_error: Optional[Exception] = None
         for attempt in range(self.max_retries + 1):
             try:
                 if asyncio.iscoroutinefunction(func):
@@ -144,4 +144,6 @@ class IntelligentRetryHandler:
                             )
                         )
                     raise
-        raise last_error  # pragma: no cover
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Retry attempts exhausted without captured exception")

@@ -27,9 +27,9 @@ class TrainingJob:
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     error_message: Optional[str] = None
-    metrics: Dict[str, Any] = None
+    metrics: Optional[Dict[str, Any]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.metrics is None:
             self.metrics = {}
 

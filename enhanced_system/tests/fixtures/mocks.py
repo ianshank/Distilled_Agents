@@ -17,7 +17,7 @@ class MockAgent:
     def __init__(self, name: str = "mock_agent"):
         self.name = name
         self.call_count = 0
-        self.last_task = None
+        self.last_task: Optional[str] = None
 
     async def infer(self, task: str, **kwargs) -> dict[str, Any]:
         """Mock inference method."""

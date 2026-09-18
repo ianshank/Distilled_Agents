@@ -29,9 +29,9 @@ class ValidationResult(BaseValidationResult):
     """Result of input validation with optional PII details."""
 
     pii_detected: bool = False
-    pii_entities: list = None
+    pii_entities: Optional[List[Dict[str, Any]]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__post_init__()
         if self.pii_entities is None:
             self.pii_entities = []
@@ -130,7 +130,7 @@ class InputValidator(BaseValidator):
         Returns:
             ValidationResult with validation status and details
         """
-        warnings = []
+        warnings: List[str] = []
 
         # Check if input is empty
         if not task or not task.strip():
@@ -158,7 +158,7 @@ class InputValidator(BaseValidator):
 
         # Check for PII
         pii_detected = False
-        pii_entities = []
+        pii_entities: List[Dict[str, Any]] = []
         if self.enable_pii_detection:
             pii_detected, pii_entities = self._detect_pii(task)
             if pii_detected:

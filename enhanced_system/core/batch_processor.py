@@ -8,7 +8,7 @@ import heapq
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, cast
 
 from enhanced_system.core.enums import Priority
 
@@ -26,11 +26,11 @@ class BatchRequest:
     timestamp: float
     metadata: Dict[str, Any]
 
-    def __lt__(self, other):
+    def __lt__(self, other: Any) -> bool:
         """For priority queue comparison"""
         if self.priority.numeric_value != other.priority.numeric_value:
-            return self.priority.numeric_value < other.priority.numeric_value
-        return self.timestamp < other.timestamp
+            return bool(self.priority.numeric_value < getattr(other.priority, "numeric_value", 0))
+        return bool(self.timestamp < getattr(other, "timestamp", 0))
 
 
 class BatchProcessor:
@@ -80,7 +80,7 @@ class BatchProcessor:
             f"workers: {self.num_workers})"
         )
 
-    async def start(self):
+    async def start(self) -> None:
         """Start batch processing workers"""
         if self.running:
             logger.warning("Batch processor already running")
@@ -95,7 +95,7 @@ class BatchProcessor:
 
         logger.info(f"Started {self.num_workers} batch workers")
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Stop batch processing workers"""
         if not self.running:
             return
@@ -142,7 +142,7 @@ class BatchProcessor:
                 raise Exception(f"Queue full ({self.queue_size} requests)")
 
         # Create request
-        future = asyncio.Future()
+        future: asyncio.Future[Any] = asyncio.Future()
         request = BatchRequest(
             request_id=request_id or f"req_{time.time()}_{id(future)}",
             task=task,
@@ -163,7 +163,7 @@ class BatchProcessor:
         # Wait for result
         return await future
 
-    async def _batch_worker(self, worker_id: int):
+    async def _batch_worker(self, worker_id: int) -> None:
         """
         Batch processing worker
 
@@ -225,7 +225,7 @@ class BatchProcessor:
         Returns:
             List of batch requests
         """
-        batch = []
+        batch: List[BatchRequest] = []
         deadline = time.time() + (self.batch_timeout_ms / 1000.0)
 
         while len(batch) < self.max_batch_size and time.time() < deadline:
@@ -283,7 +283,7 @@ class BatchProcessor:
 
         return {"response": f"Processed: {task[:50]}...", "success": True, "processing_time_ms": 10}
 
-    def set_batch_processor(self, processor_func: Callable):
+    def set_batch_processor(self, processor_func: Callable) -> None:
         """
         Set custom batch processing function
 
@@ -314,7 +314,7 @@ class BatchProcessor:
         else:
             results = self._custom_processor(tasks)
 
-        return results
+        return cast(List[Any], results)
 
     def get_stats(self) -> Dict[str, Any]:
         """Get batch processing statistics"""
@@ -323,7 +323,7 @@ class BatchProcessor:
         stats["num_workers"] = len(self.workers)
         return stats
 
-    async def process_batch_sync(self, tasks: List[str], **kwargs) -> List[Any]:
+    async def process_batch_sync(self, tasks: List[str], **kwargs: Any) -> List[Any]:
         """
         Process a batch synchronously (no queuing)
 

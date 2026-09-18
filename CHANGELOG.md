@@ -8,6 +8,10 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 ## [Unreleased]
 
 ### Added
+- Comprehensive SDLC code hardening and sanity gates (`tests/test_rca_regression.py` regression suite).
+- Enforced strict type-checking (`disallow_untyped_defs = true`) across `enhanced_system.core`, `enhanced_system.evaluation`, `enhanced_system.training`, and `enhanced_system.config`.
+- Extended `Makefile` `typecheck` command to scan all enhanced_system modules.
+- Addressed `Bandit B108` and resolved Pydantic v2 `dict()` deprecations in basic inference E2E journeys.
 
 - Native `enhanced_system.harness` runtime (YAML specs, frozen tool-id registry, AST/JSON dispatch, Echo/Transformers backends, rule-based tailor). Local CLIs: `scripts/harness/run_agent.py`, `collect_trajectories.py`, `eval_harness.py`, `build_memory.py`, `compose_dualdistill.py`, `collect_score.py`, `tailor_harness.py`.
 - Shared `prompt_render` for harness generate and masked trajectory SFT (SageMaker-safe copy under `scripts/training/distill/`). Optional `planning.instruction` (Kang `I_agent`). `split_thought_action` remainder is the thought channel. Shared JSONL reader `enhanced_system.harness.jsonl` (skip vs `--strict`) for collect / eval / score / compose / memory.
