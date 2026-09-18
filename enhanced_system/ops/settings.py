@@ -50,6 +50,16 @@ class MangoMASSettings(BaseSettings):
     harness_apply_patches: bool = Field(default=False)
     harness_memory_bank: str = Field(default="")
 
+    # Distillation expansion settings (Phase 1)
+    lora_rank: int = Field(default=16)
+    lora_alpha: int = Field(default=32)
+    lora_dropout: float = Field(default=0.1)
+    use_dora: bool = Field(default=False)
+    quantize_4bit: bool = Field(default=False)
+    distill_temperature: float = Field(default=2.0)
+    dpo_beta: float = Field(default=0.1)
+    lora_target_modules: str = Field(default="")
+
     def role_arn(self, account_id: str) -> str:
         return f"arn:aws:iam::{account_id}:role/{self.execution_role_name}"
 
