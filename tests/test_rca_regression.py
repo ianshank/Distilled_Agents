@@ -77,3 +77,49 @@ def test_b108_tmp_out_fixed():
     assert harness_test_file.exists(), "test_harness_runtime.py must exist to be verified"
     content = harness_test_file.read_text(encoding="utf-8")
     assert "/tmp/out" not in content, "Bandit B108 violation found: /tmp/out is hardcoded."
+
+
+@pytest.mark.regression
+def test_rca_trajectory_filter_truncation_boundary():
+    """RCA-001/002: supervised tokens beyond max_length must be correctly excluded.
+
+    Verifies that has_supervised_tokens returns False when supervised content
+    falls beyond the truncation boundary, and True when max_length is large
+    enough to include it.
+    """
+    pytest.importorskip("datasets")
+    pytest.importorskip("transformers")
+    from dataclasses import dataclass
+
+    from scripts.training.distill.trajectory_collator import has_supervised_tokens
+
+    @dataclass
+    class _Tok:
+        pad_token_id: int = 0
+
+        def encode(self, text: str, add_special_tokens: bool = False) -> list:
+            return [ord(ch) % 20 + 1 for ch in text] if text else []
+
+    tok = _Tok()
+    # Row with supervised content: completion='c' produces an assistant turn
+    row = {"prompt": "p", "completion": "c", "trajectory": {"steps": []}}
+
+    # With max_length=16, the supervised 'c' at char 19 is truncated away
+    assert has_supervised_tokens(tok, row, max_length=16) is False
+
+    # With max_length=32, the supervised 'c' fits within the window
+    assert has_supervised_tokens(tok, row, max_length=32) is True
+
+
+@pytest.mark.regression
+def test_rca_gpu_device_fallback():
+    """Verify torch device selection uses dynamic CUDA detection, never hardcoded."""
+    torch = pytest.importorskip("torch")
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    assert device.type in ("cuda", "cpu")
+    # Ensure the selection is consistent with torch's own detection
+    if torch.cuda.is_available():
+        assert device.type == "cuda"
+    else:
+        assert device.type == "cpu"

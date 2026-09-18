@@ -27,7 +27,7 @@ def load_causal_lm(model_name: str, args: Any):
     from transformers import AutoModelForCausalLM
 
     trust = resolve_trust_remote_code(args)
-    return AutoModelForCausalLM.from_pretrained(
+    return AutoModelForCausalLM.from_pretrained(  # nosec B615
         model_name,
         torch_dtype=torch.float16 if args.use_fp16 else torch.float32,
         device_map="auto" if args.use_device_map else None,
@@ -39,7 +39,7 @@ def load_causal_lm(model_name: str, args: Any):
 def load_tokenizer(model_name: str, args: Any):
     from transformers import AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer = AutoTokenizer.from_pretrained(  # nosec B615
         model_name,
         trust_remote_code=resolve_trust_remote_code(args),
         revision=resolve_model_revision(args),

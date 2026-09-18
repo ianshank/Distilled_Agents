@@ -947,7 +947,7 @@ def test_trajectory_mode_filters_unsupervised_rows(monkeypatch):
     monkeypatch.setattr(
         "scripts.training.distill.trainer.load_tokenizer", lambda *args, **kwargs: _TokenizerStub()
     )
-    trainer = AgentDistillationTrainer(_trainer_args(trajectory_mode=True))
+    trainer = AgentDistillationTrainer(_trainer_args(trajectory_mode=True, max_length=32))
     prepared = trainer.prepare_dataset()
     assert len(prepared) == 1
     assert set(prepared.column_names) >= {"prompt", "completion", "trajectory"}
@@ -967,9 +967,12 @@ def test_trajectory_eval_keeps_raw_rows(monkeypatch):
     monkeypatch.setattr(
         "scripts.training.distill.trainer.load_tokenizer", lambda *args, **kwargs: _TokenizerStub()
     )
-    trainer = AgentDistillationTrainer(_trainer_args(trajectory_mode=True, eval_file="eval.jsonl"))
+    trainer = AgentDistillationTrainer(
+        _trainer_args(trajectory_mode=True, eval_file="eval.jsonl", max_length=32)
+    )
     prepared = trainer.prepare_eval_dataset()
     assert prepared is not None
+    assert len(prepared) >= 1
     assert set(prepared.column_names) >= {"prompt", "completion", "trajectory"}
     assert "input_ids" not in prepared.column_names
 
