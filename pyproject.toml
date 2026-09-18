@@ -207,5 +207,4 @@ skips = [
     "B101",
     "B105",  # false positives on pass_rate / numeric defaults
     "B106",  # false positives on token="" kwargs
-    "B615",  # huggingface_unsafe_download triggered despite dynamic revision=
 ]
