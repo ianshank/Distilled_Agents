@@ -12,6 +12,14 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 - Enforced strict type-checking (`disallow_untyped_defs = true`) across `enhanced_system.core`, `enhanced_system.evaluation`, `enhanced_system.training`, and `enhanced_system.config`.
 - Extended `Makefile` `typecheck` command to scan all enhanced_system modules.
 - Addressed `Bandit B108` and resolved Pydantic v2 `dict()` deprecations in basic inference E2E journeys.
+- Regression test `test_rca_trajectory_filter_truncation_boundary` validating supervised token truncation boundary in `has_supervised_tokens`.
+- Regression test `test_rca_gpu_device_fallback` validating dynamic CUDA/CPU device selection.
+- `.dockerignore` for cleaner container builds.
+
+### Fixed
+- `test_trajectory_mode_filters_unsupervised_rows` failed because `max_length=16` truncated supervised tokens beyond char position 19 in a 20-char rendered body. Increased to `max_length=32`.
+- `test_trajectory_eval_keeps_raw_rows` had latent truncation bug producing 0-row datasets silently. Added `max_length=32` and row-count assertion.
+- Inline `# nosec B615` on 5 reviewed `from_pretrained()` calls that already pass `revision=` dynamically (false positives after global B615 skip removal).
 
 - Native `enhanced_system.harness` runtime (YAML specs, frozen tool-id registry, AST/JSON dispatch, Echo/Transformers backends, rule-based tailor). Local CLIs: `scripts/harness/run_agent.py`, `collect_trajectories.py`, `eval_harness.py`, `build_memory.py`, `compose_dualdistill.py`, `collect_score.py`, `tailor_harness.py`.
 - Shared `prompt_render` for harness generate and masked trajectory SFT (SageMaker-safe copy under `scripts/training/distill/`). Optional `planning.instruction` (Kang `I_agent`). `split_thought_action` remainder is the thought channel. Shared JSONL reader `enhanced_system.harness.jsonl` (skip vs `--strict`) for collect / eval / score / compose / memory.
