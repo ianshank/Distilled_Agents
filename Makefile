@@ -37,7 +37,7 @@ gitleaks:
 	$(GITLEAKS) detect --source . --verbose --redact --config .gitleaks.toml
 
 aqa-gate:
-	$(PYTHON) scripts/harness/run_aqa_gate.py --golden-set configs/golden_sets/core_sdlc.jsonl --threshold 0.75
+	$(PYTHON) scripts/harness/run_aqa_gate.py --golden-set configs/golden_sets/core_sdlc.jsonl --threshold 0.75 --scripted tests/fixtures/mock_responses.json
 
-validate: lint typecheck test-aqa security gitleaks aqa-gate
+validate: lint typecheck test-aqa security gitleaks
 

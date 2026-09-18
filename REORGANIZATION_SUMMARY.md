@@ -110,7 +110,7 @@ The following files were updated to reflect the new directory structure:
   ```
 - **Line 126**: Updated data path
   ```python
-  input_file = os.path.join('data', 'training', args.input_file)
+  input_file = os.path.join("data", "training", args.input_file)
   ```
 
 ### 2. `scripts/deployment/run_sagemaker_training.py`
@@ -123,10 +123,7 @@ The following files were updated to reflect the new directory structure:
 ### 3. `scripts/deployment/launch_sagemaker_training_jobs.py`
 - **Lines 223-228**: Updated script file paths to use new directory structure
   ```python
-  script_files = [
-      ("train_distilled_adapter.py", "scripts/training"),
-      ("requirements.txt", "config")
-  ]
+  script_files = [("train_distilled_adapter.py", "scripts/training"), ("requirements.txt", "config")]
   ```
 
 ### 4. `scripts/deployment/launch_all_agents_sagemaker.py`

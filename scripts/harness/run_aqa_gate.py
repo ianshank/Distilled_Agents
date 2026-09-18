@@ -14,6 +14,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="AQA Regression Gate")
     parser.add_argument("--golden-set", required=True, help="Path to golden set JSONL")
     parser.add_argument("--threshold", type=float, default=0.75, help="Minimum pass rate")
+    parser.add_argument("--scripted", type=str, help="Path to scripted responses for deterministic CI tests")
     args = parser.parse_args()
 
     golden_set_path = Path(args.golden_set)
@@ -28,20 +29,22 @@ def main() -> int:
         "--threshold", str(args.threshold),
         "--scan-security"
     ]
-    
+    if args.scripted:
+        cmd.extend(["--scripted", args.scripted])
+
     logger.info("Running AQA Regression Gate against %s...", golden_set_path.name)
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    
+
     # We only print stdout if it's there (eval_harness dumps JSON at the end)
     if result.stdout:
         print(result.stdout.strip())
-        
+
     if result.returncode != 0:
         logger.error("AQA Gate FAILED (exit code %s)", result.returncode)
         if result.stderr:
             logger.error("Error details:\n%s", result.stderr.strip())
         return 1
-        
+
     logger.info("AQA Gate PASSED.")
     return 0
 

@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-import types
 from unittest.mock import MagicMock, patch
 
-import pytest
 import torch
-
 from enhanced_system.ops.settings import MangoMASSettings
-
 
 # ---------------------------------------------------------------------------
 # LoRA Target Module Auto-Detection

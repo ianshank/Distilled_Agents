@@ -3,16 +3,27 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from presidio_analyzer import AnalyzerEngine as TypedAnalyzerEngine
+    from presidio_anonymizer import AnonymizerEngine as TypedAnonymizerEngine
+    from presidio_anonymizer.entities import RecognizerResult as AnonymizerResult
+else:
+    TypedAnalyzerEngine = Any
+    TypedAnonymizerEngine = Any
+    AnonymizerResult = Any
+
 try:
-    from presidio_analyzer import AnalyzerEngine
-    from presidio_anonymizer import AnonymizerEngine
+    from presidio_analyzer import AnalyzerEngine as _AnalyzerEngine
+    from presidio_anonymizer import AnonymizerEngine as _AnonymizerEngine
+    HAS_PRESIDIO = True
 except ImportError:
-    AnalyzerEngine = None
-    AnonymizerEngine = None
+    HAS_PRESIDIO = False
+    _AnalyzerEngine = Any  # type: ignore
+    _AnonymizerEngine = Any  # type: ignore
 
 
 class PIIScrubber:
@@ -22,14 +33,18 @@ class PIIScrubber:
     """
 
     def __init__(self, entities: Optional[List[str]] = None):
-        if AnalyzerEngine is None or AnonymizerEngine is None:
+        if not HAS_PRESIDIO:
             raise ImportError(
                 "Presidio libraries not found. Install with: pip install 'mangomas[security]'"
             )
 
         # Initialize Presidio
-        self.analyzer = AnalyzerEngine()
-        self.anonymizer = AnonymizerEngine()
+        try:
+            self.analyzer: TypedAnalyzerEngine = _AnalyzerEngine()
+        except OSError as e:
+            raise RuntimeError("Failed to load NLP model for Presidio. Try: python -m spacy download en_core_web_lg") from e
+
+        self.anonymizer: TypedAnonymizerEngine = _AnonymizerEngine()
 
         # Default high-risk entities
         self.entities = entities or [
@@ -54,7 +69,9 @@ class PIIScrubber:
         if not results:
             return text
 
-        anonymized = self.anonymizer.anonymize(text=text, analyzer_results=results)
+        # presidio-analyzer and presidio-anonymizer have mismatched type hints for RecognizerResult
+        anon_results = cast(List[AnonymizerResult], results)
+        anonymized = self.anonymizer.anonymize(text=text, analyzer_results=anon_results)
         return anonymized.text
 
     def redact_object(self, obj: Any) -> Any:

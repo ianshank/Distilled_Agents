@@ -61,7 +61,9 @@ def resolve_target_modules_for_model(model_name: str) -> list[str]:
         config = AutoConfig.from_pretrained(model_name, trust_remote_code=False)
         model_type = getattr(config, "model_type", "").lower()
         modules = _LORA_MODULE_MAP.get(model_type, _DEFAULT_MODULES)
-        logger.info("Auto-detected LoRA modules for %s (type=%s): %s", model_name, model_type, modules)
+        logger.info(
+            "Auto-detected LoRA modules for %s (type=%s): %s", model_name, model_type, modules
+        )
         return list(modules)
     except Exception:
         logger.warning("Could not auto-detect model type for %s, using default modules", model_name)
@@ -290,12 +292,18 @@ class DistillationTrainer(Trainer):
             student_logits = student_outputs.logits[:, :-1, :] / self.temperature
             teacher_logits = teacher_outputs.logits[:, :-1, :] / self.temperature
 
-            # Align vocabulary dimensions (handles teacher/student vocab mismatch)
             s_vocab = student_logits.size(-1)
             t_vocab = teacher_logits.size(-1)
-            shared_vocab = min(s_vocab, t_vocab)
-            student_logits = student_logits[..., :shared_vocab]
-            teacher_logits = teacher_logits[..., :shared_vocab]
+            if s_vocab != t_vocab:
+                import warnings
+                warnings.warn(
+                    f"Vocab mismatch: Student({s_vocab}) vs Teacher({t_vocab}). "
+                    "Cannot safely compute KL divergence across disparate token spaces. "
+                    "Falling back to task loss.",
+                    RuntimeWarning,
+                    stacklevel=2
+                )
+                return task_loss
 
             # Compute KL divergence
             kl_loss = torch.nn.functional.kl_div(

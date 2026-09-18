@@ -121,9 +121,9 @@ def _evaluate_file(
             if strict:
                 raise
             continue
-            
+
         total += 1
-        
+
         # Security scan
         if scanner is not None:
             findings = scanner.scan_trajectory(result.trajectory)
@@ -133,7 +133,7 @@ def _evaluate_file(
                     raise ValueError(f"Security vulnerability generated at line {line_no}")
                 # Count as a fault if not strict
                 result.trajectory.faults.append(f"Security finding: {len(findings)} issues")
-                
+
         if result.truncated:
             truncated += 1
         if result.trajectory.faults:

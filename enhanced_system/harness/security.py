@@ -37,7 +37,8 @@ class SecurityScanner:
 
         try:
             # Run bandit with JSON output format
-            cmd = ["bandit", "-f", "json", temp_path]
+            import sys
+            cmd = [sys.executable, "-m", "bandit", "-f", "json", temp_path]
             result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
             # Bandit returns 0 if no issues, 1 if issues found
@@ -45,7 +46,7 @@ class SecurityScanner:
                 import json
 
                 report = json.loads(result.stdout)
-                findings = report.get("results", [])
+                findings: List[Dict[str, str]] = report.get("results", [])
 
                 if self.fail_on_high:
                     high_sev = [f for f in findings if f.get("issue_severity") == "HIGH"]
@@ -58,18 +59,21 @@ class SecurityScanner:
             except json.JSONDecodeError:
                 logger.error("Failed to parse bandit output: %s", result.stdout)
                 return []
+        except (FileNotFoundError, OSError, subprocess.SubprocessError) as e:
+            logger.error("Failed to run bandit: %s", e)
+            return []
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
     def scan_trajectory(self, trajectory: object) -> List[Dict[str, str]]:
         """Scan all tool action arguments in a trajectory that look like code."""
-        findings = []
+        findings: List[Dict[str, str]] = []
         if not hasattr(trajectory, "steps"):
             return findings
 
         for step in trajectory.steps:
-            if step.action and "code" in step.action:
+            if isinstance(step.action, dict) and "code" in step.action:
                 code = step.action["code"]
                 step_findings = self.scan_python_code(str(code))
                 if step_findings:

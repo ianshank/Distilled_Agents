@@ -62,7 +62,9 @@ def main():
     parser.add_argument("--use_fp16", type=str, default="False")
     parser.add_argument("--use_device_map", type=str, default="False")
     parser.add_argument("--use_dora", type=str, default=os.getenv("MANGOMAS_USE_DORA", "False"))
-    parser.add_argument("--quantize_4bit", type=str, default=os.getenv("MANGOMAS_QUANTIZE_4BIT", "False"))
+    parser.add_argument(
+        "--quantize_4bit", type=str, default=os.getenv("MANGOMAS_QUANTIZE_4BIT", "False")
+    )
     parser.add_argument(
         "--trust_remote_code",
         type=str,

@@ -77,11 +77,13 @@
 
 **Example:**
 ```python
-config = (ConfigBuilder()
+config = (
+    ConfigBuilder()
     .with_caching(l1_enabled=True, l2_enabled=False)
     .with_validation(max_length=4096)
     .with_monitoring(enabled=True)
-    .build())
+    .build()
+)
 ```
 
 ### Phase 2: Type Hints & Modularity
@@ -321,10 +323,7 @@ tox
 from enhanced_system.core.factories import CacheManagerFactory
 
 # Create cache manager with defaults
-cache = CacheManagerFactory.create({
-    'l1': {'max_size': 500},
-    'l2': {'enabled': False}
-})
+cache = CacheManagerFactory.create({"l1": {"max_size": 500}, "l2": {"enabled": False}})
 ```
 
 ### Using Builder
@@ -332,11 +331,13 @@ cache = CacheManagerFactory.create({
 ```python
 from enhanced_system.config.builders import ConfigBuilder
 
-config = (ConfigBuilder()
+config = (
+    ConfigBuilder()
     .with_caching(l1_enabled=True, l2_enabled=True)
     .with_validation(max_length=4096)
     .with_monitoring(enabled=True)
-    .build())
+    .build()
+)
 ```
 
 ### Using Constants and Enums
@@ -381,9 +382,10 @@ complexity = TaskComplexity.COMPLEX
    ```python
    # Before
    max_size = 1000
-   
+
    # After
    from enhanced_system.core.constants import DEFAULT_CACHE_SIZE
+
    max_size = DEFAULT_CACHE_SIZE
    ```
 
@@ -391,9 +393,10 @@ complexity = TaskComplexity.COMPLEX
    ```python
    # Before
    cache = IntelligentCacheManager(config)
-   
+
    # After
    from enhanced_system.core.factories import CacheManagerFactory
+
    cache = CacheManagerFactory.create(config)
    ```
 
@@ -401,9 +404,10 @@ complexity = TaskComplexity.COMPLEX
    ```python
    # Before
    level = "l1"
-   
+
    # After
    from enhanced_system.core.enums import CacheLevel
+
    level = CacheLevel.L1
    ```
 

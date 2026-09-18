@@ -90,15 +90,11 @@ import asyncio
 
 # Create launcher with custom configuration
 launcher = MangoMASSageMakerLauncher(
-    region='us-east-1',
-    role_arn='arn:aws:iam::123456789012:role/SageMakerExecutionRole'
+    region="us-east-1", role_arn="arn:aws:iam::123456789012:role/SageMakerExecutionRole"
 )
 
 # Launch training jobs
-results = asyncio.run(launcher.launch_all_jobs(
-    parallel=True,
-    max_concurrent=3
-))
+results = asyncio.run(launcher.launch_all_jobs(parallel=True, max_concurrent=3))
 ```
 
 ### **3. Individual Agent Training**
@@ -112,7 +108,7 @@ config = TrainingJobConfig(
     agent_name="product_manager",
     training_file="product_manager_agent_real_data.jsonl",
     epochs=3,
-    batch_size=2
+    batch_size=2,
 )
 
 result = asyncio.run(launcher.launch_training_job(config, s3_uri))
@@ -139,17 +135,15 @@ from launch_all_agents_sagemaker import MangoMASSageMakerLauncher
 
 # Initialize launcher
 launcher = MangoMASSageMakerLauncher(
-    region='us-east-1',
-    role_arn='arn:aws:iam::123456789012:role/SageMakerExecutionRole'
+    region="us-east-1", role_arn="arn:aws:iam::123456789012:role/SageMakerExecutionRole"
 )
+
 
 # Launch all training jobs
 async def main():
-    results = await launcher.launch_all_jobs(
-        parallel=True,
-        max_concurrent=3
-    )
+    results = await launcher.launch_all_jobs(parallel=True, max_concurrent=3)
     return results
+
 
 # Run training
 results = asyncio.run(main())
@@ -166,7 +160,7 @@ summary = launcher.generate_summary_report()
 print(summary)
 
 # Save results
-launcher.save_results('training_results.json')
+launcher.save_results("training_results.json")
 ```
 
 ### **Custom Training Configuration**
@@ -181,7 +175,7 @@ config = TrainingJobConfig(
     epochs=5,
     batch_size=4,
     learning_rate=1e-4,
-    instance_type="ml.g4dn.2xlarge"
+    instance_type="ml.g4dn.2xlarge",
 )
 
 # Launch training with custom config
@@ -193,12 +187,12 @@ result = await launcher.launch_training_job(config, s3_uri)
 ### **Default Hyperparameters**
 ```python
 TrainingJobConfig(
-    model_name='mistralai/Mistral-7B-v0.1',
-    instance_type='ml.g4dn.xlarge',
+    model_name="mistralai/Mistral-7B-v0.1",
+    instance_type="ml.g4dn.xlarge",
     epochs=3,
     batch_size=2,
     learning_rate=2e-5,
-    max_length=512
+    max_length=512,
 )
 ```
 
@@ -227,7 +221,7 @@ aws sagemaker describe-training-job --training-job-name mangomas-product-manager
 ### **Results Analysis**
 ```python
 # Load training results
-with open('training_results.json', 'r') as f:
+with open("training_results.json", "r") as f:
     results = json.load(f)
 
 print(f"Success Rate: {results['summary']['success_rate']:.1%}")
@@ -246,13 +240,13 @@ print(f"Total Jobs: {results['summary']['total_jobs']}")
 ```python
 # Modify training script for custom requirements
 estimator = HuggingFace(
-    entry_point='custom_training_script.py',
-    source_dir='training',
+    entry_point="custom_training_script.py",
+    source_dir="training",
     hyperparameters={
-        'custom_param': 'value',
-        'model_name_or_path': 'custom-model',
-        'num_train_epochs': 5
-    }
+        "custom_param": "value",
+        "model_name_or_path": "custom-model",
+        "num_train_epochs": 5,
+    },
 )
 ```
 
@@ -260,12 +254,9 @@ estimator = HuggingFace(
 ```python
 # Configure for multi-GPU training
 estimator = HuggingFace(
-    instance_type='ml.p3.8xlarge',  # 4 GPUs
+    instance_type="ml.p3.8xlarge",  # 4 GPUs
     instance_count=1,
-    hyperparameters={
-        'per_device_train_batch_size': 4,
-        'gradient_accumulation_steps': 2
-    }
+    hyperparameters={"per_device_train_batch_size": 4, "gradient_accumulation_steps": 2},
 )
 ```
 
@@ -273,10 +264,10 @@ estimator = HuggingFace(
 ```python
 # Add custom evaluation metrics
 hyperparameters = {
-    'evaluation_strategy': 'steps',
-    'eval_steps': 500,
-    'metric_for_best_model': 'custom_metric',
-    'load_best_model_at_end': True
+    "evaluation_strategy": "steps",
+    "eval_steps": 500,
+    "metric_for_best_model": "custom_metric",
+    "load_best_model_at_end": True,
 }
 ```
 
@@ -321,8 +312,8 @@ hyperparameters = {
 # Deploy trained model to SageMaker endpoint
 predictor = estimator.deploy(
     initial_instance_count=1,
-    instance_type='ml.m5.large',
-    endpoint_name=f'mangomas-{agent_name}-endpoint'
+    instance_type="ml.m5.large",
+    endpoint_name=f"mangomas-{agent_name}-endpoint",
 )
 ```
 
@@ -332,8 +323,8 @@ predictor = estimator.deploy(
 from sagemaker.pipeline import Pipeline
 
 pipeline = Pipeline(
-    name='mangomas-inference-pipeline',
-    steps=[preprocessing_step, inference_step, postprocessing_step]
+    name="mangomas-inference-pipeline",
+    steps=[preprocessing_step, inference_step, postprocessing_step],
 )
 ```
 
@@ -350,24 +341,23 @@ pipeline = Pipeline(
 import asyncio
 from launch_all_agents_sagemaker import MangoMASSageMakerLauncher
 
+
 async def train_all_agents():
     # Initialize launcher
     launcher = MangoMASSageMakerLauncher()
-    
+
     # Launch training jobs
-    results = await launcher.launch_all_jobs(
-        parallel=True,
-        max_concurrent=3
-    )
-    
+    results = await launcher.launch_all_jobs(parallel=True, max_concurrent=3)
+
     # Generate report
     summary = launcher.generate_summary_report()
     print(summary)
-    
+
     # Save results
     launcher.save_results()
-    
+
     return results
+
 
 # Run training
 results = asyncio.run(train_all_agents())
@@ -384,7 +374,7 @@ custom_config = TrainingJobConfig(
     model_name="microsoft/DialoGPT-medium",
     epochs=5,
     batch_size=4,
-    learning_rate=1e-4
+    learning_rate=1e-4,
 )
 
 # Train custom agent

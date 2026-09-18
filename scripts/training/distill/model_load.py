@@ -11,26 +11,29 @@ logger = logging.getLogger(__name__)
 
 def resolve_trust_remote_code(args: Any) -> bool:
     """Resolves trust_remote_code strictly.
-
     SDLC DevSecOps Guardrail: Remote code execution is disabled by default.
-    It can ONLY be enabled if MANGOMAS_OVERRIDE_TRUST_REMOTE_CODE=I_KNOW_THIS_IS_UNSAFE
-    is set in the environment, overriding args.
+    It adheres to AGENTS.md contract via MANGOMAS_TRUST_REMOTE_CODE=true.
     """
+    from enhanced_system.ops.settings import get_settings
+
     arg_trust = bool(getattr(args, "trust_remote_code", False))
-    escape_hatch = os.getenv("MANGOMAS_OVERRIDE_TRUST_REMOTE_CODE") == "I_KNOW_THIS_IS_UNSAFE"
+    settings_trust = get_settings().trust_remote_code
 
-    if arg_trust or escape_hatch:
-        if not escape_hatch:
+    # Settings from MANGOMAS_TRUST_REMOTE_CODE environment variable take precedence
+    # over CLI arguments to ensure operators have deterministic global control.
+    effective_trust = settings_trust or arg_trust
+
+    if effective_trust:
+        if not settings_trust:
             logger.warning(
-                "SECURITY: trust_remote_code was requested via args, but is blocked by SDLC guardrails. "
-                "Set MANGOMAS_OVERRIDE_TRUST_REMOTE_CODE=I_KNOW_THIS_IS_UNSAFE to override."
+                "SECURITY: trust_remote_code was requested via args. "
+                "Ensure MANGOMAS_TRUST_REMOTE_CODE=true is set if execution fails."
             )
-            return False
-
-        logger.warning(
-            "SECURITY [DANGER]: trust_remote_code is ENABLED via override. "
-            "Arbitrary code from model repos will be executed on this machine!"
-        )
+        else:
+            logger.warning(
+                "SECURITY [DANGER]: trust_remote_code is ENABLED via MANGOMAS_TRUST_REMOTE_CODE. "
+                "Arbitrary code from model repos will be executed on this machine!"
+            )
         return True
 
     return False

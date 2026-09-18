@@ -59,17 +59,18 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("invalid --scripted JSON: %s", exc)
         return 1
     out_path = Path(args.output)
-    
+
     scrubber = None
     if args.redact_pii:
         try:
             from enhanced_system.harness.data_governance import PIIScrubber
+
             scrubber = PIIScrubber()
             logger.info("PII redaction enabled via Presidio")
         except ImportError as exc:
             logger.error("Cannot enable PII redaction: %s", exc)
             return 1
-            
+
     try:
         store = JsonlTraceStore(raw_store_path(out_path))
         runtime = HarnessFactory.create(
@@ -85,7 +86,9 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("%s", exc)
         return 1
     try:
-        rows = _collect_rows(runtime, Path(args.input), args.harness_id, args.strict, scrubber=scrubber)
+        rows = _collect_rows(
+            runtime, Path(args.input), args.harness_id, args.strict, scrubber=scrubber
+        )
     except JsonlRowError as exc:
         logger.error("%s", exc)
         return 1
