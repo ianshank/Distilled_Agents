@@ -103,14 +103,18 @@ Global coverage `fail_under` is 60. Harness package coverage is 90 via `.coverag
 
 ## Key Components
 
+### DevSecOps & Governance (New)
+To support enterprise-grade ML operations, the pipeline now enforces:
+- **PII Redaction**: `enhanced_system/harness/data_governance.py` integrates Presidio to scrub high-risk PII from trajectories before dataset compilation.
+- **Output Security Scanning**: `enhanced_system/harness/security.py` uses Bandit and GitLeaks to scan generated agent outputs, blocking malicious payload injection during evaluation.
+- **AQA Regression Gating**: `configs/golden_sets/core_sdlc.jsonl` provides deterministic validation via Pass@K thresholds for core agent workflows (`make aqa-gate`).
+- **Strict Supply Chain**: `trust_remote_code=False` is enforced at the framework level and requires explicit environment variable overrides.
+
 ### Enhanced System
 The `enhanced_system/` directory contains the core inference system with:
-- Adaptive routing
-- Intelligent caching
+- Adaptive routing & Intelligent caching
 - Consensus inference
 - Error handling and retries
-- Input validation
-- Performance monitoring
 - Local harness runtime (`enhanced_system/harness/`)
 
 ### Training Data
@@ -120,7 +124,6 @@ Agent training datasets are located in `data/training/` and include specialized 
 - Architecture
 - DevOps
 - Product Management
-- VP Product
 
 ### Scripts
 Organized by function:
@@ -128,7 +131,7 @@ Organized by function:
 - **training/**: Model training and distillation
 - **evaluation/**: Agent skill evaluation and registration
 - **infrastructure/**: Setup, security, and verification
-- **harness/**: Local agent runtime (`run_agent`, collect, eval, tailor, memory, dualdistill, score)
+- **harness/**: Local agent runtime (`run_agent`, collect, eval, aqa_gate)
 
 ## Contributing
 

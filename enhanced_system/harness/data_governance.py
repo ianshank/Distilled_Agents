@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ except ImportError:
 
 class PIIScrubber:
     """Redacts PII from text and complex JSON structures using Presidio.
-    
+
     Requires the `security` optional dependency group.
     """
 
@@ -26,11 +26,11 @@ class PIIScrubber:
             raise ImportError(
                 "Presidio libraries not found. Install with: pip install 'mangomas[security]'"
             )
-        
+
         # Initialize Presidio
         self.analyzer = AnalyzerEngine()
         self.anonymizer = AnonymizerEngine()
-        
+
         # Default high-risk entities
         self.entities = entities or [
             "EMAIL_ADDRESS",
@@ -48,20 +48,13 @@ class PIIScrubber:
         """Redact PII from a single string."""
         if not text or not isinstance(text, str):
             return text
-            
-        results = self.analyzer.analyze(
-            text=text,
-            entities=self.entities,
-            language="en"
-        )
-        
+
+        results = self.analyzer.analyze(text=text, entities=self.entities, language="en")
+
         if not results:
             return text
-            
-        anonymized = self.anonymizer.anonymize(
-            text=text,
-            analyzer_results=results
-        )
+
+        anonymized = self.anonymizer.anonymize(text=text, analyzer_results=results)
         return anonymized.text
 
     def redact_object(self, obj: Any) -> Any:
