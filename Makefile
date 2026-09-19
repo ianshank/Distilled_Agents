@@ -39,5 +39,8 @@ gitleaks:
 aqa-gate:
 	$(PYTHON) scripts/harness/run_aqa_gate.py --golden-set configs/golden_sets/core_sdlc.jsonl --threshold 0.75 --scripted tests/fixtures/mock_responses.json
 
+train-dpo:
+	$(PYTHON) scripts/training/train_dpo_adapter.py --model_name_or_path "gpt2" --dataset_path "configs/golden_sets/core_sdlc.jsonl" --epochs 1 --batch_size 1 --output_dir "./dpo_adapter_test"
+
 validate: lint typecheck test-aqa security gitleaks
 
