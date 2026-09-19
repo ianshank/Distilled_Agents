@@ -104,6 +104,8 @@ def _evaluate_file(
     total = 0
     with_expected = 0
     exact = 0
+    semantic_matches = 0
+    tool_sequence_exact = 0
     truncated = 0
     with_faults = 0
     valid_tools = 0
@@ -145,13 +147,29 @@ def _evaluate_file(
             if step.tool_id:
                 valid_tools += 1
         expected = payload.get("expected")
+        expected_tools = payload.get("expected_tools")
         labeled = expected is not None and bool(str(expected).strip())
+
+        # Tool sequence accuracy
+        if expected_tools is not None and isinstance(expected_tools, list):
+            actual_tools = []
+            for step in result.trajectory.steps:
+                if isinstance(step.action, dict) and "name" in step.action:
+                    actual_tools.append(step.action["name"])
+            if actual_tools == expected_tools:
+                tool_sequence_exact += 1
+
         if labeled:
             with_expected += 1
+            from enhanced_system.harness.score import semantic_match
             matched = answers_match(result.final_answer, str(expected))
+            sem_matched = semantic_match(result.final_answer, str(expected))
             if matched:
                 exact += 1
                 successes += 1
+            elif sem_matched:
+                semantic_matches += 1
+                successes += 1  # Count semantic match as a success
         elif not result.truncated:
             successes += 1
     pass_rate = 100.0 * successes / total if total else 0.0
@@ -159,6 +177,8 @@ def _evaluate_file(
         "total": total,
         "with_expected": with_expected,
         "exact_match": exact,
+        "semantic_match": semantic_matches,
+        "tool_sequence_exact": tool_sequence_exact,
         "truncated": truncated,
         "with_faults": with_faults,
         "valid_tool_steps": valid_tools,
