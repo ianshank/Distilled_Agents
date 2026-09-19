@@ -7,7 +7,6 @@ SageMaker-compatible inference script for distilled agent models
 import json
 import logging
 import os
-import re
 import threading
 from pathlib import Path
 from typing import Any, Dict
@@ -32,6 +31,7 @@ class DistilledAgentInference:
         self.active_adapter = None
         self.adapters_loaded = []
         self.adapter_root: Path | None = None
+        self.available_adapters: dict[str, Path] = {}
         self._adapter_lock = threading.RLock()
 
     def model_fn(self, model_dir: str):
@@ -40,6 +40,7 @@ class DistilledAgentInference:
         self.model_dir = model_dir
         configured_root = os.getenv("MANGOMAS_ADAPTER_ROOT")
         self.adapter_root = Path(configured_root).resolve() if configured_root else Path(model_dir).resolve()
+        self.available_adapters = self._discover_available_adapters()
 
         try:
             # Load tokenizer
@@ -70,15 +71,27 @@ class DistilledAgentInference:
             logger.error(f"Error loading model: {e}")
             raise
 
+    def _discover_available_adapters(self) -> dict[str, Path]:
+        root = self.adapter_root
+        if root is None or not root.exists():
+            return {}
+        available: dict[str, Path] = {}
+        for entry in root.iterdir():
+            if not entry.is_dir():
+                continue
+            if (entry / "adapter_config.json").is_file():
+                available[entry.name] = entry
+        return available
+
     def load_adapter(self, adapter_name: str):
         """Load a new adapter for Blue/Green deployments."""
         assert self.model is not None, "Model not loaded"
         if not hasattr(self.model, "load_adapter"):
             raise ValueError("Base model does not support adapters (not a PeftModel).")
-        if not re.fullmatch(r"[A-Za-z0-9._-]+", adapter_name):
-            raise ValueError("Adapter name must contain only letters, numbers, dots, dashes, or underscores.")
-        allowed_root = self.adapter_root or Path(self.model_dir).resolve()
-        requested = (allowed_root / adapter_name).resolve()
+        self.available_adapters = self._discover_available_adapters()
+        requested = self.available_adapters.get(adapter_name)
+        if requested is None:
+            raise ValueError(f"Adapter {adapter_name} not found under {self.adapter_root}")
         with self._adapter_lock:
             logger.info(f"Loading adapter '{adapter_name}' from {requested}")
             self.model.load_adapter(str(requested), adapter_name=adapter_name)
