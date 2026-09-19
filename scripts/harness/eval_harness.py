@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         summary = _evaluate_file(
             runtime, Path(args.input), args.harness_id, strict=args.strict, scanner=scanner
         )
-    except (JsonlRowError, OSError, ValueError) as exc:
+    except (JsonlRowError, OSError, ValueError, RuntimeError) as exc:
         logger.error("%s", exc)
         return 1
     json.dump(summary, sys.stdout)
@@ -126,6 +126,7 @@ def _evaluate_file(
             continue
 
         total += 1
+        security_failed = False
 
         # Security scan
         if scanner is not None:
@@ -136,6 +137,7 @@ def _evaluate_file(
                     raise ValueError(f"Security vulnerability generated at line {line_no}")
                 # Count as a fault if not strict
                 result.trajectory.faults.append(f"Security finding: {len(findings)} issues")
+                security_failed = True
 
         if result.truncated:
             truncated += 1
@@ -153,10 +155,11 @@ def _evaluate_file(
 
         # Tool sequence accuracy
         if expected_tools is not None and isinstance(expected_tools, list):
-            actual_tools = []
-            for step in result.trajectory.steps:
-                if isinstance(step.action, dict) and "name" in step.action:
-                    actual_tools.append(step.action["name"])
+            actual_tools = [
+                step.tool_id
+                for step in result.trajectory.steps
+                if step.tool_id and not step.fault and step.action
+            ]
             if actual_tools == expected_tools:
                 tool_sequence_exact += 1
 
@@ -165,13 +168,13 @@ def _evaluate_file(
             from enhanced_system.harness.score import semantic_match
             matched = answers_match(result.final_answer, str(expected))
             sem_matched = semantic_match(result.final_answer, str(expected))
-            if matched:
+            if matched and not security_failed:
                 exact += 1
                 successes += 1
-            elif sem_matched:
+            elif sem_matched and not security_failed:
                 semantic_matches += 1
                 successes += 1  # Count semantic match as a success
-        elif not result.truncated:
+        elif not result.truncated and not security_failed:
             successes += 1
     pass_rate = 100.0 * successes / total if total else 0.0
     return {

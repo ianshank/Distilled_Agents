@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import torch
+import pytest
 from enhanced_system.ops.settings import MangoMASSettings
+
+pytestmark = [pytest.mark.unit, pytest.mark.regression]
+torch = pytest.importorskip("torch")
+pytest.importorskip("datasets")
+pytest.importorskip("transformers")
 
 # ---------------------------------------------------------------------------
 # LoRA Target Module Auto-Detection

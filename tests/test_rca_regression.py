@@ -113,13 +113,18 @@ def test_rca_trajectory_filter_truncation_boundary():
 
 @pytest.mark.regression
 def test_rca_gpu_device_fallback():
-    """Verify torch device selection uses dynamic CUDA detection, never hardcoded."""
+    """Verify production inference device selection uses dynamic CUDA detection."""
     torch = pytest.importorskip("torch")
+    pytest.importorskip("transformers")
+    pytest.importorskip("peft")
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    assert device.type in ("cuda", "cpu")
-    # Ensure the selection is consistent with torch's own detection
-    if torch.cuda.is_available():
-        assert device.type == "cuda"
-    else:
-        assert device.type == "cpu"
+    from scripts.inference import DistilledAgentInference
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(torch.cuda, "is_available", lambda: False)
+        cpu_handler = DistilledAgentInference()
+        assert cpu_handler.device.type == "cpu"
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(torch.cuda, "is_available", lambda: True)
+        cuda_handler = DistilledAgentInference()
+        assert cuda_handler.device.type == "cuda"

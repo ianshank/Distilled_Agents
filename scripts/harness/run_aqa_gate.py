@@ -2,6 +2,7 @@
 """AQA Regression Gate: Runs Golden Sets and enforces Pass@K thresholds."""
 
 import argparse
+import json
 import logging
 import subprocess
 import sys
@@ -13,8 +14,12 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     parser = argparse.ArgumentParser(description="AQA Regression Gate")
     parser.add_argument("--golden-set", required=True, help="Path to golden set JSONL")
-    parser.add_argument("--threshold", type=float, default=0.75, help="Minimum pass rate")
-    parser.add_argument("--scripted", type=str, help="Path to scripted responses for deterministic CI tests")
+    parser.add_argument("--threshold", type=float, default=75.0, help="Minimum pass rate (0-100)")
+    parser.add_argument(
+        "--scripted",
+        type=str,
+        help="Path to scripted responses JSON file for deterministic CI tests",
+    )
     args = parser.parse_args()
 
     golden_set_path = Path(args.golden_set)
@@ -22,15 +27,31 @@ def main() -> int:
         logger.error("Golden set not found: %s", golden_set_path)
         return 1
 
+    threshold = args.threshold * 100.0 if 0.0 <= args.threshold <= 1.0 else args.threshold
+    if threshold < 0.0 or threshold > 100.0:
+        logger.error("Threshold must be in range [0, 100] or [0, 1].")
+        return 1
+
     cmd = [
         sys.executable,
         "scripts/harness/eval_harness.py",
         "--input", str(golden_set_path),
-        "--threshold", str(args.threshold),
-        "--scan-security"
+        "--threshold",
+        str(threshold),
+        "--scan-security",
+        "--strict",
     ]
     if args.scripted:
-        cmd.extend(["--scripted", args.scripted])
+        scripted_path = Path(args.scripted)
+        if not scripted_path.is_file():
+            logger.error("Scripted responses file not found: %s", scripted_path)
+            return 1
+        try:
+            scripted_payload = json.loads(scripted_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.error("Invalid scripted responses file %s: %s", scripted_path, exc)
+            return 1
+        cmd.extend(["--scripted", json.dumps(scripted_payload)])
 
     logger.info("Running AQA Regression Gate against %s...", golden_set_path.name)
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)

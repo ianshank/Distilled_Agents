@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
@@ -40,28 +41,27 @@ class SecurityScanner:
             import sys
             cmd = [sys.executable, "-m", "bandit", "-f", "json", temp_path]
             result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if result.returncode not in (0, 1):
+                raise RuntimeError(f"Bandit failed with exit code {result.returncode}: {result.stderr}")
 
             # Bandit returns 0 if no issues, 1 if issues found
             try:
-                import json
-
                 report = json.loads(result.stdout)
-                findings: List[Dict[str, str]] = report.get("results", [])
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(f"Failed to parse bandit output: {result.stdout}") from exc
+            findings: List[Dict[str, str]] = report.get("results", [])
 
-                if self.fail_on_high:
-                    high_sev = [f for f in findings if f.get("issue_severity") == "HIGH"]
-                    if high_sev:
-                        logger.error(
-                            "High severity security issues found in generated code: %s",
-                            [f.get("issue_text") for f in high_sev],
-                        )
-                return findings
-            except json.JSONDecodeError:
-                logger.error("Failed to parse bandit output: %s", result.stdout)
-                return []
-        except (FileNotFoundError, OSError, subprocess.SubprocessError) as e:
+            if self.fail_on_high:
+                high_sev = [f for f in findings if f.get("issue_severity") == "HIGH"]
+                if high_sev:
+                    logger.error(
+                        "High severity security issues found in generated code: %s",
+                        [f.get("issue_text") for f in high_sev],
+                    )
+            return findings
+        except (FileNotFoundError, OSError, subprocess.SubprocessError, RuntimeError) as e:
             logger.error("Failed to run bandit: %s", e)
-            return []
+            raise RuntimeError(f"Security scanner failed: {e}") from e
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -73,8 +73,21 @@ class SecurityScanner:
             return findings
 
         for step in trajectory.steps:
-            if isinstance(step.action, dict) and "code" in step.action:
-                code = step.action["code"]
+            action_payload = None
+            if isinstance(step.action, str) and step.action:
+                try:
+                    action_payload = json.loads(step.action)
+                except json.JSONDecodeError:
+                    action_payload = None
+            elif isinstance(step.action, dict):
+                action_payload = step.action
+            code = None
+            if isinstance(action_payload, dict):
+                if "code" in action_payload:
+                    code = action_payload["code"]
+                elif isinstance(action_payload.get("args"), dict):
+                    code = action_payload["args"].get("code")
+            if code is not None:
                 step_findings = self.scan_python_code(str(code))
                 if step_findings:
                     findings.extend(step_findings)

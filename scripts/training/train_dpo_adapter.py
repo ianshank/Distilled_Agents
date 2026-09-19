@@ -11,6 +11,7 @@ from enhanced_system.ops.settings import get_settings
 
 from scripts.training.distill.dpo_collator import format_dpo_example
 from scripts.training.distill.model_load import load_causal_lm, load_tokenizer
+from scripts.training.distill.trainer import resolve_target_modules_for_model
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +50,17 @@ def main() -> int:
 
     # Setup LoRA
     # Dynamically resolve target modules based on Phase 1 auto-detection if empty
-    from scripts.training.train_distilled_adapter import resolve_target_modules_for_model
-    target_modules = settings.lora_target_modules or resolve_target_modules_for_model(model)
+    target_modules = (
+        [item.strip() for item in settings.lora_target_modules.split(",") if item.strip()]
+        if settings.lora_target_modules
+        else resolve_target_modules_for_model(args.model_name_or_path)
+    )
 
     peft_config = LoraConfig(
         r=settings.lora_rank,
         lora_alpha=settings.lora_alpha,
         target_modules=target_modules,
-        lora_dropout=0.05,
+        lora_dropout=settings.lora_dropout,
         bias="none",
         task_type="CAUSAL_LM",
         use_dora=settings.use_dora,

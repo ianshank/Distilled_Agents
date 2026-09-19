@@ -7,6 +7,8 @@ SageMaker-compatible inference script for distilled agent models
 import json
 import logging
 import os
+import threading
+from pathlib import Path
 from typing import Any, Dict
 
 import torch
@@ -26,12 +28,17 @@ class DistilledAgentInference:
         self.tokenizer = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model_dir = "/opt/ml/model"
-        self.active_adapter = "default"
+        self.active_adapter = None
         self.adapters_loaded = []
+        self.adapter_root: Path | None = None
+        self._adapter_lock = threading.RLock()
 
     def model_fn(self, model_dir: str):
         """Load the model and tokenizer"""
         logger.info(f"Loading model from: {model_dir}")
+        self.model_dir = model_dir
+        configured_root = os.getenv("MANGOMAS_ADAPTER_ROOT")
+        self.adapter_root = Path(configured_root).resolve() if configured_root else Path(model_dir).resolve()
 
         try:
             # Load tokenizer
@@ -67,18 +74,25 @@ class DistilledAgentInference:
         assert self.model is not None, "Model not loaded"
         if not hasattr(self.model, "load_adapter"):
             raise ValueError("Base model does not support adapters (not a PeftModel).")
-        logger.info(f"Loading adapter '{adapter_name}' from {adapter_dir}")
-        self.model.load_adapter(adapter_dir, adapter_name=adapter_name)
-        self.adapters_loaded.append(adapter_name)
+        requested = Path(adapter_dir).expanduser().resolve()
+        allowed_root = self.adapter_root or Path(self.model_dir).resolve()
+        if os.path.commonpath([str(requested), str(allowed_root)]) != str(allowed_root):
+            raise ValueError(f"Adapter path must be within {allowed_root}")
+        with self._adapter_lock:
+            logger.info(f"Loading adapter '{adapter_name}' from {requested}")
+            self.model.load_adapter(str(requested), adapter_name=adapter_name)
+            if adapter_name not in self.adapters_loaded:
+                self.adapters_loaded.append(adapter_name)
 
     def set_adapter(self, adapter_name: str):
         """Switch the active adapter."""
         assert self.model is not None, "Model not loaded"
         if adapter_name not in self.adapters_loaded:
             raise ValueError(f"Adapter {adapter_name} not loaded.")
-        logger.info(f"Switching active adapter to '{adapter_name}'")
-        self.model.set_adapter(adapter_name)
-        self.active_adapter = adapter_name
+        with self._adapter_lock:
+            logger.info(f"Switching active adapter to '{adapter_name}'")
+            self.model.set_adapter(adapter_name)
+            self.active_adapter = adapter_name
 
     def unload_adapter(self, adapter_name: str):
         """Unload an adapter to free memory."""
@@ -88,10 +102,11 @@ class DistilledAgentInference:
         if adapter_name == self.active_adapter:
             raise ValueError(f"Cannot unload active adapter '{adapter_name}'. Switch to another adapter first.")
 
-        logger.info(f"Unloading adapter '{adapter_name}'")
-        if hasattr(self.model, "delete_adapter"):
-            self.model.delete_adapter(adapter_name)
-        self.adapters_loaded.remove(adapter_name)
+        with self._adapter_lock:
+            logger.info(f"Unloading adapter '{adapter_name}'")
+            if hasattr(self.model, "delete_adapter"):
+                self.model.delete_adapter(adapter_name)
+            self.adapters_loaded.remove(adapter_name)
 
     def input_fn(self, request_body: str, request_content_type: str = "application/json"):
         """Parse input data"""
@@ -124,19 +139,20 @@ class DistilledAgentInference:
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
             # Generate response
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    **inputs,
-                    max_length=max_length,
-                    temperature=temperature,
-                    top_p=top_p,
-                    top_k=top_k,
-                    do_sample=do_sample,
-                    num_return_sequences=num_return_sequences,
-                    pad_token_id=self.tokenizer.pad_token_id,
-                    eos_token_id=self.tokenizer.eos_token_id,
-                    repetition_penalty=input_data.get("repetition_penalty", 1.1),
-                )
+            with self._adapter_lock:
+                with torch.no_grad():
+                    outputs = self.model.generate(
+                        **inputs,
+                        max_length=max_length,
+                        temperature=temperature,
+                        top_p=top_p,
+                        top_k=top_k,
+                        do_sample=do_sample,
+                        num_return_sequences=num_return_sequences,
+                        pad_token_id=self.tokenizer.pad_token_id,
+                        eos_token_id=self.tokenizer.eos_token_id,
+                        repetition_penalty=input_data.get("repetition_penalty", 1.1),
+                    )
 
             # Decode outputs
             responses = []
@@ -227,7 +243,8 @@ if __name__ == "__main__":
     @app.route("/ping", methods=["GET"])
     def ping():
         """Health check endpoint"""
-        return jsonify({"status": "healthy", "active_adapter": inference_handler.active_adapter})
+        active = inference_handler.active_adapter if inference_handler.active_adapter else "base"
+        return jsonify({"status": "healthy", "active_adapter": active})
 
     if HAS_PROMETHEUS:
         @app.route("/metrics", methods=["GET"])
@@ -237,6 +254,9 @@ if __name__ == "__main__":
 
     @app.route("/adapter/load", methods=["POST"])
     def load_adapter():
+        auth_error = _require_adapter_auth()
+        if auth_error:
+            return auth_error
         data = request.json or {}
         adapter_name = data.get("adapter_name")
         adapter_dir = data.get("adapter_dir")
@@ -250,6 +270,9 @@ if __name__ == "__main__":
 
     @app.route("/adapter/unload", methods=["POST"])
     def unload_adapter():
+        auth_error = _require_adapter_auth()
+        if auth_error:
+            return auth_error
         data = request.json or {}
         adapter_name = data.get("adapter_name")
         if not adapter_name:
@@ -262,6 +285,9 @@ if __name__ == "__main__":
 
     @app.route("/adapter/switch", methods=["POST"])
     def switch_adapter():
+        auth_error = _require_adapter_auth()
+        if auth_error:
+            return auth_error
         data = request.json or {}
         adapter_name = data.get("adapter_name")
         if not adapter_name:
@@ -302,4 +328,21 @@ if __name__ == "__main__":
     # Run Flask app
     port = int(os.getenv("PORT", 8080))
     host = os.getenv("MANGOMAS_BIND_HOST", os.getenv("BIND_HOST", "127.0.0.1"))
+
+    def _require_adapter_auth():
+        token = os.getenv("MANGOMAS_ADAPTER_ADMIN_TOKEN", "")
+        non_local = host not in {"127.0.0.1", "localhost", "::1"}
+        if not token and not non_local:
+            return None
+        if not token:
+            return jsonify({"error": "Adapter management requires MANGOMAS_ADAPTER_ADMIN_TOKEN"}), 403
+        expected = token
+        candidate = request.headers.get("X-Adapter-Token", "")
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            candidate = auth_header[7:]
+        if candidate != expected:
+            return jsonify({"error": "Unauthorized"}), 401
+        return None
+
     app.run(host=host, port=port, debug=False)

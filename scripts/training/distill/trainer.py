@@ -86,6 +86,20 @@ class AgentDistillationTrainer:
                 config=vars(self.args),
             )
 
+    def _validate_distillation_compatibility(self) -> None:
+        if self.args.distillation_alpha <= 0:
+            return
+        student_tokenizer = load_tokenizer(self.args.student_model_name, self.args)
+        teacher_tokenizer = load_tokenizer(self.args.teacher_model_name, self.args)
+        student_vocab = len(student_tokenizer)
+        teacher_vocab = len(teacher_tokenizer)
+        if student_vocab != teacher_vocab:
+            raise ValueError(
+                "Incompatible teacher/student tokenizers for KL distillation: "
+                f"student_vocab={student_vocab}, teacher_vocab={teacher_vocab}. "
+                "Set distillation_alpha=0 or use tokenizer-compatible model pairs."
+            )
+
     def load_teacher_model(self):
         logger.info("Loading teacher model: %s", self.args.teacher_model_name)
         teacher_model = load_causal_lm(self.args.teacher_model_name, self.args)
@@ -160,6 +174,8 @@ class AgentDistillationTrainer:
 
     def train(self):
         logger.info("Starting agent distillation training")
+        if not getattr(self.args, "trajectory_mode", False):
+            self._validate_distillation_compatibility()
         teacher_model = None
         if self.args.distillation_alpha > 0 and not getattr(self.args, "trajectory_mode", False):
             teacher_model = self.load_teacher_model()
@@ -271,8 +287,14 @@ class DistillationTrainer(Trainer):
         student_outputs = model(**inputs)
         teacher_outputs = None
         if self.teacher_model is not None and self.distillation_alpha > 0:
-            with torch.no_grad():
-                teacher_outputs = self.teacher_model(**inputs)
+            try:
+                with torch.no_grad():
+                    teacher_outputs = self.teacher_model(**inputs)
+            except (RuntimeError, IndexError) as exc:
+                raise ValueError(
+                    "Teacher forward pass failed with student-tokenized inputs. "
+                    "Use tokenizer-compatible teacher/student models or disable distillation."
+                ) from exc
         loss = self.create_distillation_loss(student_outputs, teacher_outputs, inputs.get("labels"))
         return (loss, student_outputs) if return_outputs else loss
 

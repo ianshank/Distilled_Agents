@@ -106,7 +106,7 @@ Global coverage `fail_under` is 60. Harness package coverage is 90 via `.coverag
 ### DevSecOps & Governance (Phase 2)
 To support enterprise-grade ML operations, the pipeline now enforces:
 - **PII Redaction**: `enhanced_system/harness/data_governance.py` integrates Presidio to scrub high-risk PII from trajectories before dataset compilation. *(Note: Transformer-based NLP models run synchronously here and may inject 100-300ms of latency per tool-loop).*
-- **Output Security Scanning**: `enhanced_system/harness/security.py` uses Bandit and GitLeaks to scan generated agent outputs, blocking malicious payload injection during evaluation.
+- **Output Security Scanning**: `enhanced_system/harness/security.py` uses Bandit to scan generated agent outputs, blocking malicious payload injection during evaluation.
 - **Strict Supply Chain**: `trust_remote_code=False` is enforced at the framework level and requires explicit environment variable overrides.
 
 ### DPO Orchestration (Phase 3)

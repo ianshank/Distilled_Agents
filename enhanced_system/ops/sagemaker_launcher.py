@@ -29,6 +29,7 @@ class AgentTrainingConfig:
     use_spot_instances: bool = True
     max_runtime: int = 0
     student_model: str = ""
+    trajectory_mode: bool = False
 
 
 class MangoMASSageMakerLauncher:
@@ -209,14 +210,15 @@ class MangoMASSageMakerLauncher:
             "per_device_train_batch_size": str(config.batch_size),
             "learning_rate": str(config.learning_rate),
             "trust_remote_code": str(self.settings.trust_remote_code).lower(),
-            # Distillation expansion: forward LoRA and training mode args
-            "trajectory_mode": str(getattr(config, "trajectory_mode", False)),
+            "temperature": str(self.settings.distill_temperature),
             "lora_r": str(self.settings.lora_rank),
             "lora_alpha": str(self.settings.lora_alpha),
             "lora_dropout": str(self.settings.lora_dropout),
             "use_dora": str(self.settings.use_dora).lower(),
             "quantize_4bit": str(self.settings.quantize_4bit).lower(),
         }
+        if config.trajectory_mode:
+            hyperparams["trajectory_mode"] = "True"
         # Only forward explicit target modules if configured
         if self.settings.lora_target_modules:
             hyperparams["lora_target_modules"] = self.settings.lora_target_modules

@@ -67,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
 
             scrubber = PIIScrubber()
             logger.info("PII redaction enabled via Presidio")
-        except ImportError as exc:
+        except (ImportError, RuntimeError) as exc:
             logger.error("Cannot enable PII redaction: %s", exc)
             return 1
 
