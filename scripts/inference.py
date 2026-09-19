@@ -64,6 +64,7 @@ class DistilledAgentInference:
 
     def load_adapter(self, adapter_dir: str, adapter_name: str):
         """Load a new adapter for Blue/Green deployments."""
+        assert self.model is not None, "Model not loaded"
         if not hasattr(self.model, "load_adapter"):
             raise ValueError("Base model does not support adapters (not a PeftModel).")
         logger.info(f"Loading adapter '{adapter_name}' from {adapter_dir}")
@@ -72,6 +73,7 @@ class DistilledAgentInference:
 
     def set_adapter(self, adapter_name: str):
         """Switch the active adapter."""
+        assert self.model is not None, "Model not loaded"
         if adapter_name not in self.adapters_loaded:
             raise ValueError(f"Adapter {adapter_name} not loaded.")
         logger.info(f"Switching active adapter to '{adapter_name}'")
@@ -88,6 +90,8 @@ class DistilledAgentInference:
 
     def predict_fn(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate predictions"""
+        assert self.model is not None, "Model not loaded"
+        assert self.tokenizer is not None, "Tokenizer not loaded"
         try:
             # Extract input parameters
             prompt = input_data.get("prompt", "")
