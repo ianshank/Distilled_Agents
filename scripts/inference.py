@@ -7,6 +7,7 @@ SageMaker-compatible inference script for distilled agent models
 import json
 import logging
 import os
+import re
 import threading
 from pathlib import Path
 from typing import Any, Dict
@@ -74,6 +75,8 @@ class DistilledAgentInference:
         assert self.model is not None, "Model not loaded"
         if not hasattr(self.model, "load_adapter"):
             raise ValueError("Base model does not support adapters (not a PeftModel).")
+        if not re.fullmatch(r"[A-Za-z0-9._-]+", adapter_name):
+            raise ValueError("Adapter name must contain only letters, numbers, dots, dashes, or underscores.")
         allowed_root = self.adapter_root or Path(self.model_dir).resolve()
         requested = (allowed_root / adapter_name).resolve()
         with self._adapter_lock:
