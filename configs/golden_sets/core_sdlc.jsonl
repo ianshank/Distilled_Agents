@@ -1,0 +1,4 @@
+{"prompt": "Fix the issue in src/main.py where integer division causes a crash when dividing by zero.", "expected": "ZeroDivisionError handled"}
+{"prompt": "Generate a python script that prints 'Hello World' and run it.", "expected": "Hello World"}
+{"prompt": "Explain what a C4 architecture diagram is.", "expected": "Context, Containers, Components, and Code"}
+{"prompt": "Write a unit test for a simple addition function in pytest.", "expected": "assert"}

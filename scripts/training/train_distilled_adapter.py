@@ -56,10 +56,15 @@ def main():
     parser.add_argument(
         "--lora_target_modules",
         type=str,
-        default="q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj",
+        default=os.getenv("MANGOMAS_LORA_TARGET_MODULES", ""),
+        help="Comma-separated LoRA target modules (auto-detected if empty)",
     )
     parser.add_argument("--use_fp16", type=str, default="False")
     parser.add_argument("--use_device_map", type=str, default="False")
+    parser.add_argument("--use_dora", type=str, default=os.getenv("MANGOMAS_USE_DORA", "False"))
+    parser.add_argument(
+        "--quantize_4bit", type=str, default=os.getenv("MANGOMAS_QUANTIZE_4BIT", "False")
+    )
     parser.add_argument(
         "--trust_remote_code",
         type=str,
@@ -83,6 +88,8 @@ def main():
     args.use_lora = args.use_lora.lower() == "true"
     args.trust_remote_code = args.trust_remote_code.lower() == "true"
     args.trajectory_mode = args.trajectory_mode.lower() == "true"
+    args.use_dora = args.use_dora.lower() == "true"
+    args.quantize_4bit = args.quantize_4bit.lower() == "true"
     if args.trajectory_mode:
         try:
             args.distillation_alpha = parse_trajectory_distill_alpha(

@@ -24,16 +24,22 @@ test:
 	$(PYTEST) -m "unit or integration" --cov=enhanced_system --cov-report=term --cov-fail-under=60
 
 test-harness:
-	$(PYTEST) -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness --cov-report=term
+	$(PYTEST) -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness --cov-report=term --cov-fail-under=80
 
 test-aqa:
 	$(PYTEST) -m "unit or integration or regression or harness" --cov=enhanced_system --cov-report=term --cov-fail-under=60
-	$(PYTEST) -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness --cov-report=term
+	$(PYTEST) -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness --cov-report=term --cov-fail-under=80
 
 security:
 	$(PYTHON) -m bandit -r enhanced_system scripts -x tests,enhanced_system/tests,enhanced_system/examples -c pyproject.toml -q
 
 gitleaks:
 	$(GITLEAKS) detect --source . --verbose --redact --config .gitleaks.toml
+
+aqa-gate:
+	$(PYTHON) scripts/harness/run_aqa_gate.py --golden-set configs/golden_sets/core_sdlc.jsonl --threshold 75.0 --scripted tests/fixtures/mock_responses.json
+
+train-dpo:
+	$(PYTHON) scripts/training/train_dpo_adapter.py --model_name_or_path "gpt2" --dataset_path "tests/fixtures/dpo_preferences.jsonl" --epochs 1 --batch_size 1 --output_dir "./dpo_adapter_test"
 
 validate: lint typecheck test-aqa security gitleaks

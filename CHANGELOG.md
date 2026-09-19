@@ -8,10 +8,36 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 ## [Unreleased]
 
 ### Added
-- Comprehensive SDLC code hardening and sanity gates (`tests/test_rca_regression.py` regression suite).
-- Enforced strict type-checking (`disallow_untyped_defs = true`) across `enhanced_system.core`, `enhanced_system.evaluation`, `enhanced_system.training`, and `enhanced_system.config`.
-- Extended `Makefile` `typecheck` command to scan all enhanced_system modules.
+- **Distillation Expansion Phase 2:** DevSecOps and Data Governance.
+- Added `SecurityScanner` (Bandit API) validating agent trajectory AST safety.
+- Added `PIIScrubber` (Presidio + Spacy) enforcing data governance on agent outputs.
+- **Distillation Expansion Phase 3:** Governed ML Pipeline & DPO.
+- Added `scripts/training/distill/dpo_collator.py` enabling Direct Preference Optimization formatting.
+- Added `train_dpo_adapter.py` orchestrating `trl.DPOTrainer` alongside PEFT.
+- **Distillation Expansion Phase 4:** AQA & Golden Set Gating.
+- Added Pass@K Regression gating logic to CI via `aqa-gate` (`run_aqa_gate.py`).
+- Added semantic matching alongside exact matching in `eval_harness.py`.
+- Added Tool Sequence Accuracy validation to trajectory evaluations.
+- **Distillation Expansion Phase 5:** Observability & Serving.
+- Added Prometheus `/metrics` endpoint to the local inference container tracking latency, errors, and throughput.
+- Implemented Multi-Adapter Blue/Green Hot-swapping via `/adapter/load`, `/adapter/switch`, and `/adapter/unload` endpoints.
 - Addressed `Bandit B108` and resolved Pydantic v2 `dict()` deprecations in basic inference E2E journeys.
+- Regression test `test_rca_trajectory_filter_truncation_boundary` validating supervised token truncation boundary in `has_supervised_tokens`.
+- Regression test `test_rca_gpu_device_fallback` validating dynamic CUDA/CPU device selection.
+- `.dockerignore` for cleaner container builds.
+
+### Changed
+- **BREAKING:** Upgraded `peft==0.4.0` → `peft>=0.14.0` (DoRA, QLoRA, modern architecture support).
+- Upgraded `transformers>=4.30.0` → `transformers>=4.45.0` (Qwen2.5, Llama3, fast tokenizers).
+- Upgraded `accelerate>=0.22.0` → `accelerate>=0.34.0`.
+- Upgraded `torch>=2.0.0` → `torch>=2.2.0` (CUDA 12.x support).
+- SageMaker estimator updated from `transformers 4.26.0 / PyTorch 1.13.1 / py39` to `transformers 4.45.0 / PyTorch 2.2.0 / py311`.
+- `--lora_target_modules` now defaults to empty (auto-detected) instead of hardcoded LLaMA module names.
+
+### Fixed
+- `test_trajectory_mode_filters_unsupervised_rows` failed because `max_length=16` truncated supervised tokens beyond char position 19 in a 20-char rendered body. Increased to `max_length=32`.
+- `test_trajectory_eval_keeps_raw_rows` had latent truncation bug producing 0-row datasets silently. Added `max_length=32` and row-count assertion.
+- Inline `# nosec B615` on 5 reviewed `from_pretrained()` calls that already pass `revision=` dynamically (false positives after global B615 skip removal).
 
 - Native `enhanced_system.harness` runtime (YAML specs, frozen tool-id registry, AST/JSON dispatch, Echo/Transformers backends, rule-based tailor). Local CLIs: `scripts/harness/run_agent.py`, `collect_trajectories.py`, `eval_harness.py`, `build_memory.py`, `compose_dualdistill.py`, `collect_score.py`, `tailor_harness.py`.
 - Shared `prompt_render` for harness generate and masked trajectory SFT (SageMaker-safe copy under `scripts/training/distill/`). Optional `planning.instruction` (Kang `I_agent`). `split_thought_action` remainder is the thought channel. Shared JSONL reader `enhanced_system.harness.jsonl` (skip vs `--strict`) for collect / eval / score / compose / memory.

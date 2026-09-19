@@ -39,7 +39,7 @@ class TransformersBackend:
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self._tokenizer = AutoTokenizer.from_pretrained(
+        self._tokenizer = AutoTokenizer.from_pretrained(  # nosec B615
             self._model_name,
             trust_remote_code=self._trust_remote_code,
             revision=self._model_revision,
@@ -52,7 +52,7 @@ class TransformersBackend:
                 self._tokenizer.add_special_tokens({"pad_token": "<pad>"})  # nosec B105
                 needs_resize = True
         if torch.cuda.is_available():
-            self._model = AutoModelForCausalLM.from_pretrained(
+            self._model = AutoModelForCausalLM.from_pretrained(  # nosec B615
                 self._model_name,
                 torch_dtype=torch.float16,
                 device_map="auto",
@@ -60,7 +60,7 @@ class TransformersBackend:
                 revision=self._model_revision,
             )
         else:
-            self._model = AutoModelForCausalLM.from_pretrained(
+            self._model = AutoModelForCausalLM.from_pretrained(  # nosec B615
                 self._model_name,
                 torch_dtype=torch.float32,
                 trust_remote_code=self._trust_remote_code,

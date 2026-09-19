@@ -12,6 +12,19 @@ def answers_match(actual: str, expected: str) -> bool:
     """Exact-match grader used for outcome filter and DualDistill."""
     return actual.strip() == expected.strip()
 
+def semantic_match(actual: str, expected: str) -> bool:
+    """Basic semantic matching without an LLM: normalize whitespace, casing, and basic punctuation."""
+    import re
+    def normalize(text: str) -> str:
+        text = text.lower()
+        text = re.sub(r'[^\w\s]', '', text)
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
+
+    act_norm = normalize(actual)
+    exp_norm = normalize(expected)
+    return act_norm == exp_norm or exp_norm in act_norm
+
 
 def earliest_error_index(trajectory: Trajectory, expected: Optional[str] = None) -> Optional[int]:
     """Index of the action to replace. Outcome success is not a fault bag.

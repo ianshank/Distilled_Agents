@@ -157,12 +157,12 @@ aws s3 sync s3://mangomas-sagemaker-production-{account-id}/models/ ./models/
 ### Hyperparameters
 ```python
 hyperparameters = {
-    'model_name_or_path': 'mistralai/Mistral-7B-v0.1',
-    'num_train_epochs': '3',  # 4 for real-world data
-    'per_device_train_batch_size': '2',
-    'learning_rate': '2e-5',
-    'fp16': 'True',  # Mixed precision
-    'output_dir': '/opt/ml/model'
+    "model_name_or_path": "mistralai/Mistral-7B-v0.1",
+    "num_train_epochs": "3",  # 4 for real-world data
+    "per_device_train_batch_size": "2",
+    "learning_rate": "2e-5",
+    "fp16": "True",  # Mixed precision
+    "output_dir": "/opt/ml/model",
 }
 ```
 

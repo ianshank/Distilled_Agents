@@ -8,6 +8,7 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 from enhanced_system.harness.factory import HarnessFactory
 from enhanced_system.harness.jsonl import JsonlRowError, iter_jsonl_dicts
@@ -34,17 +35,38 @@ def main(argv: list[str] | None = None) -> int:
         "--strict",
         action="store_true",
         default=False,
-        help="fail on malformed JSONL rows instead of skipping",
+        help="Fail on the first row error (default: skip and continue)",
+    )
+    parser.add_argument(
+        "--scan-security",
+        action="store_true",
+        default=False,
+        help="Run bandit/security scans on generated agent code. Fails the row if issues found.",
     )
     args = parser.parse_args(argv)
     try:
         scripted = json.loads(args.scripted) if args.scripted else None
+    except json.JSONDecodeError as exc:
+        logger.error("invalid --scripted JSON: %s", exc)
+        return 1
+    scanner = None
+    if args.scan_security:
+        try:
+            from enhanced_system.harness.security import SecurityScanner
+
+            scanner = SecurityScanner(fail_on_high=True)
+            logger.info("Security scanning (Bandit) enabled on agent outputs")
+        except ImportError as exc:
+            logger.error("Cannot enable security scanning: %s", exc)
+            return 1
+    try:
         runtime = HarnessFactory.create(
             {
                 "harness_id": args.harness_id,
                 "scripted": scripted,
                 "teacher": not args.student,
                 "strict_injection": False,
+                "security_scanner": scanner,
             }
         )
     except (json.JSONDecodeError, ValueError, FileNotFoundError, OSError) as exc:
@@ -54,8 +76,10 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("input not found: %s", args.input)
         return 1
     try:
-        summary = _evaluate_file(runtime, Path(args.input), args.harness_id, strict=args.strict)
-    except (JsonlRowError, OSError, ValueError) as exc:
+        summary = _evaluate_file(
+            runtime, Path(args.input), args.harness_id, strict=args.strict, scanner=scanner
+        )
+    except (JsonlRowError, OSError, ValueError, RuntimeError) as exc:
         logger.error("%s", exc)
         return 1
     json.dump(summary, sys.stdout)
@@ -76,10 +100,13 @@ def _evaluate_file(
     harness_id: str,
     *,
     strict: bool,
+    scanner: Any | None = None,
 ) -> dict[str, float | int]:
     total = 0
     with_expected = 0
     exact = 0
+    semantic_matches = 0
+    tool_sequence_exact = 0
     truncated = 0
     with_faults = 0
     valid_tools = 0
@@ -97,7 +124,21 @@ def _evaluate_file(
             if strict:
                 raise
             continue
+
         total += 1
+        security_failed = False
+
+        # Security scan
+        if scanner is not None:
+            findings = scanner.scan_trajectory(result.trajectory)
+            if findings:
+                logger.error("Line %s failed security scan: %s", line_no, findings)
+                if strict:
+                    raise ValueError(f"Security vulnerability generated at line {line_no}")
+                # Count as a fault if not strict
+                result.trajectory.faults.append(f"Security finding: {len(findings)} issues")
+                security_failed = True
+
         if result.truncated:
             truncated += 1
         if result.trajectory.faults:
@@ -109,20 +150,39 @@ def _evaluate_file(
             if step.tool_id:
                 valid_tools += 1
         expected = payload.get("expected")
+        expected_tools = payload.get("expected_tools")
         labeled = expected is not None and bool(str(expected).strip())
+
+        # Tool sequence accuracy
+        if expected_tools is not None and isinstance(expected_tools, list):
+            actual_tools = [
+                step.tool_id
+                for step in result.trajectory.steps
+                if step.tool_id and not step.fault and step.action
+            ]
+            if actual_tools == expected_tools:
+                tool_sequence_exact += 1
+
         if labeled:
             with_expected += 1
+            from enhanced_system.harness.score import semantic_match
             matched = answers_match(result.final_answer, str(expected))
-            if matched:
+            sem_matched = semantic_match(result.final_answer, str(expected))
+            if matched and not security_failed:
                 exact += 1
                 successes += 1
-        elif not result.truncated:
+            elif sem_matched and not security_failed:
+                semantic_matches += 1
+                successes += 1  # Count semantic match as a success
+        elif not result.truncated and not security_failed:
             successes += 1
     pass_rate = 100.0 * successes / total if total else 0.0
     return {
         "total": total,
         "with_expected": with_expected,
         "exact_match": exact,
+        "semantic_match": semantic_matches,
+        "tool_sequence_exact": tool_sequence_exact,
         "truncated": truncated,
         "with_faults": with_faults,
         "valid_tool_steps": valid_tools,

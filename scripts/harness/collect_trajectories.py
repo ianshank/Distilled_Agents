@@ -46,6 +46,12 @@ def main(argv: list[str] | None = None) -> int:
         default=False,
         help="Fail on the first row error (default: skip and continue)",
     )
+    parser.add_argument(
+        "--redact-pii",
+        action="store_true",
+        default=False,
+        help="Use presidio to redact PII from the collected trajectories",
+    )
     args = parser.parse_args(argv)
     try:
         scripted = json.loads(args.scripted) if args.scripted else None
@@ -53,6 +59,18 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("invalid --scripted JSON: %s", exc)
         return 1
     out_path = Path(args.output)
+
+    scrubber = None
+    if args.redact_pii:
+        try:
+            from enhanced_system.harness.data_governance import PIIScrubber
+
+            scrubber = PIIScrubber()
+            logger.info("PII redaction enabled via Presidio")
+        except (ImportError, RuntimeError) as exc:
+            logger.error("Cannot enable PII redaction: %s", exc)
+            return 1
+
     try:
         store = JsonlTraceStore(raw_store_path(out_path))
         runtime = HarnessFactory.create(
@@ -68,7 +86,9 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("%s", exc)
         return 1
     try:
-        rows = _collect_rows(runtime, Path(args.input), args.harness_id, args.strict)
+        rows = _collect_rows(
+            runtime, Path(args.input), args.harness_id, args.strict, scrubber=scrubber
+        )
     except JsonlRowError as exc:
         logger.error("%s", exc)
         return 1
@@ -90,6 +110,7 @@ def _collect_rows(
     path: Path,
     harness_id: str,
     strict: bool,
+    scrubber: object | None = None,
 ) -> list[dict[str, object]] | None:
     rows: list[dict[str, object]] = []
     for line_no, payload in iter_jsonl_dicts(path, require_prompt=True, strict=strict):
@@ -103,7 +124,10 @@ def _collect_rows(
                     if strict:
                         return None
                     continue
-            rows.append(trajectory_to_legacy(result.trajectory, expected=expected))
+            row_dict = trajectory_to_legacy(result.trajectory, expected=expected)
+            if scrubber is not None:
+                row_dict = scrubber.redact_object(row_dict)  # type: ignore[attr-defined]
+            rows.append(row_dict)
         except (ValueError, FileNotFoundError, OSError) as exc:
             logger.warning("skipping line %s: %s", line_no, exc)
             if strict:

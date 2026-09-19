@@ -29,6 +29,7 @@ class AgentTrainingConfig:
     use_spot_instances: bool = True
     max_runtime: int = 0
     student_model: str = ""
+    trajectory_mode: bool = False
 
 
 class MangoMASSageMakerLauncher:
@@ -201,6 +202,26 @@ class MangoMASSageMakerLauncher:
             return False
 
     def create_job_spec(self, config: AgentTrainingConfig) -> dict[str, Any]:
+        hyperparams = {
+            "teacher_model_name": config.model_name or self.settings.teacher_model,
+            "student_model_name": config.student_model or self.settings.student_model,
+            "train_file": Path(config.training_file).name,
+            "num_train_epochs": str(config.epochs),
+            "per_device_train_batch_size": str(config.batch_size),
+            "learning_rate": str(config.learning_rate),
+            "trust_remote_code": str(self.settings.trust_remote_code).lower(),
+            "temperature": str(self.settings.distill_temperature),
+            "lora_r": str(self.settings.lora_rank),
+            "lora_alpha": str(self.settings.lora_alpha),
+            "lora_dropout": str(self.settings.lora_dropout),
+            "use_dora": str(self.settings.use_dora).lower(),
+            "quantize_4bit": str(self.settings.quantize_4bit).lower(),
+        }
+        if config.trajectory_mode:
+            hyperparams["trajectory_mode"] = "True"
+        # Only forward explicit target modules if configured
+        if self.settings.lora_target_modules:
+            hyperparams["lora_target_modules"] = self.settings.lora_target_modules
         return {
             "agent_name": config.agent_name,
             "training_file": config.training_file,
@@ -208,15 +229,7 @@ class MangoMASSageMakerLauncher:
             "model_name": config.model_name or self.settings.teacher_model,
             "role": self._get_execution_role(),
             "bucket": self._get_s3_bucket(),
-            "hyperparameters": {
-                "teacher_model_name": config.model_name or self.settings.teacher_model,
-                "student_model_name": config.student_model or self.settings.student_model,
-                "train_file": Path(config.training_file).name,
-                "num_train_epochs": str(config.epochs),
-                "per_device_train_batch_size": str(config.batch_size),
-                "learning_rate": str(config.learning_rate),
-                "trust_remote_code": str(self.settings.trust_remote_code).lower(),
-            },
+            "hyperparameters": hyperparams,
         }
 
     async def launch_training_job(self, config: AgentTrainingConfig) -> dict[str, Any]:
@@ -230,9 +243,9 @@ class MangoMASSageMakerLauncher:
                 instance_type=spec["instance_type"],
                 instance_count=1,
                 role=spec["role"],
-                transformers_version="4.26.0",
-                pytorch_version="1.13.1",
-                py_version="py39",
+                transformers_version="4.45.0",
+                pytorch_version="2.2.0",
+                py_version="py311",
                 use_spot_instances=config.use_spot_instances,
                 max_run=config.max_runtime or self.settings.max_run_seconds,
                 hyperparameters=spec["hyperparameters"],

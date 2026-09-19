@@ -33,6 +33,42 @@ try:
 except ImportError:
     wandb = None
 
+# Architecture-specific LoRA target module mappings.
+# Key = model_type from config.json; value = list of linear module names.
+_LORA_MODULE_MAP: dict[str, list[str]] = {
+    # GPT-2 / DialoGPT family
+    "gpt2": ["c_attn", "c_proj", "c_fc"],
+    # LLaMA / Mistral / Qwen / Yi / DeepSeek family
+    "llama": ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    "mistral": ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    "qwen2": ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    "phi3": ["qkv_proj", "o_proj", "gate_up_proj", "down_proj"],
+    "gemma": ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    "gemma2": ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+}
+_DEFAULT_MODULES = ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+
+
+def resolve_target_modules_for_model(model_name: str) -> list[str]:
+    """Detect LoRA target modules from model config's ``model_type``.
+
+    Returns architecture-appropriate module names. Falls back to the
+    LLaMA-style default if the model type is unrecognized.
+    """
+    try:
+        from transformers import AutoConfig
+
+        config = AutoConfig.from_pretrained(model_name, trust_remote_code=False)
+        model_type = getattr(config, "model_type", "").lower()
+        modules = _LORA_MODULE_MAP.get(model_type, _DEFAULT_MODULES)
+        logger.info(
+            "Auto-detected LoRA modules for %s (type=%s): %s", model_name, model_type, modules
+        )
+        return list(modules)
+    except Exception:
+        logger.warning("Could not auto-detect model type for %s, using default modules", model_name)
+        return list(_DEFAULT_MODULES)
+
 
 class AgentDistillationTrainer:
     """Advanced trainer for agent distillation with knowledge transfer."""
@@ -50,6 +86,20 @@ class AgentDistillationTrainer:
                 config=vars(self.args),
             )
 
+    def _validate_distillation_compatibility(self) -> None:
+        if self.args.distillation_alpha <= 0:
+            return
+        student_tokenizer = load_tokenizer(self.args.student_model_name, self.args)
+        teacher_tokenizer = load_tokenizer(self.args.teacher_model_name, self.args)
+        student_vocab = len(student_tokenizer)
+        teacher_vocab = len(teacher_tokenizer)
+        if student_vocab != teacher_vocab:
+            raise ValueError(
+                "Incompatible teacher/student tokenizers for KL distillation: "
+                f"student_vocab={student_vocab}, teacher_vocab={teacher_vocab}. "
+                "Set distillation_alpha=0 or use tokenizer-compatible model pairs."
+            )
+
     def load_teacher_model(self):
         logger.info("Loading teacher model: %s", self.args.teacher_model_name)
         teacher_model = load_causal_lm(self.args.teacher_model_name, self.args)
@@ -64,14 +114,30 @@ class AgentDistillationTrainer:
     def setup_lora_config(self):
         if LoraConfig is None:
             raise ImportError("PEFT is required for LoRA training")
-        return LoraConfig(
-            task_type=TaskType.CAUSAL_LM,
-            inference_mode=False,
-            r=self.args.lora_r,
-            lora_alpha=self.args.lora_alpha,
-            lora_dropout=self.args.lora_dropout,
-            target_modules=self.args.lora_target_modules.split(","),
-        )
+        target_modules = self._resolve_target_modules()
+        lora_kwargs = {
+            "task_type": TaskType.CAUSAL_LM,
+            "inference_mode": False,
+            "r": self.args.lora_r,
+            "lora_alpha": self.args.lora_alpha,
+            "lora_dropout": self.args.lora_dropout,
+            "target_modules": target_modules,
+        }
+        # DoRA support (peft >= 0.14.0)
+        if getattr(self.args, "use_dora", False):
+            lora_kwargs["use_dora"] = True
+            logger.info("DoRA enabled for LoRA config")
+        return LoraConfig(**lora_kwargs)
+
+    def _resolve_target_modules(self) -> list[str]:
+        """Auto-detect LoRA target modules based on model architecture.
+
+        Falls back to explicit --lora_target_modules if provided.
+        """
+        explicit = getattr(self.args, "lora_target_modules", "")
+        if explicit:
+            return explicit.split(",")
+        return resolve_target_modules_for_model(self.args.student_model_name)
 
     def prepare_dataset(self) -> Dataset:
         train_file = resolve_train_file(train_file=getattr(self.args, "train_file", None))
@@ -108,6 +174,8 @@ class AgentDistillationTrainer:
 
     def train(self):
         logger.info("Starting agent distillation training")
+        if not getattr(self.args, "trajectory_mode", False):
+            self._validate_distillation_compatibility()
         teacher_model = None
         if self.args.distillation_alpha > 0 and not getattr(self.args, "trajectory_mode", False):
             teacher_model = self.load_teacher_model()
@@ -219,8 +287,14 @@ class DistillationTrainer(Trainer):
         student_outputs = model(**inputs)
         teacher_outputs = None
         if self.teacher_model is not None and self.distillation_alpha > 0:
-            with torch.no_grad():
-                teacher_outputs = self.teacher_model(**inputs)
+            try:
+                with torch.no_grad():
+                    teacher_outputs = self.teacher_model(**inputs)
+            except (RuntimeError, IndexError) as exc:
+                raise ValueError(
+                    "Teacher forward pass failed with student-tokenized inputs. "
+                    "Use tokenizer-compatible teacher/student models or disable distillation."
+                ) from exc
         loss = self.create_distillation_loss(student_outputs, teacher_outputs, inputs.get("labels"))
         return (loss, student_outputs) if return_outputs else loss
 
@@ -232,14 +306,42 @@ class DistillationTrainer(Trainer):
             shifted_labels.view(-1),
             ignore_index=-100,
         )
+        # Avoid NaN if all labels are masked (e.g. during certain trajectory segments)
+        if torch.isnan(task_loss):
+            task_loss = (shifted_logits * 0.0).sum()
+
         if self.distillation_alpha > 0 and teacher_outputs is not None:
-            student_logits = student_outputs.logits / self.temperature
-            teacher_logits = teacher_outputs.logits / self.temperature
-            distillation_loss = torch.nn.functional.kl_div(
+            student_logits = student_outputs.logits[:, :-1, :] / self.temperature
+            teacher_logits = teacher_outputs.logits[:, :-1, :] / self.temperature
+
+            s_vocab = student_logits.size(-1)
+            t_vocab = teacher_logits.size(-1)
+            if s_vocab != t_vocab:
+                import warnings
+                warnings.warn(
+                    f"Vocab mismatch: Student({s_vocab}) vs Teacher({t_vocab}). "
+                    "Cannot safely compute KL divergence across disparate token spaces. "
+                    "Falling back to task loss.",
+                    RuntimeWarning,
+                    stacklevel=2
+                )
+                return task_loss
+
+            # Compute KL divergence
+            kl_loss = torch.nn.functional.kl_div(
                 torch.nn.functional.log_softmax(student_logits, dim=-1),
                 torch.nn.functional.softmax(teacher_logits, dim=-1),
-                reduction="batchmean",
-            ) * (self.temperature**2)
+                reduction="none",
+            ).sum(dim=-1)  # shape: (batch, seq_len)
+
+            # Apply label mask: only compute KL on supervised positions
+            label_mask = shifted_labels != -100
+            if label_mask.any():
+                kl_loss = (kl_loss * label_mask.float()).sum() / label_mask.float().sum()
+            else:
+                kl_loss = (kl_loss * 0.0).sum()
+
+            distillation_loss = kl_loss * (self.temperature**2)
             return (
                 1 - self.distillation_alpha
             ) * task_loss + self.distillation_alpha * distillation_loss

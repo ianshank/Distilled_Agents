@@ -316,6 +316,7 @@ Based on the implementation plan:
 ### 1. Simple Inference
 ```python
 from enhanced_system.core import InputValidator
+
 validator = InputValidator(config)
 result = validator.validate_task_input(task)
 ```
@@ -323,6 +324,7 @@ result = validator.validate_task_input(task)
 ### 2. Cached Inference
 ```python
 from enhanced_system.core import IntelligentCacheManager
+
 cache = IntelligentCacheManager(config)
 result = await cache.get_or_compute(key, compute_func)
 ```
@@ -330,6 +332,7 @@ result = await cache.get_or_compute(key, compute_func)
 ### 3. Consensus Inference
 ```python
 from enhanced_system.core import ConsensusInference
+
 consensus = ConsensusInference(config)
 result = await consensus.infer_with_consensus(task, agents)
 ```
@@ -337,6 +340,7 @@ result = await consensus.infer_with_consensus(task, agents)
 ### 4. Training Orchestration
 ```python
 from enhanced_system.training import TrainingOrchestrator
+
 orchestrator = TrainingOrchestrator(config)
 results = await orchestrator.train_all()
 ```
@@ -344,6 +348,7 @@ results = await orchestrator.train_all()
 ### 5. Skill Evaluation
 ```python
 from enhanced_system.evaluation import SkillEvaluator
+
 evaluator = SkillEvaluator()
 result = evaluator.evaluate_agent(name, tests, func)
 ```
