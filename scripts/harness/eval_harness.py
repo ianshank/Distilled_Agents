@@ -8,6 +8,7 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 from enhanced_system.harness.factory import HarnessFactory
 from enhanced_system.harness.jsonl import JsonlRowError, iter_jsonl_dicts
@@ -99,7 +100,7 @@ def _evaluate_file(
     harness_id: str,
     *,
     strict: bool,
-    scanner: object | None = None,
+    scanner: Any | None = None,
 ) -> dict[str, float | int]:
     total = 0
     with_expected = 0
