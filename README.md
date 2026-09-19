@@ -103,12 +103,23 @@ Global coverage `fail_under` is 60. Harness package coverage is 90 via `.coverag
 
 ## Key Components
 
-### DevSecOps & Governance (New)
+### DevSecOps & Governance (Phase 2)
 To support enterprise-grade ML operations, the pipeline now enforces:
-- **PII Redaction**: `enhanced_system/harness/data_governance.py` integrates Presidio to scrub high-risk PII from trajectories before dataset compilation.
+- **PII Redaction**: `enhanced_system/harness/data_governance.py` integrates Presidio to scrub high-risk PII from trajectories before dataset compilation. *(Note: Transformer-based NLP models run synchronously here and may inject 100-300ms of latency per tool-loop).*
 - **Output Security Scanning**: `enhanced_system/harness/security.py` uses Bandit and GitLeaks to scan generated agent outputs, blocking malicious payload injection during evaluation.
-- **AQA Regression Gating**: `configs/golden_sets/core_sdlc.jsonl` provides deterministic validation via Pass@K thresholds for core agent workflows (`make aqa-gate`).
 - **Strict Supply Chain**: `trust_remote_code=False` is enforced at the framework level and requires explicit environment variable overrides.
+
+### DPO Orchestration (Phase 3)
+- `scripts/training/distill/dpo_collator.py` dynamically aligns chosen/rejected trajectory subsets into Chat Templates for Direct Preference Optimization using `trl`.
+- `train_dpo_adapter.py` seamlessly layers DPOTrainer workflows over base PEFT/LoRA models to penalize tool-hallucination paths.
+
+### AQA & Golden Set Validation (Phase 4)
+- **AQA Regression Gating**: `configs/golden_sets/core_sdlc.jsonl` provides deterministic validation via Pass@K thresholds for core agent workflows (`make aqa-gate`).
+- Evaluators now track `semantic_match` alongside exact matching and enforce Tool Sequence Accuracy across trajectory replays.
+
+### Serving & Observability (Phase 5)
+- The local inference container (`scripts/inference.py`) exposes a Prometheus `/metrics` endpoint tracking requests, errors, and LLM-scaled latencies.
+- **Blue/Green Hot-swapping**: Operators can dynamically swap LoRA adapters in VRAM via `/adapter/load`, `/adapter/switch`, and `/adapter/unload` without restarting the inference server.
 
 ### Enhanced System
 The `enhanced_system/` directory contains the core inference system with:

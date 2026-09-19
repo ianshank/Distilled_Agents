@@ -8,18 +8,19 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 ## [Unreleased]
 
 ### Added
-- **Distillation Expansion Phase 1:** Foundation modernization for expanded distillation pipeline.
-- Architecture-aware LoRA target module auto-detection (`resolve_target_modules_for_model`) supporting GPT-2, LLaMA, Mistral, Qwen2, Phi-3, Gemma families.
-- DoRA support via `--use_dora` / `MANGOMAS_USE_DORA` setting.
-- QLoRA 4-bit quantization flag via `--quantize_4bit` / `MANGOMAS_QUANTIZE_4BIT`.
-- New settings: `lora_rank`, `lora_alpha`, `lora_dropout`, `use_dora`, `quantize_4bit`, `distill_temperature`, `dpo_beta`, `lora_target_modules`.
-- SageMaker `create_job_spec` now forwards `trajectory_mode`, LoRA config, DoRA, and quantization hyperparameters.
-- `alignment` optional dependency group (`trl>=0.14.0`) for DPO/GRPO training.
-- `quantization` optional dependency group (`bitsandbytes>=0.43.0`) for QLoRA.
-- 33 new tests in `tests/test_distillation_expansion.py` covering LoRA auto-detect, KL loss fixes, settings, SageMaker forwarding.
-- Comprehensive SDLC code hardening and sanity gates (`tests/test_rca_regression.py` regression suite).
-- Enforced strict type-checking (`disallow_untyped_defs = true`) across `enhanced_system.core`, `enhanced_system.evaluation`, `enhanced_system.training`, and `enhanced_system.config`.
-- Extended `Makefile` `typecheck` command to scan all enhanced_system modules.
+- **Distillation Expansion Phase 2:** DevSecOps and Data Governance.
+- Added `SecurityScanner` (Bandit API) validating agent trajectory AST safety.
+- Added `PIIScrubber` (Presidio + Spacy) enforcing data governance on agent outputs.
+- **Distillation Expansion Phase 3:** Governed ML Pipeline & DPO.
+- Added `scripts/training/distill/dpo_collator.py` enabling Direct Preference Optimization formatting.
+- Added `train_dpo_adapter.py` orchestrating `trl.DPOTrainer` alongside PEFT.
+- **Distillation Expansion Phase 4:** AQA & Golden Set Gating.
+- Added Pass@K Regression gating logic to CI via `aqa-gate` (`run_aqa_gate.py`).
+- Added semantic matching alongside exact matching in `eval_harness.py`.
+- Added Tool Sequence Accuracy validation to trajectory evaluations.
+- **Distillation Expansion Phase 5:** Observability & Serving.
+- Added Prometheus `/metrics` endpoint to the local inference container tracking latency, errors, and throughput.
+- Implemented Multi-Adapter Blue/Green Hot-swapping via `/adapter/load`, `/adapter/switch`, and `/adapter/unload` endpoints.
 - Addressed `Bandit B108` and resolved Pydantic v2 `dict()` deprecations in basic inference E2E journeys.
 - Regression test `test_rca_trajectory_filter_truncation_boundary` validating supervised token truncation boundary in `has_supervised_tokens`.
 - Regression test `test_rca_gpu_device_fallback` validating dynamic CUDA/CPU device selection.

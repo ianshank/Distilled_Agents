@@ -80,6 +80,19 @@ class DistilledAgentInference:
         self.model.set_adapter(adapter_name)
         self.active_adapter = adapter_name
 
+    def unload_adapter(self, adapter_name: str):
+        """Unload an adapter to free memory."""
+        assert self.model is not None, "Model not loaded"
+        if adapter_name not in self.adapters_loaded:
+            raise ValueError(f"Adapter {adapter_name} not loaded.")
+        if adapter_name == self.active_adapter:
+            raise ValueError(f"Cannot unload active adapter '{adapter_name}'. Switch to another adapter first.")
+        
+        logger.info(f"Unloading adapter '{adapter_name}'")
+        if hasattr(self.model, "delete_adapter"):
+            self.model.delete_adapter(adapter_name)
+        self.adapters_loaded.remove(adapter_name)
+
     def input_fn(self, request_body: str, request_content_type: str = "application/json"):
         """Parse input data"""
         if request_content_type == "application/json":
@@ -191,10 +204,15 @@ def output_fn(prediction: Dict[str, Any], content_type: str = "application/json"
 if __name__ == "__main__":
     from flask import Flask, jsonify, request
     try:
-        from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+        from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
         INFERENCE_REQUESTS = Counter("inference_requests_total", "Total inference requests")
         INFERENCE_ERRORS = Counter("inference_errors_total", "Total inference errors")
-        INFERENCE_LATENCY = Histogram("inference_latency_seconds", "Inference latency")
+        # Tune buckets for LLM generation: 0.1s to 60.0s
+        INFERENCE_LATENCY = Histogram(
+            "inference_latency_seconds", 
+            "Inference latency",
+            buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 45.0, 60.0, float("inf"))
+        )
         HAS_PROMETHEUS = True
     except ImportError:
         HAS_PROMETHEUS = False
@@ -227,6 +245,18 @@ if __name__ == "__main__":
         try:
             inference_handler.load_adapter(adapter_dir, adapter_name)
             return jsonify({"status": "loaded", "adapters": inference_handler.adapters_loaded})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/adapter/unload", methods=["POST"])
+    def unload_adapter():
+        data = request.json or {}
+        adapter_name = data.get("adapter_name")
+        if not adapter_name:
+            return jsonify({"error": "Missing adapter_name"}), 400
+        try:
+            inference_handler.unload_adapter(adapter_name)
+            return jsonify({"status": "unloaded", "adapters": inference_handler.adapters_loaded})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 

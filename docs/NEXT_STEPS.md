@@ -43,17 +43,24 @@ Wire or delete unused factories for router/batch/calibrator/consensus/monitor, a
 
 `.dockerignore` exists at repo root. Compose `context: ../..` from `enhanced_system/infrastructure/docker/` still does not match a root-context Dockerfile layout; fix that in a dedicated image PR. Do not bump the image Python 3.9 pin here.
 
+## Phase 6: Deployment & A/B Testing
+
+With Phases 1-5 closed out on `feature/distillation-expansion`, the immediate next steps are:
+1. **Model Registration**: Wire up the completed SageMaker LoRA training outputs to the SageMaker Model Registry.
+2. **Endpoint Provisioning**: Expand `simple_launch_sagemaker.py` to support real-time endpoint deployment of the compiled DPO weights.
+3. **A/B Testing Framework**: Extend the Prometheus `/metrics` pipeline we just added to include cohort routing telemetry, allowing us to mathematically compare base Agent implementations against Distilled versions via the `predict_fn`.
+
 ## Dependencies
 
-Revisit the `peft==0.4.0` training-image pin when SageMaker images move forward. DialoGPT LoRA `target_modules` vs Mistral, and SageMaker `transformers_version=4.26.0` vs requirements `>=4.30`, stay known product limits.
+The `peft==0.4.0` training-image pin has successfully been upgraded to `peft>=0.14.0,<0.15.0`. SageMaker estimators now run `transformers 4.45.0` natively. The next step is evaluating Qwen2.5 integration fully on SageMaker instances.
 
 ## Types
 
-Incremental mypy covers `enhanced_system/ops`, `enhanced_system/core/cache`, and `enhanced_system/harness` (`python_version = 3.11`). Strict mypy on all of `enhanced_system` is later. Do not use `--follow-imports=skip` to hide harness errors.
+Strict type-checking (`disallow_untyped_defs = true`) has been successfully established for `enhanced_system.core`, `enhanced_system.evaluation`, `enhanced_system.training`, `enhanced_system.config`, `enhanced_system.harness`, and `enhanced_system.ops`. The remaining frontier is `scripts/`.
 
 ## Tests
 
-Do not add live AWS e2e. Keep `e2e` / `slow` / `benchmark` unused for **live AWS**. Local Echo harness pipelines stay `integration` (and `harness`). Contract tests must keep boto3 monkeypatched.
+Do not add live AWS e2e. Keep `e2e` / `slow` / `benchmark` unused for **live AWS**. Local Echo harness pipelines stay `integration` (and `harness`). Contract tests must keep boto3 monkeypatched. Harness code coverage is now enforced at 80% via `--cov-fail-under=80`.
 
 ## Dependabot
 

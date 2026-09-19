@@ -22,9 +22,15 @@ C4Component
         Component(memory, "memory_bank", "memory_bank.py")
         Component(dual, "dualdistill", "dualdistill.py")
         Component(score, "score", "score.py")
+        Component(security, "SecurityScanner", "security.py")
+        Component(pii, "PIIScrubber", "data_governance.py")
     }
     Container_Boundary(serve, "Serve") {
         Component(predict, "predict_fn", "scripts/inference.py")
+    }
+    Container_Boundary(train, "Training") {
+        Component(dpo, "DPO Collator", "scripts/training/distill/dpo_collator.py")
+        Component(dpo_script, "train_dpo", "scripts/training/train_dpo_adapter.py")
     }
     Rel(runtime, settings, "get_settings(); not Config.harness limits")
     Rel(runtime, validator, "user-task only; collect turns injection off")
@@ -32,8 +38,11 @@ C4Component
     Rel(runtime, dispatch, "no eval/exec")
     Rel(runtime, renderer, "role-tagged turns; I_agent")
     Rel(runtime, memory, "workflow prefix; tool_error hints")
+    Rel(runtime, security, "bandit scans on trajectory steps")
+    Rel(runtime, pii, "presidio scrubbing on final answers")
     Rel(predict, tools, "not wired v1")
     Rel(launcher, settings, "region, models, trust_remote_code")
+    Rel(dpo_script, dpo, "formats chosen/rejected via Chat Template")
 ```
 
 JSON serialization is used for L2/L3 (`docs/adr/0001-json-cache-serialization.md`). All SageMaker CLIs share `MangoMASSageMakerLauncher` (`docs/adr/0002-unify-sagemaker-launchers.md`). Runtime harness–policy pair: `docs/adr/0006-runtime-harness-policy.md`. SageMaker collator uses `scripts/training/distill/prompt_render.py` (twin of `enhanced_system.harness.prompt_render`; no `enhanced_system` import).

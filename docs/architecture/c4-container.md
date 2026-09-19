@@ -6,19 +6,19 @@ Installable library `mangomas` (`enhanced_system`) plus thin `scripts/` CLIs. Di
 C4Container
     title MangoMAS — Distill / Serve / Harness H
     Person(operator, "Operator")
-    Container(distill, "Distill", "scripts/training + distill/", "LoRA / trajectory SFT; SageMaker source_dir")
-    Container(serve, "Serve", "scripts/inference.py", "SageMaker predict_fn single-shot; no tools")
-    Container(harnessH, "Harness H", "enhanced_system.harness", "YAML specs, TOOL_REGISTRY, AgentRuntime")
-    Container(cli, "Thin CLIs", "scripts/harness + ops", "run_agent, collect, eval, tailor, memory, dualdistill, score, train, launch, scan")
-    Container(ci, "CI", "GitHub Actions", "lint / unit+integration@60 / harness@90 / types / security")
+    Container(distill, "Distill", "scripts/training + distill/", "LoRA / SFT / DPO; SageMaker source_dir")
+    Container(serve, "Serve", "scripts/inference.py", "SageMaker predict_fn; Prometheus metrics; Blue/Green PEFT")
+    Container(harnessH, "Harness H", "enhanced_system.harness", "YAML specs, TOOLS, AgentRuntime, Security, PII")
+    Container(cli, "Thin CLIs", "scripts/harness + ops", "run_agent, eval, tailor, memory, dualdistill, train, launch, scan, aqa")
+    Container(ci, "CI", "GitHub Actions", "lint / unit+integration@60 / harness@80 / types / security")
     System_Ext(aws, "AWS", "SageMaker, S3, IAM roles")
     Rel(operator, cli, "python scripts/... / make validate")
-    Rel(cli, harnessH, "run / collect / eval / tailor / memory / dualdistill / score")
-    Rel(cli, distill, "train_distilled_adapter --trajectory_mode")
+    Rel(cli, harnessH, "run / collect / eval / tailor / memory / dualdistill / aqa")
+    Rel(cli, distill, "train_distilled_adapter / train_dpo_adapter")
     Rel(distill, aws, "optional training jobs")
     Rel(serve, aws, "endpoint invoke")
-    Rel(harnessH, distill, "JSONL trajectories")
-    Rel(ci, harnessH, "pytest -m harness --cov-config=.coveragerc.harness")
+    Rel(harnessH, distill, "JSONL trajectories -> DPO format")
+    Rel(ci, harnessH, "pytest -m harness --cov-fail-under=80")
     Rel(serve, harnessH, "not wired in v1")
 ```
 

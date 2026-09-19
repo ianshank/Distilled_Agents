@@ -24,11 +24,11 @@ test:
 	$(PYTEST) -m "unit or integration" --cov=enhanced_system --cov-report=term --cov-fail-under=60
 
 test-harness:
-	$(PYTEST) -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness --cov-report=term
+	$(PYTEST) -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness --cov-report=term --cov-fail-under=80
 
 test-aqa:
 	$(PYTEST) -m "unit or integration or regression or harness" --cov=enhanced_system --cov-report=term --cov-fail-under=60
-	$(PYTEST) -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness --cov-report=term
+	$(PYTEST) -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness --cov-report=term --cov-fail-under=80
 
 security:
 	$(PYTHON) -m bandit -r enhanced_system scripts -x tests,enhanced_system/tests,enhanced_system/examples -c pyproject.toml -q
