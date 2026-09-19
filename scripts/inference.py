@@ -69,15 +69,13 @@ class DistilledAgentInference:
             logger.error(f"Error loading model: {e}")
             raise
 
-    def load_adapter(self, adapter_dir: str, adapter_name: str):
+    def load_adapter(self, adapter_name: str):
         """Load a new adapter for Blue/Green deployments."""
         assert self.model is not None, "Model not loaded"
         if not hasattr(self.model, "load_adapter"):
             raise ValueError("Base model does not support adapters (not a PeftModel).")
-        requested = Path(adapter_dir).expanduser().resolve()
         allowed_root = self.adapter_root or Path(self.model_dir).resolve()
-        if os.path.commonpath([str(requested), str(allowed_root)]) != str(allowed_root):
-            raise ValueError(f"Adapter path must be within {allowed_root}")
+        requested = (allowed_root / adapter_name).resolve()
         with self._adapter_lock:
             logger.info(f"Loading adapter '{adapter_name}' from {requested}")
             self.model.load_adapter(str(requested), adapter_name=adapter_name)
@@ -259,11 +257,10 @@ if __name__ == "__main__":
             return auth_error
         data = request.json or {}
         adapter_name = data.get("adapter_name")
-        adapter_dir = data.get("adapter_dir")
-        if not adapter_name or not adapter_dir:
-            return jsonify({"error": "Missing adapter_name or adapter_dir"}), 400
+        if not adapter_name:
+            return jsonify({"error": "Missing adapter_name"}), 400
         try:
-            inference_handler.load_adapter(adapter_dir, adapter_name)
+            inference_handler.load_adapter(adapter_name)
             return jsonify({"status": "loaded", "adapters": inference_handler.adapters_loaded})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
