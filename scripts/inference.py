@@ -26,6 +26,8 @@ class DistilledAgentInference:
         self.tokenizer = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model_dir = "/opt/ml/model"
+        self.active_adapter = "default"
+        self.adapters_loaded = []
 
     def model_fn(self, model_dir: str):
         """Load the model and tokenizer"""
@@ -48,8 +50,10 @@ class DistilledAgentInference:
 
             # Check if LoRA adapter is present
             if os.path.exists(os.path.join(model_dir, "adapter_config.json")):
-                logger.info("Loading LoRA adapter...")
-                self.model = PeftModel.from_pretrained(self.model, model_dir)
+                logger.info("Loading default LoRA adapter...")
+                self.model = PeftModel.from_pretrained(self.model, model_dir, adapter_name="default")
+                self.adapters_loaded.append("default")
+                self.active_adapter = "default"
 
             self.model.eval()
             logger.info("Model loaded successfully")
@@ -57,6 +61,22 @@ class DistilledAgentInference:
         except Exception as e:
             logger.error(f"Error loading model: {e}")
             raise
+
+    def load_adapter(self, adapter_dir: str, adapter_name: str):
+        """Load a new adapter for Blue/Green deployments."""
+        if not hasattr(self.model, "load_adapter"):
+            raise ValueError("Base model does not support adapters (not a PeftModel).")
+        logger.info(f"Loading adapter '{adapter_name}' from {adapter_dir}")
+        self.model.load_adapter(adapter_dir, adapter_name=adapter_name)
+        self.adapters_loaded.append(adapter_name)
+
+    def set_adapter(self, adapter_name: str):
+        """Switch the active adapter."""
+        if adapter_name not in self.adapters_loaded:
+            raise ValueError(f"Adapter {adapter_name} not loaded.")
+        logger.info(f"Switching active adapter to '{adapter_name}'")
+        self.model.set_adapter(adapter_name)
+        self.active_adapter = adapter_name
 
     def input_fn(self, request_body: str, request_content_type: str = "application/json"):
         """Parse input data"""
@@ -166,6 +186,15 @@ def output_fn(prediction: Dict[str, Any], content_type: str = "application/json"
 # Flask app for local testing
 if __name__ == "__main__":
     from flask import Flask, jsonify, request
+    try:
+        from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+        INFERENCE_REQUESTS = Counter("inference_requests_total", "Total inference requests")
+        INFERENCE_ERRORS = Counter("inference_errors_total", "Total inference errors")
+        INFERENCE_LATENCY = Histogram("inference_latency_seconds", "Inference latency")
+        HAS_PROMETHEUS = True
+    except ImportError:
+        HAS_PROMETHEUS = False
+    import time
 
     app = Flask(__name__)
 
@@ -176,11 +205,45 @@ if __name__ == "__main__":
     @app.route("/ping", methods=["GET"])
     def ping():
         """Health check endpoint"""
-        return jsonify({"status": "healthy"})
+        return jsonify({"status": "healthy", "active_adapter": inference_handler.active_adapter})
+
+    if HAS_PROMETHEUS:
+        @app.route("/metrics", methods=["GET"])
+        def metrics():
+            from flask import Response
+            return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+
+    @app.route("/adapter/load", methods=["POST"])
+    def load_adapter():
+        data = request.json or {}
+        adapter_name = data.get("adapter_name")
+        adapter_dir = data.get("adapter_dir")
+        if not adapter_name or not adapter_dir:
+            return jsonify({"error": "Missing adapter_name or adapter_dir"}), 400
+        try:
+            inference_handler.load_adapter(adapter_dir, adapter_name)
+            return jsonify({"status": "loaded", "adapters": inference_handler.adapters_loaded})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/adapter/switch", methods=["POST"])
+    def switch_adapter():
+        data = request.json or {}
+        adapter_name = data.get("adapter_name")
+        if not adapter_name:
+            return jsonify({"error": "Missing adapter_name"}), 400
+        try:
+            inference_handler.set_adapter(adapter_name)
+            return jsonify({"status": "switched", "active_adapter": inference_handler.active_adapter})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     @app.route("/invocations", methods=["POST"])
     def invoke():
         """Inference endpoint"""
+        start_time = time.time()
+        if HAS_PROMETHEUS:
+            INFERENCE_REQUESTS.inc()
         try:
             # Get input data
             input_data = inference_handler.input_fn(
@@ -193,9 +256,13 @@ if __name__ == "__main__":
             # Format output
             response = inference_handler.output_fn(prediction)
 
+            if HAS_PROMETHEUS:
+                INFERENCE_LATENCY.observe(time.time() - start_time)
             return response, 200, {"Content-Type": "application/json"}
 
         except Exception as e:
+            if HAS_PROMETHEUS:
+                INFERENCE_ERRORS.inc()
             return jsonify({"error": str(e)}), 500
 
     # Run Flask app
