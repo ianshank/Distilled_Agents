@@ -33,7 +33,7 @@ def main() -> int:
     settings = get_settings()
 
     try:
-        from peft import LoraConfig, get_peft_model
+        from peft import LoraConfig
         from trl import DPOConfig, DPOTrainer
     except ImportError:
         logger.error("DPO requires 'trl' and 'peft'. Install with: pip install trl peft")

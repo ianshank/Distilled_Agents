@@ -1,6 +1,7 @@
 import pytest
 from scripts.training.distill.dpo_collator import format_dpo_example
 
+
 class DummyTokenizer:
     def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=False):
         # Extremely simple mock of chat template
@@ -20,11 +21,11 @@ def test_format_dpo_example():
     }
     tokenizer = DummyTokenizer()
     result = format_dpo_example(example, tokenizer)
-    
+
     assert "prompt" in result
     assert "chosen" in result
     assert "rejected" in result
-    
+
     assert result["prompt"] == "<user>Write a python script</user><assistant>"
     assert result["chosen"] == "<assistant>print('hello')</assistant>"
     assert result["rejected"] == "<assistant>import os; os.system('rm -rf /')</assistant>"
@@ -39,5 +40,5 @@ def test_format_dpo_example_with_history():
     }
     tokenizer = DummyTokenizer()
     result = format_dpo_example(example, tokenizer)
-    
+
     assert result["prompt"] == "<user>Hi</user><user>Next step</user><assistant>"

@@ -7,12 +7,12 @@ logger = logging.getLogger(__name__)
 
 def format_dpo_example(example: Dict[str, Any], tokenizer: Any) -> Dict[str, Any]:
     """Formats a raw preference pair into a DPO-compatible dict.
-    
+
     Expects `example` to have:
     - prompt (or history)
     - chosen (the accepted assistant trajectory)
     - rejected (the failed or suboptimal trajectory)
-    
+
     Returns a dict with 'prompt', 'chosen', and 'rejected' strings.
     """
     # Extract common context

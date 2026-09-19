@@ -87,7 +87,7 @@ class DistilledAgentInference:
             raise ValueError(f"Adapter {adapter_name} not loaded.")
         if adapter_name == self.active_adapter:
             raise ValueError(f"Cannot unload active adapter '{adapter_name}'. Switch to another adapter first.")
-        
+
         logger.info(f"Unloading adapter '{adapter_name}'")
         if hasattr(self.model, "delete_adapter"):
             self.model.delete_adapter(adapter_name)
@@ -204,12 +204,12 @@ def output_fn(prediction: Dict[str, Any], content_type: str = "application/json"
 if __name__ == "__main__":
     from flask import Flask, jsonify, request
     try:
-        from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+        from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
         INFERENCE_REQUESTS = Counter("inference_requests_total", "Total inference requests")
         INFERENCE_ERRORS = Counter("inference_errors_total", "Total inference errors")
         # Tune buckets for LLM generation: 0.1s to 60.0s
         INFERENCE_LATENCY = Histogram(
-            "inference_latency_seconds", 
+            "inference_latency_seconds",
             "Inference latency",
             buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 45.0, 60.0, float("inf"))
         )
