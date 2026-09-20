@@ -1,26 +1,1033 @@
 {
-  "sqe-hard-dag-001": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"checkout compile lint test package\"}}",
-  "sqe-hard-dag-002": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"fetch parse transform validate load\"}}",
-  "sqe-hard-dag-003": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"a b c d e\"}}",
-  "sqe-hard-dag-004": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"data_clean feature_eng model_train model_eval model_deploy\"}}",
-  "sqe-hard-dag-005": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"init plan execute verify archive\"}}",
-  "sqe-hard-dag-006": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"alpha beta gamma delta\"}}",
-  "sqe-hard-tree-001": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"{\\\"A\\\": true, \\\"B\\\": true, \\\"C\\\": false}\"}}",
-  "sqe-hard-tree-002": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"{\\\"X\\\": false, \\\"Y\\\": true, \\\"Z\\\": true}\"}}",
-  "sqe-hard-tree-003": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"{\\\"auth_enabled\\\": true, \\\"debug_mode\\\": false, \\\"tls_required\\\": true}\"}}",
-  "sqe-hard-tree-004": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"{\\\"allow_bypass\\\": false, \\\"audit_logged\\\": true, \\\"fallback_active\\\": false, \\\"strict_mode\\\": true}\"}}",
-  "sqe-hard-tree-005": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"{\\\"P\\\": true, \\\"Q\\\": true, \\\"R\\\": false, \\\"S\\\": false}\"}}",
-  "sqe-hard-tree-006": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"{\\\"can_read\\\": true, \\\"can_write\\\": true, \\\"is_admin\\\": false}\"}}",
-  "sqe-hard-mixed-001": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"{\\\"gate_open\\\": true, \\\"order\\\": [\\\"stage_1\\\", \\\"stage_2\\\", \\\"stage_3\\\"]}\"}}",
-  "sqe-hard-mixed-002": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"{\\\"backup_active\\\": false, \\\"order\\\": [\\\"db\\\", \\\"app\\\", \\\"ingress\\\"]}\"}}",
-  "sqe-hard-mixed-003": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"{\\\"debug\\\": false, \\\"isolated_env\\\": true, \\\"order\\\": [\\\"step_prep\\\", \\\"step_run\\\"]}\"}}",
-  "sqe-hard-mixed-004": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"{\\\"order\\\": [\\\"scan\\\", \\\"patch\\\", \\\"reboot\\\"], \\\"reboot_allowed\\\": true}\"}}",
-  "sqe-ood-cycle-001": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:CYCLE_DETECTED\"}}",
-  "sqe-ood-cycle-002": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:CYCLE_DETECTED\"}}",
-  "sqe-ood-unsat-001": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:UNSAT\"}}",
-  "sqe-ood-unsat-002": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:UNSAT\"}}",
-  "sqe-ood-schema-001": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:SCHEMA_VIOLATION\"}}",
-  "sqe-ood-syntax-002": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:SYNTAX_INVALID\"}}",
-  "sqe-ood-theory-001": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:UNSUPPORTED_THEORY\"}}",
-  "sqe-ood-theory-002": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:UNSUPPORTED_THEORY\"}}"
+  "sqe-hard-dag-001": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "checkout",
+            "compile",
+            "lint",
+            "test",
+            "package"
+          ],
+          "edges": [
+            [
+              "checkout",
+              "compile"
+            ],
+            [
+              "checkout",
+              "lint"
+            ],
+            [
+              "compile",
+              "test"
+            ],
+            [
+              "lint",
+              "test"
+            ],
+            [
+              "test",
+              "package"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "checkout compile lint test package"
+      }
+    }
+  ],
+  "sqe-hard-dag-002": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "fetch",
+            "parse",
+            "transform",
+            "validate",
+            "load"
+          ],
+          "edges": [
+            [
+              "fetch",
+              "parse"
+            ],
+            [
+              "parse",
+              "transform"
+            ],
+            [
+              "transform",
+              "validate"
+            ],
+            [
+              "validate",
+              "load"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "fetch parse transform validate load"
+      }
+    }
+  ],
+  "sqe-hard-dag-003": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e"
+          ],
+          "edges": [
+            [
+              "a",
+              "c"
+            ],
+            [
+              "b",
+              "c"
+            ],
+            [
+              "c",
+              "d"
+            ],
+            [
+              "c",
+              "e"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "a b c d e"
+      }
+    }
+  ],
+  "sqe-hard-dag-004": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "data_clean",
+            "feature_eng",
+            "model_train",
+            "model_eval",
+            "model_deploy"
+          ],
+          "edges": [
+            [
+              "data_clean",
+              "feature_eng"
+            ],
+            [
+              "feature_eng",
+              "model_train"
+            ],
+            [
+              "model_train",
+              "model_eval"
+            ],
+            [
+              "model_eval",
+              "model_deploy"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "data_clean feature_eng model_train model_eval model_deploy"
+      }
+    }
+  ],
+  "sqe-hard-dag-005": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "init",
+            "plan",
+            "execute",
+            "verify",
+            "archive"
+          ],
+          "edges": [
+            [
+              "init",
+              "plan"
+            ],
+            [
+              "plan",
+              "execute"
+            ],
+            [
+              "execute",
+              "verify"
+            ],
+            [
+              "verify",
+              "archive"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "init plan execute verify archive"
+      }
+    }
+  ],
+  "sqe-hard-dag-006": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "alpha",
+            "beta",
+            "gamma",
+            "delta"
+          ],
+          "edges": [
+            [
+              "alpha",
+              "gamma"
+            ],
+            [
+              "beta",
+              "delta"
+            ],
+            [
+              "gamma",
+              "delta"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "alpha beta gamma delta"
+      }
+    }
+  ],
+  "sqe-hard-tree-001": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "A"
+          },
+          {
+            "id": "c2",
+            "op": "atom",
+            "atom": "B"
+          },
+          {
+            "id": "c3",
+            "op": "atom",
+            "atom": "C"
+          },
+          {
+            "id": "c4",
+            "op": "not",
+            "args": [
+              "c3"
+            ]
+          },
+          {
+            "id": "c5",
+            "op": "and",
+            "args": [
+              "c1",
+              "c2"
+            ]
+          },
+          {
+            "id": "root",
+            "op": "and",
+            "args": [
+              "c5",
+              "c4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "{\"A\": true, \"B\": true, \"C\": false}"
+      }
+    }
+  ],
+  "sqe-hard-tree-002": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "X"
+          },
+          {
+            "id": "c2",
+            "op": "atom",
+            "atom": "Y"
+          },
+          {
+            "id": "c3",
+            "op": "atom",
+            "atom": "Z"
+          },
+          {
+            "id": "c4",
+            "op": "or",
+            "args": [
+              "c1",
+              "c2"
+            ]
+          },
+          {
+            "id": "c5",
+            "op": "not",
+            "args": [
+              "c1"
+            ]
+          },
+          {
+            "id": "c6",
+            "op": "and",
+            "args": [
+              "c5",
+              "c3"
+            ]
+          },
+          {
+            "id": "root",
+            "op": "and",
+            "args": [
+              "c4",
+              "c6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "{\"X\": false, \"Y\": true, \"Z\": true}"
+      }
+    }
+  ],
+  "sqe-hard-tree-003": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "auth_enabled"
+          },
+          {
+            "id": "c2",
+            "op": "atom",
+            "atom": "tls_required"
+          },
+          {
+            "id": "c3",
+            "op": "atom",
+            "atom": "debug_mode"
+          },
+          {
+            "id": "c4",
+            "op": "and",
+            "args": [
+              "c1",
+              "c2"
+            ]
+          },
+          {
+            "id": "c5",
+            "op": "not",
+            "args": [
+              "c3"
+            ]
+          },
+          {
+            "id": "root",
+            "op": "and",
+            "args": [
+              "c4",
+              "c5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "{\"auth_enabled\": true, \"debug_mode\": false, \"tls_required\": true}"
+      }
+    }
+  ],
+  "sqe-hard-tree-004": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "assignment": {
+          "fallback_active": false
+        },
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "strict_mode"
+          },
+          {
+            "id": "c2",
+            "op": "atom",
+            "atom": "allow_bypass"
+          },
+          {
+            "id": "c3",
+            "op": "atom",
+            "atom": "audit_logged"
+          },
+          {
+            "id": "c4",
+            "op": "atom",
+            "atom": "fallback_active"
+          },
+          {
+            "id": "c5",
+            "op": "not",
+            "args": [
+              "c2"
+            ]
+          },
+          {
+            "id": "c6",
+            "op": "and",
+            "args": [
+              "c1",
+              "c5"
+            ]
+          },
+          {
+            "id": "c7",
+            "op": "or",
+            "args": [
+              "c3",
+              "c4"
+            ]
+          },
+          {
+            "id": "root",
+            "op": "and",
+            "args": [
+              "c6",
+              "c7"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "{\"allow_bypass\": false, \"audit_logged\": true, \"fallback_active\": false, \"strict_mode\": true}"
+      }
+    }
+  ],
+  "sqe-hard-tree-005": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "P"
+          },
+          {
+            "id": "c2",
+            "op": "atom",
+            "atom": "Q"
+          },
+          {
+            "id": "c3",
+            "op": "atom",
+            "atom": "R"
+          },
+          {
+            "id": "c4",
+            "op": "atom",
+            "atom": "S"
+          },
+          {
+            "id": "c5",
+            "op": "and",
+            "args": [
+              "c1",
+              "c2"
+            ]
+          },
+          {
+            "id": "c6",
+            "op": "not",
+            "args": [
+              "c3"
+            ]
+          },
+          {
+            "id": "c7",
+            "op": "not",
+            "args": [
+              "c4"
+            ]
+          },
+          {
+            "id": "c8",
+            "op": "and",
+            "args": [
+              "c6",
+              "c7"
+            ]
+          },
+          {
+            "id": "root",
+            "op": "and",
+            "args": [
+              "c5",
+              "c8"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "{\"P\": true, \"Q\": true, \"R\": false, \"S\": false}"
+      }
+    }
+  ],
+  "sqe-hard-tree-006": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "can_read"
+          },
+          {
+            "id": "c2",
+            "op": "atom",
+            "atom": "can_write"
+          },
+          {
+            "id": "c3",
+            "op": "atom",
+            "atom": "is_admin"
+          },
+          {
+            "id": "c4",
+            "op": "and",
+            "args": [
+              "c1",
+              "c2"
+            ]
+          },
+          {
+            "id": "c5",
+            "op": "not",
+            "args": [
+              "c3"
+            ]
+          },
+          {
+            "id": "root",
+            "op": "and",
+            "args": [
+              "c4",
+              "c5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "{\"can_read\": true, \"can_write\": true, \"is_admin\": false}"
+      }
+    }
+  ],
+  "sqe-hard-mixed-001": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "stage_1",
+            "stage_2",
+            "stage_3"
+          ],
+          "edges": [
+            [
+              "stage_1",
+              "stage_2"
+            ],
+            [
+              "stage_2",
+              "stage_3"
+            ]
+          ]
+        },
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "gate_open"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "{\"gate_open\": true, \"order\": [\"stage_1\", \"stage_2\", \"stage_3\"]}"
+      }
+    }
+  ],
+  "sqe-hard-mixed-002": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "db",
+            "app",
+            "ingress"
+          ],
+          "edges": [
+            [
+              "db",
+              "app"
+            ],
+            [
+              "app",
+              "ingress"
+            ]
+          ]
+        },
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "backup_active"
+          },
+          {
+            "id": "root",
+            "op": "not",
+            "args": [
+              "c1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "{\"backup_active\": false, \"order\": [\"db\", \"app\", \"ingress\"]}"
+      }
+    }
+  ],
+  "sqe-hard-mixed-003": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "step_prep",
+            "step_run"
+          ],
+          "edges": [
+            [
+              "step_prep",
+              "step_run"
+            ]
+          ]
+        },
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "isolated_env"
+          },
+          {
+            "id": "c2",
+            "op": "atom",
+            "atom": "debug"
+          },
+          {
+            "id": "c3",
+            "op": "not",
+            "args": [
+              "c2"
+            ]
+          },
+          {
+            "id": "root",
+            "op": "and",
+            "args": [
+              "c1",
+              "c3"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "{\"debug\": false, \"isolated_env\": true, \"order\": [\"step_prep\", \"step_run\"]}"
+      }
+    }
+  ],
+  "sqe-hard-mixed-004": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "scan",
+            "patch",
+            "reboot"
+          ],
+          "edges": [
+            [
+              "scan",
+              "patch"
+            ],
+            [
+              "patch",
+              "reboot"
+            ]
+          ]
+        },
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "reboot_allowed"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "{\"order\": [\"scan\", \"patch\", \"reboot\"], \"reboot_allowed\": true}"
+      }
+    }
+  ],
+  "sqe-ood-cycle-001": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "job_a",
+            "job_b",
+            "job_c"
+          ],
+          "edges": [
+            [
+              "job_a",
+              "job_b"
+            ],
+            [
+              "job_b",
+              "job_c"
+            ],
+            [
+              "job_c",
+              "job_a"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "BLOCKED:CYCLE_DETECTED"
+      }
+    }
+  ],
+  "sqe-ood-cycle-002": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "graph": {
+          "nodes": [
+            "service_alpha",
+            "service_beta"
+          ],
+          "edges": [
+            [
+              "service_alpha",
+              "service_beta"
+            ],
+            [
+              "service_beta",
+              "service_alpha"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "BLOCKED:CYCLE_DETECTED"
+      }
+    }
+  ],
+  "sqe-ood-unsat-001": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "feature_flag"
+          },
+          {
+            "id": "c2",
+            "op": "not",
+            "args": [
+              "c1"
+            ]
+          },
+          {
+            "id": "root",
+            "op": "and",
+            "args": [
+              "c1",
+              "c2"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "BLOCKED:UNSAT"
+      }
+    }
+  ],
+  "sqe-ood-unsat-002": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "mode": "solve",
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "A"
+          },
+          {
+            "id": "c2",
+            "op": "atom",
+            "atom": "B"
+          },
+          {
+            "id": "c3",
+            "op": "and",
+            "args": [
+              "c1",
+              "c2"
+            ]
+          },
+          {
+            "id": "c4",
+            "op": "not",
+            "args": [
+              "c1"
+            ]
+          },
+          {
+            "id": "c5",
+            "op": "not",
+            "args": [
+              "c2"
+            ]
+          },
+          {
+            "id": "c6",
+            "op": "or",
+            "args": [
+              "c4",
+              "c5"
+            ]
+          },
+          {
+            "id": "root",
+            "op": "and",
+            "args": [
+              "c3",
+              "c6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "BLOCKED:UNSAT"
+      }
+    }
+  ],
+  "sqe-ood-schema-001": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "constraint_type": "dag"
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "BLOCKED:SCHEMA_VIOLATION"
+      }
+    }
+  ],
+  "sqe-ood-syntax-002": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "atom",
+            "atom": "((A AND B) OR NOT"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "BLOCKED:SYNTAX_INVALID"
+      }
+    }
+  ],
+  "sqe-ood-theory-001": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "constraints": [
+          {
+            "id": "c1",
+            "op": ">=",
+            "args": [
+              "x*y",
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "BLOCKED:UNSUPPORTED_THEORY"
+      }
+    }
+  ],
+  "sqe-ood-theory-002": [
+    {
+      "tool": "sqe_constraint_solver",
+      "args": {
+        "constraints": [
+          {
+            "id": "c1",
+            "op": "exists",
+            "args": [
+              "x"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "final_answer",
+      "args": {
+        "text": "BLOCKED:UNSUPPORTED_THEORY"
+      }
+    }
+  ]
 }

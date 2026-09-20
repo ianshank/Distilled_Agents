@@ -623,7 +623,7 @@ def test_echo_backend_dict_object_and_empty() -> None:
 @pytest.mark.unit
 @pytest.mark.harness
 def test_sqe_dispose_rows_in_pass_at_k() -> None:
-    """Verify that Pass@K runs handle sqe_dispose harness rows with canonical refusals."""
+    """Verify that Pass@K runs handle sqe_dispose harness rows with canonical refusals and solver calls."""
     row_dag = GoldenRow(
         id="sqe-hard-dag-001",
         slice="hard",
@@ -650,8 +650,44 @@ def test_sqe_dispose_rows_in_pass_at_k() -> None:
     )
     backend = EchoBackend(
         {
-            "Resolve dependencies": '{"tool": "final_answer", "args": {"text": "checkout compile lint test package"}}',
-            "Circular dependency": '{"tool": "final_answer", "args": {"text": "BLOCKED:CYCLE_DETECTED"}}',
+            "Resolve dependencies": [
+                {
+                    "tool": "sqe_constraint_solver",
+                    "args": {
+                        "mode": "solve",
+                        "graph": {
+                            "nodes": ["checkout", "compile", "lint", "test", "package"],
+                            "edges": [
+                                ["checkout", "compile"],
+                                ["checkout", "lint"],
+                                ["compile", "test"],
+                                ["lint", "test"],
+                                ["test", "package"],
+                            ],
+                        },
+                    },
+                },
+                {
+                    "tool": "final_answer",
+                    "args": {"text": "checkout compile lint test package"},
+                },
+            ],
+            "Circular dependency": [
+                {
+                    "tool": "sqe_constraint_solver",
+                    "args": {
+                        "mode": "solve",
+                        "graph": {
+                            "nodes": ["job_a", "job_b", "job_c"],
+                            "edges": [["job_a", "job_b"], ["job_b", "job_c"], ["job_c", "job_a"]],
+                        },
+                    },
+                },
+                {
+                    "tool": "final_answer",
+                    "args": {"text": "BLOCKED:CYCLE_DETECTED"},
+                },
+            ],
         }
     )
     from enhanced_system.harness.registry import load_spec
@@ -661,8 +697,108 @@ def test_sqe_dispose_rows_in_pass_at_k() -> None:
     res = evaluate_pass_at_k(runtime, [row_dag, row_ood], n=2, k=1, harness_id="sqe_dispose")
     assert res["pass_at_k"]["1"] == 1.0
     assert res["ood_synthetic_success_violations"] == 0
+    assert res["vacuity_violations"] == 0
     assert res["exact_only"] is True
     assert res["semantic_counted"] is False
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_vacuity_falsifier_solver_bypass_fails_gate(tmp_path: Path) -> None:
+    """Falsifier: a trajectory reaching final_answer without prior sqe_constraint_solver MUST fail."""
+    from enhanced_system.harness.registry import load_spec
+    from enhanced_system.harness.runtime import AgentRuntime
+
+    row = GoldenRow(
+        id="sqe-hard-dag-001",
+        slice="hard",
+        bucket="dag",
+        ood=False,
+        grader="exact",
+        allow_semantic=False,
+        harness_id="sqe_dispose",
+        expected_tools=["sqe_constraint_solver", "final_answer"],
+        prompt="[sqe-hard-dag-001] Resolve dependencies",
+        expected="checkout compile lint test package",
+    )
+
+    # 1. Bypassed solver: answers_match is True, but no prior sqe_constraint_solver call
+    bypass_backend = EchoBackend(
+        {
+            "Resolve dependencies": '{"tool": "final_answer", "args": {"text": "checkout compile lint test package"}}',
+        }
+    )
+    runtime_bypass = AgentRuntime(bypass_backend, spec=load_spec("sqe_dispose"), teacher=False)
+    res_bypass = evaluate_pass_at_k(runtime_bypass, [row], n=3, k=1, harness_id="sqe_dispose")
+
+    # MUST fail vacuity: vacuity_violations > 0, pass@k == 0.0 despite exact answers_match
+    assert res_bypass["vacuity_violations"] == 3
+    assert res_bypass["pass_at_k"]["1"] == 0.0
+
+    # 2. Gate CLI execution with bypassed solver MUST return exit code 1
+    # Create full 24-row golden set where 1 row bypasses solver
+    full_golden = Path("configs/golden_sets/sqe_hard_ood.jsonl").read_text(encoding="utf-8")
+    test_golden_file = tmp_path / "sqe_test_golden.jsonl"
+    test_golden_file.write_text(full_golden, encoding="utf-8")
+
+    # Scripted fixtures where sqe-hard-dag-001 bypasses solver
+    fixtures_data = json.loads(
+        Path("tests/fixtures/mock_responses_sqe_passk.json").read_text(encoding="utf-8")
+    )
+    bypass_fixtures = dict(fixtures_data)
+    bypass_fixtures["sqe-hard-dag-001"] = [
+        {"tool": "final_answer", "args": {"text": "checkout compile lint test package"}}
+    ]
+    bypass_fixture_file = tmp_path / "bypass_fixtures.json"
+    bypass_fixture_file.write_text(json.dumps(bypass_fixtures), encoding="utf-8")
+
+    # Running pass_at_k CLI on bypassed fixtures MUST fail (exit 1), even with lower threshold 0.5
+    exit_code = run_pass_k_main(
+        [
+            "--golden-set",
+            str(test_golden_file),
+            "--scripted",
+            str(bypass_fixture_file),
+            "--threshold",
+            "0.5",
+            "--n",
+            "2",
+            "--k",
+            "1",
+        ]
+    )
+    assert exit_code == 1, "CLI must exit with code 1 when solver bypass occurs"
+
+    # 3. Compliant solver execution succeeds with vacuity_violations == 0
+    compliant_backend = EchoBackend(
+        {
+            "Resolve dependencies": [
+                {
+                    "tool": "sqe_constraint_solver",
+                    "args": {
+                        "mode": "solve",
+                        "graph": {
+                            "nodes": ["checkout", "compile", "lint", "test", "package"],
+                            "edges": [
+                                ["checkout", "compile"],
+                                ["checkout", "lint"],
+                                ["compile", "test"],
+                                ["lint", "test"],
+                                ["test", "package"],
+                            ],
+                        },
+                    },
+                },
+                {"tool": "final_answer", "args": {"text": "checkout compile lint test package"}},
+            ]
+        }
+    )
+    runtime_compliant = AgentRuntime(
+        compliant_backend, spec=load_spec("sqe_dispose"), teacher=False
+    )
+    res_compliant = evaluate_pass_at_k(runtime_compliant, [row], n=2, k=1, harness_id="sqe_dispose")
+    assert res_compliant["vacuity_violations"] == 0
+    assert res_compliant["pass_at_k"]["1"] == 1.0
 
 
 @pytest.mark.unit

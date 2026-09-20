@@ -56,9 +56,15 @@ def verify_rule_matrix(
                 f"Rule item {idx} has invalid solver_status '{status}'; "
                 f"must be one of {sorted(VALID_SOLVER_STATUSES)} and cannot be 'none'"
             )
+        if rule.get("harness_id") == "sqe_dispose" and status not in {"fixture", "active"}:
+            raise ValueError(
+                f"Rule item {idx} ({rule.get('rule_id')}) bound to sqe_dispose must have "
+                f"solver_status in {{'fixture', 'active'}}, got '{status}'"
+            )
         matrix_golden_ids.add(str(rule["golden_id"]).strip())
 
     hard_golden_ids: set[str] = set()
+    ood_golden_ids: set[str] = set()
     with golden_file.open("r", encoding="utf-8") as f:
         for line in f:
             stripped = line.strip()
@@ -66,20 +72,29 @@ def verify_rule_matrix(
                 continue
             item = json.loads(stripped)
             slice_val = str(item.get("slice", "")).lower()
-            if slice_val == "hard":
+            is_ood = slice_val == "ood" or bool(item.get("ood"))
+            if slice_val == "hard" and not is_ood:
                 row_id = item.get("id")
                 if not row_id or not str(row_id).strip():
                     raise ValueError("Hard slice row is missing a stable 'id'")
                 hard_golden_ids.add(str(row_id).strip())
+            elif is_ood:
+                row_id = item.get("id")
+                if not row_id or not str(row_id).strip():
+                    raise ValueError("OOD slice row is missing a stable 'id'")
+                ood_golden_ids.add(str(row_id).strip())
 
-    missing = hard_golden_ids - matrix_golden_ids
+    target_ids = hard_golden_ids | ood_golden_ids
+    missing = target_ids - matrix_golden_ids
     if missing:
         raise ValueError(
-            f"Rule matrix {matrix_file} missing coverage for hard golden ids: {sorted(missing)}"
+            f"Rule matrix {matrix_file} missing coverage for golden ids: {sorted(missing)}"
         )
 
     return {
         "covered_hard_ids": len(hard_golden_ids),
+        "covered_ood_ids": len(ood_golden_ids),
+        "covered_ids": len(target_ids),
         "total_rules": len(rules),
         "matrix_golden_ids": sorted(matrix_golden_ids),
     }
