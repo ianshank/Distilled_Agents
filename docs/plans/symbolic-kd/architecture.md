@@ -360,7 +360,7 @@ Land in order. Docs-only does not clear E2E proof.
 | --- | --- | --- | --- |
 | **E0** | Docs / OpenSpec delta | This addendum + Spec Writer change package (`openspec/changes/sqe-dispose-e2e-bind/`) pinning harness_id/fixture contracts | Review only |
 | **E1** | Pass@K x dispose | Annotate `sqe_hard_ood.jsonl`; rewrite mock fixtures to solver->`final_answer`; matrix rows for all hard/OOD ids; keep `aqa-gate-passk` sole Chen entry | Green `aqa-gate-passk` proving solver tool calls on scripted path |
-| **E2** | Collect / compose | Critic-on collect/compose against `sqe_dispose` traces; reject sink still `artifacts/critic_rejects.jsonl` | Unit/integration with `OUTCOME_MISMATCH` / `DUALDISTILL_DROP_0_0` |
+| **E2** | Collect / compose | Critic-on collect/compose against `sqe_dispose` traces; reject sink still `artifacts/critic_rejects.jsonl` — **details in §12** | Unit/integration with `OUTCOME_MISMATCH` / `DUALDISTILL_DROP_0_0`; Makefile `collect-sqe-dispose` + `compose-dualdistill-sqe`; no GKD until E3 |
 | **E3** | BC smoke | Small behavior-cloning / trajectory smoke on dispose harness (no GKD enable) | Smoke job green |
 | **E4** | CI harden | Fail CI if golden lacks `harness_id: sqe_dispose` or fixtures skip solver | Required checks |
 | **E5** | OpenSpec archive | Archive completed change folders after E1-E4 green | Archive hygiene |
@@ -403,3 +403,75 @@ Coordinate OpenSpec deltas with Spec Writer under existing packages (`golden-pas
 | ADR 0007 | Canonical `docs/adr/0007-symbolic-dispose-tools.md` (supersedes `0007-symbolic-disposition-fail-closed.md`). Do not invent ADR 0008 for dispose. |
 | Task close | `openspec/changes/archive/symbolic-disposition/tasks.md` Section 8 closes only when Section 11 falsifier + `aqa-gate-passk` are green on dispose-bound fixtures |
 | Out of scope | GKD enable before E3 BC smoke; Edge-AI; INV-16; Pass@K via `run_aqa_gate.py` |
+
+
+## 12. E2 note — collect → critic → compose under `sqe_dispose`
+
+**Status:** E1 is on `main` (#34). E2 wires the existing critic cascade to **dispose-bound** traces. This is a thin ops/architecture pin, not a new critic design.
+
+**Locks:** no GKD / on-policy KD enable until **E3 BC smoke** is green. No Edge-AI / INV-16. `aqa-gate-passk` remains the sole Chen Pass@K gate (unchanged by E2).
+
+### 12.1 Pipeline
+
+```
+configs/golden_sets/sqe_hard_ood.jsonl
+  -> make collect-sqe-dispose
+       scripts/harness/collect_trajectories.py
+         --harness-id sqe_dispose
+         --scripted tests/fixtures/mock_responses_sqe_passk.json
+         --critic / MANGOMAS_CRITIC_ENABLED=1
+         --reject-log artifacts/critic_rejects.jsonl
+         --output artifacts/trajectories/sqe_dispose_teacher_a.jsonl
+  -> (optional second teacher file for DualDistill)
+  -> make compose-dualdistill-sqe
+       scripts/harness/compose_dualdistill.py
+         --first/--second teacher JSONLs
+         --reject-log artifacts/critic_rejects.jsonl
+         --output artifacts/trajectories/sqe_dispose_dualdistill.jsonl
+```
+
+Critic helpers stay in `enhanced_system/harness/critic.py` (`check_tool_allowlist`, `check_outcome`, `check_expected_tools`, `RejectSink`). Recovery traces with matching outcomes remain kept.
+
+### 12.2 Makefile targets (Implementer SHALL add)
+
+| Target | Invokes | Required flags / paths |
+| --- | --- | --- |
+| `collect-sqe-dispose` | `scripts/harness/collect_trajectories.py` | `--harness-id sqe_dispose`; input prompts derived from `configs/golden_sets/sqe_hard_ood.jsonl` (or a generated prompt JSONL beside it); `--scripted tests/fixtures/mock_responses_sqe_passk.json` for CI-deterministic runs; critic on; `--reject-log artifacts/critic_rejects.jsonl`; write under `artifacts/trajectories/` |
+| `compose-dualdistill-sqe` | `scripts/harness/compose_dualdistill.py` | Two teacher JSONLs from dispose collect; `--reject-log artifacts/critic_rejects.jsonl`; output under `artifacts/trajectories/` |
+| `test-critic-sqe-dispose` (optional alias) | pytest markers covering dispose collect/compose critic paths | Must assert both reject codes below |
+
+Do **not** invent a second Pass@K Makefile target. Do **not** route E2 collect through `run_aqa_gate.py`.
+
+### 12.3 Fixture and artifact paths
+
+| Path | Role in E2 |
+| --- | --- |
+| `configs/golden_sets/sqe_hard_ood.jsonl` | Prompt/expected corpus; rows already carry `harness_id: sqe_dispose` and `expected_tools: [sqe_constraint_solver, final_answer]` post-E1 |
+| `configs/harnesses/sqe_dispose.yaml` | Allowlist: `sqe_constraint_solver`, `final_answer` only |
+| `tests/fixtures/mock_responses_sqe_passk.json` | Scripted teacher policy for deterministic CI collect (solver before `final_answer`; OOD `BLOCKED:<CODE>`) |
+| `artifacts/trajectories/sqe_dispose_*.jsonl` | Collected / composed outputs (gitignored) |
+| `artifacts/critic_rejects.jsonl` | Sole reject sink (override via `--reject-log` / `MANGOMAS_CRITIC_REJECT_LOG` only) |
+
+### 12.4 DualDistill drop rule (single)
+
+- Compose continues to drop pairs only when **both** teachers score 0 on the graded outcome (existing `(0,0)` rule).
+- That drop MUST log `critic_reject_code: DUALDISTILL_DROP_0_0` via `RejectSink`.
+- **Forbidden:** a second DualDistill drop rule (for example dropping on partial credit, schema-only faults, or asymmetric teacher failure).
+- Collect outcome filter drops log `critic_reject_code: OUTCOME_MISMATCH` when `final_answer` fails `answers_match`.
+- Allowlist / expected-tools rejects use shared codes from `openspec/changes/_shared/blocked-reject-codes.md` where applicable; they do not replace the `(0,0)` rule.
+
+### 12.5 E2 acceptance
+
+E2 is done when all of the following hold:
+
+1. `make collect-sqe-dispose` produces dispose-harness trajectories whose tool traces include `sqe_constraint_solver` before `final_answer` under scripted fixtures.
+2. Critic-on collect emits at least one `OUTCOME_MISMATCH` record to `artifacts/critic_rejects.jsonl` in unit/integration tests (injected mismatch fixture).
+3. `make compose-dualdistill-sqe` (or tested equivalent) logs `DUALDISTILL_DROP_0_0` for a synthetic `(0,0)` pair and does **not** drop that pair under any additional rule.
+4. No Makefile/CI path enables GKD trainers or `trl-gkd-usage` entrypoints.
+5. `make aqa-gate-passk` remains green and is not redefined by E2.
+
+### 12.6 Out of scope for E2
+
+- E3 BC smoke corpus/job naming (still deferred).
+- GKD enable, Serve tool-loop, Edge-AI, INV-16.
+- Changing Chen defaults, golden bucket minima, or the vacuity falsifier from §11.
