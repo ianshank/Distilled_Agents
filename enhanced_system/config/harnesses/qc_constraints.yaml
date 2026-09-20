@@ -1,0 +1,11 @@
+id: qc_constraints
+schema_version: "1"
+planning:
+  style: react
+  instruction: "Validate quality control constraints and schemas using constraint_check. If constraints are repeatedly violated or unsatisfiable, refuse via final_answer with the appropriate canonical BLOCKED:<CODE> token."
+action:
+  tool_ids:
+    - constraint_check
+    - final_answer
+memory:
+  write_observations: true

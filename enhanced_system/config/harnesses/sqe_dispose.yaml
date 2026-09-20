@@ -1,0 +1,11 @@
+id: sqe_dispose
+schema_version: "1"
+planning:
+  style: react
+  instruction: "Solve and check constraints using sqe_constraint_solver. On cyclic, unsatisfiable, or invalid problem inputs, refuse via final_answer with the appropriate canonical BLOCKED:<CODE> token."
+action:
+  tool_ids:
+    - sqe_constraint_solver
+    - final_answer
+memory:
+  write_observations: true

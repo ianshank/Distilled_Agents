@@ -6,5 +6,13 @@
   "Refactor database connection pool to handle ConnectionRefusedError with retry logic.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"ConnectionRefusedError retry handler installed\"}}",
   "Implement input sanitization preventing SQL injection in user search query.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"parameterized query enforced\"}}",
   "Detect memory leak in background worker task loop and add cleanup.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"worker loop memory cleanup registered\"}}",
-  "Resolve deadlock condition in concurrent order processing transaction.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"transaction isolation and deadlock retry implemented\"}}"
+  "Resolve deadlock condition in concurrent order processing transaction.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"transaction isolation and deadlock retry implemented\"}}",
+  "Validate release deployment manifest schema and ensure timeout_seconds is positive.": [
+    "{\"tool\": \"constraint_check\", \"args\": {\"document\": {\"service\": \"deploy\", \"timeout_seconds\": 30}, \"required\": [\"service\", \"timeout_seconds\"], \"predicates\": [{\"key\": \"timeout_seconds\", \"op\": \">\", \"value\": 0}]}}",
+    "{\"tool\": \"final_answer\", \"args\": {\"text\": \"release deployment manifest verified and constraints satisfied\"}}"
+  ],
+  "Validate deployment manifest with invalid negative timeout and missing required checksum.": [
+    "{\"tool\": \"constraint_check\", \"args\": {\"document\": {\"service\": \"deploy\", \"timeout_seconds\": -5}, \"required\": [\"service\"], \"predicates\": [{\"key\": \"timeout_seconds\", \"op\": \">\", \"value\": 0}]}}",
+    "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:UNSAT\"}}"
+  ]
 }
