@@ -22,7 +22,8 @@ without a new ADR.
 | Organising principle | Eval meaning before scale; disposition before weights |
 | Format triangle | Train string == harness generate; Serve stays single-shot |
 | Knobs | `MANGOMAS_*` / `MangoMASSettings` only — no call-site literals |
-| Tools | Frozen `TOOL_REGISTRY` only; human-reviewed ids |
+| Tools | Frozen `TOOL_REGISTRY` only; primary dispose tool id `sqe_constraint_solver` |
+| Pass@K gate | Chen unbiased estimator defaults $n=5$, gate $k=3$, exact match only on hard/OOD |
 | DualDistill | Same task + `expected` + two teachers |
 | Vacuity refusal | A gate that cannot fail must not be called pass@k |
 | Teachers | Apache-2.0 / MIT open weights (Qwen3, R1-distills); document license |
