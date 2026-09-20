@@ -117,12 +117,18 @@ def _evaluate_file(
     for line_no, payload in rows:
         try:
             row = GoldenRow.model_validate(payload)
-            row_harness_id = row.harness_id or harness_id
+        except (TypeError, ValueError) as exc:
+            logger.warning("skipping line %s: %s", line_no, exc)
+            if strict:
+                raise
+            continue
+        row_harness_id = row.harness_id or harness_id
+        try:
             result = runtime.run(  # type: ignore[attr-defined]
                 row.prompt,
                 harness_id=row_harness_id,
             )
-        except (TypeError, ValueError) as exc:
+        except ValueError as exc:
             logger.warning("skipping line %s: %s", line_no, exc)
             if strict:
                 raise
