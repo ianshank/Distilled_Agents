@@ -8,7 +8,6 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 ## [Unreleased]
 
 ### Added
-### Added
 - **Phase P4 `trl-gkd-usage`:** Pinned exact TRL version (`trl==0.15.2`), implemented config-driven GKD / on-policy distillation adapter module, label-masked generalized JSD and KL divergence, safe vocab mismatch handling, default `trajectory_distill_alpha=0.0`, and ADR 0008.
 - Pinned exact `trl==0.15.2` in `pyproject.toml` (under `alignment` and `all`), documenting version rationale (stable GKDTrainer/GKDConfig, SFT caching fixes, transformers>=4.45.0 compatibility).
 - Added GKD operational settings in `enhanced_system/ops/settings.py` (`gkd_enabled`, `gkd_lmbda`, `gkd_beta`, `gkd_temperature`, `gkd_max_new_tokens`, `gkd_seq_kd`, `gkd_loss_type`), preserving fail-closed defaults (`gkd_enabled: false`, `trajectory_distill_alpha: 0.0`).
@@ -22,7 +21,7 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Added
 - **Phase P3 / I3 `symbolic-disposition`:** Pure-Python constraint checking, symbolic disposition tools, fail-closed refusal on OOD, and hard golden coverage.
-- Added `ConstraintCheckTool` (`constraint_check`) in `enhanced_system/harness/tools/constraint.py` and `SqeConstraintSolverTool` (`sqe_constraint_solver`) in `enhanced_system/harness/tools/solver.py`, exported through `TOOL_REGISTRY`.
+- Added `ConstraintCheckTool` (`constraint_check`) and `SqeConstraintSolverTool` (`sqe_constraint_solver`) in `enhanced_system/harness/tools/solver.py` and exported through `TOOL_REGISTRY`.
 - Supported pure-Python DAG topological sorting (lexicographically least order via Kahn's algorithm with a min-heap) and boolean condition tree solving without external native solver binaries.
 - Enforced standard reject codes conforming to `openspec/changes/_shared/blocked-reject-codes.md` (`CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`).
 - Added dedicated harness YAML specifications in `configs/harnesses/qc_constraints.yaml`, `enhanced_system/config/harnesses/qc_constraints.yaml`, `configs/harnesses/sqe_dispose.yaml`, and `enhanced_system/config/harnesses/sqe_dispose.yaml`.

@@ -622,6 +622,51 @@ def test_echo_backend_dict_object_and_empty() -> None:
 
 @pytest.mark.unit
 @pytest.mark.harness
+def test_sqe_dispose_rows_in_pass_at_k() -> None:
+    """Verify that Pass@K runs handle sqe_dispose harness rows with canonical refusals."""
+    row_dag = GoldenRow(
+        id="sqe-hard-dag-001",
+        slice="hard",
+        bucket="dag",
+        ood=False,
+        grader="exact",
+        allow_semantic=False,
+        harness_id="sqe_dispose",
+        expected_tools=["sqe_constraint_solver", "final_answer"],
+        prompt="Resolve dependencies",
+        expected="checkout compile lint test package",
+    )
+    row_ood = GoldenRow(
+        id="sqe-ood-cycle-001",
+        slice="ood",
+        bucket="cycle",
+        ood=True,
+        grader="exact",
+        allow_semantic=False,
+        harness_id="sqe_dispose",
+        expected_tools=["sqe_constraint_solver", "final_answer"],
+        prompt="Circular dependency",
+        expected="BLOCKED:CYCLE_DETECTED",
+    )
+    backend = EchoBackend(
+        {
+            "Resolve dependencies": '{"tool": "final_answer", "args": {"text": "checkout compile lint test package"}}',
+            "Circular dependency": '{"tool": "final_answer", "args": {"text": "BLOCKED:CYCLE_DETECTED"}}',
+        }
+    )
+    from enhanced_system.harness.registry import load_spec
+    from enhanced_system.harness.runtime import AgentRuntime
+
+    runtime = AgentRuntime(backend, spec=load_spec("sqe_dispose"), teacher=False)
+    res = evaluate_pass_at_k(runtime, [row_dag, row_ood], n=2, k=1, harness_id="sqe_dispose")
+    assert res["pass_at_k"]["1"] == 1.0
+    assert res["ood_synthetic_success_violations"] == 0
+    assert res["exact_only"] is True
+    assert res["semantic_counted"] is False
+
+
+@pytest.mark.unit
+@pytest.mark.harness
 def test_security_scanner_and_data_governance() -> None:
     """SecurityScanner scans code and trajectories; PIIScrubber validates missing presidio."""
     from enhanced_system.harness.data_governance import PIIScrubber
