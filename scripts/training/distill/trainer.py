@@ -49,7 +49,7 @@ _LORA_MODULE_MAP: dict[str, list[str]] = {
 _DEFAULT_MODULES = ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 
 
-def resolve_target_modules_for_model(model_name: str) -> list[str]:
+def resolve_target_modules_for_model(model_name: str, revision: Optional[str] = None) -> list[str]:
     """Detect LoRA target modules from model config's ``model_type``.
 
     Returns architecture-appropriate module names. Falls back to the
@@ -58,7 +58,14 @@ def resolve_target_modules_for_model(model_name: str) -> list[str]:
     try:
         from transformers import AutoConfig
 
-        config = AutoConfig.from_pretrained(model_name, trust_remote_code=False)
+        # Use explicit revision pin or environment fallback; nosec B615 justified
+        # by revision pinning and safe trust_remote_code=False.
+        rev = revision if revision is not None else os.getenv("MANGOMAS_MODEL_REVISION")
+        config = AutoConfig.from_pretrained(  # nosec B615
+            model_name,
+            trust_remote_code=False,
+            revision=rev,
+        )
         model_type = getattr(config, "model_type", "").lower()
         modules = _LORA_MODULE_MAP.get(model_type, _DEFAULT_MODULES)
         logger.info(
@@ -137,11 +144,13 @@ class AgentDistillationTrainer:
         explicit = getattr(self.args, "lora_target_modules", "")
         if explicit:
             return explicit.split(",")
-        return resolve_target_modules_for_model(self.args.student_model_name)
+        rev = getattr(self.args, "model_revision", None)
+        return resolve_target_modules_for_model(self.args.student_model_name, revision=rev)
 
     def prepare_dataset(self) -> Dataset:
         train_file = resolve_train_file(train_file=getattr(self.args, "train_file", None))
-        dataset = load_dataset("json", data_files={"train": train_file})  # nosec B615
+        # Local JSON file loading; Hub is not contacted (green-trunk-ci)
+        dataset = load_dataset("json", data_files={"train": train_file})  # nosec: B615
         if getattr(self.args, "trajectory_mode", False):
             from .trajectory_collator import has_supervised_tokens
 
@@ -235,7 +244,8 @@ class AgentDistillationTrainer:
     def prepare_eval_dataset(self) -> Optional[Dataset]:
         if not self.args.eval_file:
             return None
-        dataset = load_dataset("json", data_files={"eval": self.args.eval_file})  # nosec B615
+        # Local JSON file loading; Hub is not contacted (green-trunk-ci)
+        dataset = load_dataset("json", data_files={"eval": self.args.eval_file})  # nosec: B615
         if getattr(self.args, "trajectory_mode", False):
             from .trajectory_collator import has_supervised_tokens
 
@@ -318,12 +328,13 @@ class DistillationTrainer(Trainer):
             t_vocab = teacher_logits.size(-1)
             if s_vocab != t_vocab:
                 import warnings
+
                 warnings.warn(
                     f"Vocab mismatch: Student({s_vocab}) vs Teacher({t_vocab}). "
                     "Cannot safely compute KL divergence across disparate token spaces. "
                     "Falling back to task loss.",
                     RuntimeWarning,
-                    stacklevel=2
+                    stacklevel=2,
                 )
                 return task_loss
 

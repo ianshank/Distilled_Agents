@@ -112,6 +112,19 @@ class TestResolveTargetModulesForModel:
         assert modules1 is not modules2
         assert modules1 == modules2
 
+    def test_revision_passed_to_autoconfig(self):
+        """Ensure revision argument is passed through to AutoConfig.from_pretrained."""
+        resolve = self._import_resolve()
+        config = MagicMock()
+        config.model_type = "llama"
+        with patch("transformers.AutoConfig") as mock_ac:
+            mock_ac.from_pretrained.return_value = config
+            modules = resolve("meta-llama/Llama-3-8B", revision="v1.0.0")
+            mock_ac.from_pretrained.assert_called_once_with(
+                "meta-llama/Llama-3-8B", trust_remote_code=False, revision="v1.0.0"
+            )
+        assert "q_proj" in modules
+
 
 # ---------------------------------------------------------------------------
 # Vocab-Aligned KL Distillation Loss

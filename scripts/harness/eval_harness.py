@@ -166,6 +166,7 @@ def _evaluate_file(
         if labeled:
             with_expected += 1
             from enhanced_system.harness.score import semantic_match
+
             matched = answers_match(result.final_answer, str(expected))
             sem_matched = semantic_match(result.final_answer, str(expected))
             if matched and not security_failed:

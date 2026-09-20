@@ -18,7 +18,7 @@ fmt:
 	$(PYTHON) -m ruff format $(PKG_PATHS)
 
 typecheck:
-	$(PYTHON) -m mypy enhanced_system/ops enhanced_system/harness enhanced_system/core enhanced_system/evaluation enhanced_system/training enhanced_system/config
+	$(PYTHON) -m mypy enhanced_system/ops enhanced_system/core/cache enhanced_system/harness
 
 test:
 	$(PYTEST) -m "unit or integration" --cov=enhanced_system --cov-report=term --cov-fail-under=60

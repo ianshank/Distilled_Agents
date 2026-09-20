@@ -39,6 +39,7 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 - `--lora_target_modules` now defaults to empty (auto-detected) instead of hardcoded LLaMA module names.
 
 ### Fixed
+- Trunk CI hygiene (Phase P0 `green-trunk-ci`): formatted files across `enhanced_system`, `scripts`, and `tests` with `ruff format`; resolved mypy `no-any-return` on `PIIScrubber.redact_text` in `enhanced_system/harness/data_governance.py` and `_case_passed` in `enhanced_system/ops/training_system.py`; aligned `Makefile` typecheck target with CI scoped mypy (`enhanced_system/ops enhanced_system/core/cache enhanced_system/harness`); added revision parameter and pin to `resolve_target_modules_for_model` in `scripts/training/distill/trainer.py`; added targeted nosec annotations for controlled subprocess execution and local JSON dataset loading across `enhanced_system/harness/security.py`, `scripts/harness/run_aqa_gate.py`, and `scripts/training/train_dpo_adapter.py`.
 - `test_trajectory_mode_filters_unsupervised_rows` failed because `max_length=16` truncated supervised tokens beyond char position 19 in a 20-char rendered body. Increased to `max_length=32`.
 - `test_trajectory_eval_keeps_raw_rows` had latent truncation bug producing 0-row datasets silently. Added `max_length=32` and row-count assertion.
 - Inline `# nosec B615` on 5 reviewed `from_pretrained()` calls that already pass `revision=` dynamically (false positives after global B615 skip removal).

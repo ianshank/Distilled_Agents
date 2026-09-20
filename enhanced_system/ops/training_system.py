@@ -22,7 +22,7 @@ def _case_passed(case: Any) -> bool:
         return case.get("passed") is True
     if "expected" in case:
         observed = case.get("actual", case.get("output"))
-        return observed == case.get("expected")
+        return bool(observed == case.get("expected"))
     return False
 
 

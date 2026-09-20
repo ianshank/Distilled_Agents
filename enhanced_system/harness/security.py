@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-import subprocess
+import subprocess  # nosec: B404
 import tempfile
 from typing import Dict, List
 
@@ -39,10 +39,14 @@ class SecurityScanner:
         try:
             # Run bandit with JSON output format
             import sys
+
             cmd = [sys.executable, "-m", "bandit", "-f", "json", temp_path]
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            # nosec: B603 - Controlled list args invoking sys.executable with shell=False on internal temp path (green-trunk-ci)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)  # nosec: B603
             if result.returncode not in (0, 1):
-                raise RuntimeError(f"Bandit failed with exit code {result.returncode}: {result.stderr}")
+                raise RuntimeError(
+                    f"Bandit failed with exit code {result.returncode}: {result.stderr}"
+                )
 
             # Bandit returns 0 if no issues, 1 if issues found
             try:
