@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
 from enhanced_system.harness.convert import serialize_thought_action
+from enhanced_system.harness.critic import CriticRejectCode
 from enhanced_system.harness.score import answers_match
 from enhanced_system.harness.types import Step, Trajectory
+
+logger = logging.getLogger(__name__)
 
 TRANSITION_FIX = "Wait, that approach failed. Let us try the other strategy."
 TRANSITION_BOTH = "Alternatively, another valid strategy is as follows."
@@ -33,11 +37,28 @@ def compose_pair(
     second: dict[str, Any],
     *,
     expected: str,
+    reject_sink: Optional[Any] = None,
 ) -> Optional[dict[str, Any]]:
     """Compose y1 and y2 using DualDistill's (g1, g2) table. Drop (0, 0)."""
     grade_first = answers_match(final_text(first), expected)
     grade_second = answers_match(final_text(second), expected)
     if not grade_first and not grade_second:
+        prompt = str(first.get("prompt") or second.get("prompt") or "")
+        logger.warning(
+            "DualDistill dropped pair (0,0): critic_reject_code: DUALDISTILL_DROP_0_0 for prompt: %s",
+            prompt,
+            extra={"critic_reject_code": CriticRejectCode.DUALDISTILL_DROP_0_0.value},
+        )
+        if reject_sink is not None:
+            reject_sink.record(
+                CriticRejectCode.DUALDISTILL_DROP_0_0.value,
+                prompt,
+                metadata={
+                    "first_final": final_text(first),
+                    "second_final": final_text(second),
+                    "expected": expected,
+                },
+            )
         return None
     if grade_first and not grade_second:
         kept = dict(first)
