@@ -8,6 +8,7 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 ## [Unreleased]
 
 ### Added
+### Added
 - **Phase P4 `trl-gkd-usage`:** Pinned exact TRL version (`trl==0.15.2`), implemented config-driven GKD / on-policy distillation adapter module, label-masked generalized JSD and KL divergence, safe vocab mismatch handling, default `trajectory_distill_alpha=0.0`, and ADR 0008.
 - Pinned exact `trl==0.15.2` in `pyproject.toml` (under `alignment` and `all`), documenting version rationale (stable GKDTrainer/GKDConfig, SFT caching fixes, transformers>=4.45.0 compatibility).
 - Added GKD operational settings in `enhanced_system/ops/settings.py` (`gkd_enabled`, `gkd_lmbda`, `gkd_beta`, `gkd_temperature`, `gkd_max_new_tokens`, `gkd_seq_kd`, `gkd_loss_type`), preserving fail-closed defaults (`gkd_enabled: false`, `trajectory_distill_alpha: 0.0`).
@@ -18,16 +19,20 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 - Added `--use_gkd`, `--gkd_beta`, and `--gkd_lmbda` flags to `scripts/training/train_distilled_adapter.py`.
 - Updated `docs/README_AGENT_DISTILLATION.md` paper false-friends table updating GKD from Deferred to Optional behind ADR 0008.
 - Documented ADR 0008 (`docs/adr/0008-trl-gkd-usage.md`).
+
+### Added
+- **Phase P3 / I3 `symbolic-disposition`:** Pure-Python constraint checking, symbolic disposition tools, fail-closed refusal on OOD, and hard golden coverage.
 - Added `ConstraintCheckTool` (`constraint_check`) and `SqeConstraintSolverTool` (`sqe_constraint_solver`) in `enhanced_system/harness/tools/constraint.py` and exported through `TOOL_REGISTRY`.
 - Supported pure-Python DAG topological sorting (lexicographically least order via Kahn's algorithm with a min-heap) and boolean condition tree solving without external native solver binaries.
 - Enforced standard reject codes conforming to `openspec/changes/_shared/blocked-reject-codes.md` (`CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`).
 - Added dedicated harness YAML specifications in `configs/harnesses/qc_constraints.yaml`, `enhanced_system/config/harnesses/qc_constraints.yaml`, `configs/harnesses/sqe_dispose.yaml`, and `enhanced_system/config/harnesses/sqe_dispose.yaml`.
 - Enforced fail-closed refusal mapping (`BLOCKED:<CODE>`) on out-of-distribution (OOD) tasks, preventing confabulation of false SAT results.
-- Expanded `configs/golden_sets/hard_sdlc.jsonl` with hard and OOD rows for `qc_constraints`, backed by deterministic fixtures in `tests/fixtures/mock_responses.json`.
+- Added runtime fault token `"blocked"` in `enhanced_system/harness/runtime.py` when trajectories terminate with canonical refusal `BLOCKED:<CODE>`.
+- Expanded `configs/golden_sets/hard_sdlc.jsonl` with hard and OOD rows for `qc_constraints` and `sqe_dispose`, backed by deterministic fixtures in `tests/fixtures/mock_responses.json`.
 - Updated rule traceability matrix `configs/rule_traceability/matrix.yaml` with active and fixture rules for all new hard golden items.
 - Added `scripts/harness/extract_rules.py` stub script extracting rule candidates from teacher traces without auto-promotion.
-- Added comprehensive unit tests in `enhanced_system/tests/unit/test_harness_tools.py` including falsifier tests guaranteeing cyclic and unsat inputs never report SAT.
-- Documented ADR 0007 (`docs/adr/0007-symbolic-dispose-tools.md`).
+- Added comprehensive unit tests in `enhanced_system/tests/unit/test_harness_tools.py` and `enhanced_system/tests/unit/test_harness_solver.py` including falsifier tests guaranteeing cyclic and unsat inputs never report SAT, proof of all 6 reject codes, and absence of forbidden execution constructs.
+- Documented ADR 0007 (`docs/adr/0007-symbolic-dispose-tools.md` / `docs/adr/0007-symbolic-disposition-fail-closed.md`).
 
 ### Added
 - **Phase P2 `critic-cascade`:** Pure critic helpers, allowlist cascade filtering, reject telemetry, and recovery trace retention.
