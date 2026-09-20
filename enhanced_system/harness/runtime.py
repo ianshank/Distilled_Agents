@@ -171,6 +171,8 @@ class AgentRuntime:
                 prefix = None
         if truncated:
             trajectory.faults.append("loop")
+        if final_answer and final_answer.startswith("BLOCKED:"):
+            trajectory.faults.append("blocked")
         trajectory.final_answer = final_answer
         result = HarnessRunResult(
             final_answer=final_answer,

@@ -78,7 +78,7 @@ Kang `I_agent` is `planning.instruction` (YAML + schema; `additionalProperties: 
 
 SAG is parse/schema majority vote. Defaults `harness_sag_samples=1`, `harness_sag_temperature=0.0`. It is **not** execute-and-vote-on-observation.
 
-Tools are checklists (`pytest_runner` does not run pytest). Kang’s “small models retrieve/code instead of memorizing” does not apply until a sandbox exists.
+Tools are checklists (`pytest_runner` does not run pytest) with the exception of `sqe_constraint_solver` (pure-Python sound topological ordering and boolean constraint tree solving for SQE tasks). Kang’s “small models retrieve/code instead of memorizing” does not apply until a sandbox exists.
 
 `evaluate_agent_skill` counts pre-filled `passed` / `actual==expected` in a JSON file. It does **not** run a model. Harness quality is `scripts/harness/eval_harness.py` (`AgentRuntime`, Echo in tests): exact-match `final_answer`, tool-id validity, truncation, faults.
 
@@ -202,6 +202,19 @@ Student explores; teacher `generate`s a review of the **full chain** and the cor
 
 - **Single-pass regression:** `make aqa-gate` runs `scripts/harness/run_aqa_gate.py` against `configs/golden_sets/core_sdlc.jsonl`.
 - **Pass@K Hard/OOD gate (Phase 0 / I1):** `make aqa-gate-passk` runs `scripts/harness/run_pass_at_k.py` against `configs/golden_sets/sqe_hard_ood.jsonl` using the Chen et al. unbiased estimator ($n=5, k=3$). Hard and OOD slices enforce exact answers_match, disallow semantic matches, and prohibit OOD synthetic-success violations.
+
+## Symbolic Disposition and Fail-Closed OOD (Phase 0 I3)
+
+Phase 0 I3 introduces `sqe_constraint_solver` as a deterministic disposition tool:
+- Primary frozen tool ID: `sqe_constraint_solver` registered in `TOOL_REGISTRY`.
+- Pure-Python engine: DAG topological sorting via Kahn's algorithm with min-heap tie-breaking (guaranteeing lexicographically least valid order), and propositional boolean condition tree evaluation (`and`, `or`, `not`, `atom`).
+- Security guarantees: no `exec`, `eval`, `subprocess`, network, or external native solver libraries (Z3, clingo) in the solver execution path.
+- Dedicated harness: `configs/harnesses/sqe_dispose.yaml` and packaged duplicate `enhanced_system/config/harnesses/sqe_dispose.yaml` allowlisting ONLY `sqe_constraint_solver` and `final_answer`.
+- Rejection codes per `openspec/changes/_shared/blocked-reject-codes.md`:
+  - `CYCLE_DETECTED` and `UNSAT`: returned as normal observations with `ok: false`, `status: "UNSAT"`, `reject_code: <CODE>`, `order: null`, `assignment: null`.
+  - `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, and `RESOURCE_LIMIT`: raised as `ValueError("<CODE>: ...")` triggering runtime `tool_error`.
+- Trajectories ending with canonical refusal `BLOCKED:<CODE>` receive runtime fault token `blocked`.
+- Fail-closed OOD behavior: OOD rows (disjunctively `slice == "ood"` or `ood == true`) refuse with `BLOCKED:<CODE>` without confabulating SAT solutions.
 
 ## Still deferred
 

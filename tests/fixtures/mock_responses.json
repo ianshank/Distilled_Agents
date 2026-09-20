@@ -14,5 +14,13 @@
   "Validate deployment manifest with invalid negative timeout and missing required checksum.": [
     "{\"tool\": \"constraint_check\", \"args\": {\"document\": {\"service\": \"deploy\", \"timeout_seconds\": -5}, \"required\": [\"service\"], \"predicates\": [{\"key\": \"timeout_seconds\", \"op\": \">\", \"value\": 0}]}}",
     "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:UNSAT\"}}"
+  ],
+  "Resolve topological execution order for task graph: task_a precedes task_b, task_b precedes task_c.": [
+    "{\"tool\": \"sqe_constraint_solver\", \"args\": {\"mode\": \"solve\", \"graph\": {\"nodes\": [\"task_a\", \"task_b\", \"task_c\"], \"edges\": [[\"task_a\", \"task_b\"], [\"task_b\", \"task_c\"]]}}}",
+    "{\"tool\": \"final_answer\", \"args\": {\"text\": \"task_a task_b task_c\"}}"
+  ],
+  "Resolve topological execution order for cyclic dependency graph: task_a precedes task_b, task_b precedes task_a.": [
+    "{\"tool\": \"sqe_constraint_solver\", \"args\": {\"mode\": \"solve\", \"graph\": {\"nodes\": [\"task_a\", \"task_b\"], \"edges\": [[\"task_a\", \"task_b\"], [\"task_b\", \"task_a\"]]}}}",
+    "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:CYCLE_DETECTED\"}}"
   ]
 }

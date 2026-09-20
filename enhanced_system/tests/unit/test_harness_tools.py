@@ -11,7 +11,6 @@ from enhanced_system.harness.runtime import AgentRuntime
 from enhanced_system.harness.tools import (
     TOOL_REGISTRY,
     ConstraintCheckTool,
-    SqeConstraintSolverTool,
     get_tool,
 )
 from enhanced_system.harness.tools.constraint import (
@@ -22,6 +21,7 @@ from enhanced_system.harness.tools.constraint import (
     UNSAT,
     UNSUPPORTED_THEORY,
 )
+from enhanced_system.harness.tools.solver import SqeConstraintSolverTool
 
 
 @pytest.mark.unit
@@ -421,16 +421,16 @@ def test_sqe_solver_schema_and_resource_limits():
         solver.run({"graph": "not a dict"})
 
     with pytest.raises(ValueError, match=SCHEMA_VIOLATION):
-        solver.run({"graph": {"nodes": [123], "edges": []}})
+        solver.run({"graph": {"nodes": [123], "edges": []}})  # type: ignore[list-item]
 
     with pytest.raises(ValueError, match=SCHEMA_VIOLATION):
-        solver.run({"graph": {"nodes": ["A"], "edges": ["not a pair"]}})
+        solver.run({"graph": {"nodes": ["A"], "edges": ["not a pair"]}})  # type: ignore[list-item]
 
-    with pytest.raises(ValueError, match=f"{SCHEMA_VIOLATION}.*endpoint"):
+    with pytest.raises(ValueError, match=f"{SCHEMA_VIOLATION}: edge references node"):
         solver.run({"graph": {"nodes": ["A"], "edges": [["A", "UNKNOWN"]]}})
 
     # Resource limit on nodes
-    with pytest.raises(ValueError, match=RESOURCE_LIMIT):
+    with pytest.raises(ValueError, match="^SCHEMA_VIOLATION: node count"):
         solver.run(
             {
                 "graph": {"nodes": [f"N_{i}" for i in range(100)], "edges": []},
@@ -596,19 +596,19 @@ def test_sqe_solver_edge_cases():
 
     # Single dict constraint
     res = json.loads(
-        solver.run({"constraints": {"op": "atom", "atom": "flag"}, "assignment": {"flag": True}})
+        solver.run({"constraints": [{"op": "atom", "atom": "flag"}], "assignment": {"flag": True}})
     )
     assert res["ok"] is True
     assert res["status"] == "SAT"
 
     # Too many free atoms (> 16)
     too_many = [{"op": "atom", "atom": f"p_{i}"} for i in range(20)]
-    with pytest.raises(ValueError, match=RESOURCE_LIMIT):
-        solver.run({"constraints": too_many})
+    with pytest.raises(ValueError, match="^SCHEMA_VIOLATION: constraint count"):
+        solver.run({"constraints": too_many, "limits": {"max_constraints": 10}})
 
     # Edge cases in graph edges
     with pytest.raises(ValueError, match=SCHEMA_VIOLATION):
-        solver.run({"graph": {"nodes": ["A", "B"], "edges": [["A"]]}})
+        solver.run({"graph": {"nodes": ["A", "B"], "edges": [["A"]]}})  # type: ignore[list-item]
 
     # Unsupported theory in constraints with assignment
     with pytest.raises(ValueError, match=UNSUPPORTED_THEORY):
