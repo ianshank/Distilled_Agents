@@ -65,7 +65,7 @@ class MangoMASSettings(BaseSettings):
     dpo_beta: float = Field(default=0.1)
     lora_target_modules: str = Field(default="")
 
-    # Trace critic settings (Phase 2)
+    # Trace critic settings (Phase 2 / Phase 0 I2)
     critic_enabled: bool = Field(default=True)
     critic_reject_log: str = Field(default="artifacts/critic_rejects.jsonl")
 

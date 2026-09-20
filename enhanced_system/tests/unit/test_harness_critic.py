@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from enhanced_system.harness.critic import (
@@ -654,30 +655,85 @@ def test_collect_backwards_compatible_when_critic_disabled(tmp_path):
     assert len(rows) == 1
     assert rows[0]["trajectory"]["final_answer"] == "hi"
 
-    """When critic is disabled (--no-critic), collection behaves as before."""
-    from scripts.harness.collect_trajectories import main
 
-    source = tmp_path / "in.jsonl"
-    source.write_text(
-        json.dumps({"prompt": "Greet", "expected": "hi"}) + "\n",
+@pytest.mark.unit
+@pytest.mark.harness
+def test_produce_kill_artifact_critic_rejects(monkeypatch):
+    """CI/test producing uploadable artifact artifacts/critic_rejects.jsonl with both codes."""
+    from scripts.harness.collect_trajectories import main as collect_main
+    from scripts.harness.compose_dualdistill import main as compose_main
+
+    artifact_path = Path("artifacts/critic_rejects.jsonl")
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    if artifact_path.exists():
+        artifact_path.unlink()
+
+    monkeypatch.setenv("MANGOMAS_CRITIC_ENABLED", "true")
+    monkeypatch.setenv("MANGOMAS_CRITIC_REJECT_LOG", str(artifact_path))
+
+    temp_dir = Path("artifacts/_tmp_test")
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    collect_in = temp_dir / "collect_in.jsonl"
+    collect_out = temp_dir / "collect_out.jsonl"
+    collect_in.write_text(
+        json.dumps({"prompt": "Task outcome mismatch", "expected": "expected_val"}) + "\n",
         encoding="utf-8",
     )
-    dest = tmp_path / "out.jsonl"
 
-    code = main(
+    code = collect_main(
         [
             "--input",
-            str(source),
+            str(collect_in),
             "--output",
-            str(dest),
+            str(collect_out),
             "--harness-id",
             "base_react",
             "--scripted",
-            '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"hi\\"}}"]',
-            "--no-critic",
+            '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"actual_val\\"}}"]',
+            "--reject-log",
+            str(artifact_path),
+            "--critic",
         ]
     )
     assert code == 0
-    rows = [json.loads(line) for line in dest.read_text(encoding="utf-8").splitlines()]
-    assert len(rows) == 1
-    assert rows[0]["trajectory"]["final_answer"] == "hi"
+
+    t1_file = temp_dir / "t1.jsonl"
+    t2_file = temp_dir / "t2.jsonl"
+    comp_out = temp_dir / "comp_out.jsonl"
+    t1_file.write_text(
+        json.dumps({"prompt": "Task dualdistill drop", "expected": "gold", "completion": "ans1"})
+        + "\n",
+        encoding="utf-8",
+    )
+    t2_file.write_text(
+        json.dumps({"prompt": "Task dualdistill drop", "expected": "gold", "completion": "ans2"})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    code = compose_main(
+        [
+            "--first",
+            str(t1_file),
+            "--second",
+            str(t2_file),
+            "--output",
+            str(comp_out),
+            "--reject-log",
+            str(artifact_path),
+        ]
+    )
+    assert code == 0
+
+    assert artifact_path.is_file(), f"{artifact_path} was not created"
+    records = [json.loads(line) for line in artifact_path.read_text(encoding="utf-8").splitlines()]
+    codes = {r.get("critic_reject_code") for r in records}
+    assert "OUTCOME_MISMATCH" in codes, f"Missing OUTCOME_MISMATCH in {codes}"
+    assert "DUALDISTILL_DROP_0_0" in codes, f"Missing DUALDISTILL_DROP_0_0 in {codes}"
+    for r in records:
+        assert "critic_reject_code" in r
+        assert "prompt" in r
+
+    import shutil
+
+    shutil.rmtree(temp_dir, ignore_errors=True)

@@ -63,6 +63,13 @@ jobs:
         with:
           name: coverage-xml
           path: coverage.xml
+      - name: Upload critic rejects artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: critic-rejects
+          path: artifacts/critic_rejects.jsonl
+          if-no-files-found: warn
 
   security:
     runs-on: ubuntu-latest
