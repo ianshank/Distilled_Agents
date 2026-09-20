@@ -10,13 +10,19 @@ House plan/review:
 - `docs/plans/symbolic-kd/PLAN.md`
 - `docs/plans/symbolic-kd/REVIEW.md`
 
+### Active changes
+
 | Change | Phase | Status |
 |---|---|---|
-| `changes/green-trunk-ci` | P0 | proposed |
-| `changes/golden-passk-aqa` | P1 | proposed |
-| `changes/critic-cascade` | P2 | proposed |
-| `changes/symbolic-disposition` | P3 | proposed |
 | `changes/trl-gkd-usage` | P4 | implemented |
 
-Archive under `changes/archive/` only after the change’s CI/acceptance is green
-on `main` and NEXT_STEPS is updated.
+### Archived changes
+
+| Change | Phase | Status | Archive path |
+|---|---|---|---|
+| `green-trunk-ci` | P0 | archived | `changes/archive/green-trunk-ci` |
+| `golden-passk-aqa` | P1 | archived | `changes/archive/golden-passk-aqa` |
+| `critic-cascade` | P2 | archived | `changes/archive/critic-cascade` |
+| `symbolic-disposition` | P3 | archived | `changes/archive/symbolic-disposition` |
+
+Shared contracts remain active under `changes/_shared/` (e.g. `changes/_shared/blocked-reject-codes.md`).

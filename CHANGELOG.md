@@ -31,7 +31,7 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 - Updated rule traceability matrix `configs/rule_traceability/matrix.yaml` with active and fixture rules for all new hard golden items.
 - Added `scripts/harness/extract_rules.py` stub script extracting rule candidates from teacher traces without auto-promotion.
 - Added comprehensive unit tests in `enhanced_system/tests/unit/test_harness_tools.py` and `enhanced_system/tests/unit/test_harness_solver.py` including falsifier tests guaranteeing cyclic and unsat inputs never report SAT, proof of all 6 reject codes, and absence of forbidden execution constructs.
-- Documented ADR 0007 (`docs/adr/0007-symbolic-dispose-tools.md` / `docs/adr/0007-symbolic-disposition-fail-closed.md`).
+- Documented ADR 0007 (`docs/adr/0007-symbolic-dispose-tools.md`).
 
 ### Added
 - **Phase P2 `critic-cascade`:** Pure critic helpers, allowlist cascade filtering, reject telemetry, and recovery trace retention.

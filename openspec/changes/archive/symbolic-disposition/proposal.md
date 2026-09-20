@@ -1,6 +1,6 @@
 # Proposal: symbolic-disposition
 
-**Status:** implemented  
+**Status:** archived  
 **Date:** 2026-09-20  
 **Depends on:** `golden-passk-aqa` hard-slice gate exists (scripted CI green); `critic-cascade` metrics preferred
 **Plan:** Phase 3  

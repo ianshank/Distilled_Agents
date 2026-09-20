@@ -1,4 +1,4 @@
-# OpenSpec — project context (Distilled_Agents / MangoMAS)
+# OpenSpec - project context (Distilled_Agents / MangoMAS)
 
 OpenSpec is a **thin coordination/authoring layer** for in-flight changes.
 It is **not** a second source of truth.
@@ -7,7 +7,7 @@ It is **not** a second source of truth.
 
 | Concern | Source of truth |
 |---|---|
-| Runtime harness–policy | ADR 0006 (`docs/adr/0006-runtime-harness-policy.md`) |
+| Runtime harness-policy | ADR 0006 (`docs/adr/0006-runtime-harness-policy.md`) |
 | Distillation format triangle | `docs/README_AGENT_DISTILLATION.md` |
 | Operator follow-ups | `docs/NEXT_STEPS.md` |
 | Settings / knobs | `enhanced_system/ops/settings.py` (`MANGOMAS_*`) |

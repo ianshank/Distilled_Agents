@@ -1,4 +1,4 @@
-# Spec delta — ci-hygiene
+# Spec delta - ci-hygiene
 
 ## ADDED Requirements
 

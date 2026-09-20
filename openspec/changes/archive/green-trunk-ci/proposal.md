@@ -1,6 +1,6 @@
 # Proposal: green-trunk-ci
 
-**Status:** proposed  
+**Status:** archived  
 **Date:** 2026-09-20  
 **Base:** `94e6c6a`  
 **Plan:** `docs/plans/symbolic-kd/PLAN.md` Phase 0  
