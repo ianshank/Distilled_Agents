@@ -30,7 +30,9 @@ def format_dpo_example(example: Dict[str, Any], tokenizer: Any) -> Dict[str, Any
 
     Returns a dict with 'prompt', 'chosen', and 'rejected' strings.
     """
-    context_msgs = list(example.get("history", []) if isinstance(example.get("history"), list) else [])
+    context_msgs = list(
+        example.get("history", []) if isinstance(example.get("history"), list) else []
+    )
     if "prompt" in example and isinstance(example["prompt"], str):
         context_msgs.append({"role": "user", "content": example["prompt"]})
     elif "task" in example and isinstance(example["task"], str):
@@ -45,9 +47,7 @@ def format_dpo_example(example: Dict[str, Any], tokenizer: Any) -> Dict[str, Any
     try:
         # Format the shared context as the 'prompt' field for DPOTrainer
         prompt_str = tokenizer.apply_chat_template(
-            context_msgs,
-            tokenize=False,
-            add_generation_prompt=True
+            context_msgs, tokenize=False, add_generation_prompt=True
         )
 
         # Format the chosen and rejected continuations
@@ -66,11 +66,7 @@ def format_dpo_example(example: Dict[str, Any], tokenizer: Any) -> Dict[str, Any
         # if they duplicate what the prompt already ends with, but trl DPOTrainer
         # is fairly robust to this if the tokenizer's chat template is standard.
 
-        return {
-            "prompt": prompt_str,
-            "chosen": chosen_str,
-            "rejected": rejected_str
-        }
+        return {"prompt": prompt_str, "chosen": chosen_str, "rejected": rejected_str}
     except Exception as e:
         logger.error("Failed to format DPO example: %s", e)
         raise

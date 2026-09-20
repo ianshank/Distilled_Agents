@@ -39,10 +39,13 @@ class SecurityScanner:
         try:
             # Run bandit with JSON output format
             import sys
+
             cmd = [sys.executable, "-m", "bandit", "-f", "json", temp_path]
             result = subprocess.run(cmd, capture_output=True, text=True, check=False)
             if result.returncode not in (0, 1):
-                raise RuntimeError(f"Bandit failed with exit code {result.returncode}: {result.stderr}")
+                raise RuntimeError(
+                    f"Bandit failed with exit code {result.returncode}: {result.stderr}"
+                )
 
             # Bandit returns 0 if no issues, 1 if issues found
             try:

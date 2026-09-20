@@ -15,18 +15,30 @@ from scripts.training.distill.trainer import resolve_target_modules_for_model
 
 logger = logging.getLogger(__name__)
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a Distilled Agent using DPO.")
-    parser.add_argument("--model_name_or_path", type=str, required=True, help="Base model path or Hub ID")
-    parser.add_argument("--dataset_path", type=str, required=True, help="Path to preference JSONL dataset")
-    parser.add_argument("--output_dir", type=str, default="./dpo_adapter", help="Output adapter directory")
+    parser.add_argument(
+        "--model_name_or_path", type=str, required=True, help="Base model path or Hub ID"
+    )
+    parser.add_argument(
+        "--dataset_path", type=str, required=True, help="Path to preference JSONL dataset"
+    )
+    parser.add_argument(
+        "--output_dir", type=str, default="./dpo_adapter", help="Output adapter directory"
+    )
     parser.add_argument("--use_fp16", action="store_true", help="Use FP16 precision")
     parser.add_argument("--use_device_map", action="store_true", help="Use auto device map")
-    parser.add_argument("--trust_remote_code", action="store_true", help="Trust remote code (subject to SDLC guardrails)")
+    parser.add_argument(
+        "--trust_remote_code",
+        action="store_true",
+        help="Trust remote code (subject to SDLC guardrails)",
+    )
     parser.add_argument("--batch_size", type=int, default=2)
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--learning_rate", type=float, default=5e-5)
     return parser.parse_args()
+
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -109,6 +121,7 @@ def main() -> int:
     tokenizer.save_pretrained(args.output_dir)
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

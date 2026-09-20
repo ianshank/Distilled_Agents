@@ -318,12 +318,13 @@ class DistillationTrainer(Trainer):
             t_vocab = teacher_logits.size(-1)
             if s_vocab != t_vocab:
                 import warnings
+
                 warnings.warn(
                     f"Vocab mismatch: Student({s_vocab}) vs Teacher({t_vocab}). "
                     "Cannot safely compute KL divergence across disparate token spaces. "
                     "Falling back to task loss.",
                     RuntimeWarning,
-                    stacklevel=2
+                    stacklevel=2,
                 )
                 return task_loss
 
