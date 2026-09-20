@@ -53,6 +53,11 @@ class AgentRuntime:
         self.teacher = teacher
         self.memory_bank = memory_bank
 
+    def reset(self) -> None:
+        """Reset backend state between evaluation trials/samples."""
+        if hasattr(self.backend, "reset"):
+            self.backend.reset()
+
     def run(
         self,
         task: str,

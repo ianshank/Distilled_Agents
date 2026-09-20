@@ -37,6 +37,8 @@ def evaluate_pass_at_k(
 ) -> dict[str, Any]:
     """Execute n samples per row and compute unbiased pass@1 and pass@k."""
     ood_synthetic_success_violations = 0
+    vacuity_violations = 0
+    tool_compliance_violations = 0
     problem_counts: list[tuple[int, int]] = []
     total_problems = len(rows)
 
@@ -44,10 +46,18 @@ def evaluate_pass_at_k(
         c = 0
         is_ood = row.is_ood
         expected = row.expected or ""
+        expected_tools = row.expected_tools
+        row_harness_id = row.harness_id or harness_id
+        if expected_tools is None and row_harness_id == "sqe_dispose":
+            expected_tools = ["sqe_constraint_solver", "final_answer"]
 
         for sample_idx in range(n):
             security_failed = False
-            row_harness_id = row.harness_id or harness_id
+            if hasattr(runtime, "reset"):
+                runtime.reset()
+            elif hasattr(runtime, "backend") and hasattr(runtime.backend, "reset"):
+                runtime.backend.reset()
+
             try:
                 result = runtime.run(
                     str(row.prompt),
@@ -78,7 +88,60 @@ def evaluate_pass_at_k(
                     security_failed = True
 
             actual_answer = result.final_answer
-            is_match = answers_match(actual_answer, expected) and not security_failed
+
+            # Inspect recorded tool calls for tool compliance and solver bypass
+            executed_tools = [s.tool_id for s in result.trajectory.steps if s.tool_id]
+            tool_compliant = True
+            is_solver_bypass = False
+
+            if expected_tools:
+                last_idx = -1
+                for exp_tool in expected_tools:
+                    try:
+                        found_idx = executed_tools.index(exp_tool, last_idx + 1)
+                        last_idx = found_idx
+                    except ValueError:
+                        tool_compliant = False
+                        break
+
+                if "sqe_constraint_solver" in expected_tools:
+                    if "sqe_constraint_solver" not in executed_tools:
+                        is_solver_bypass = True
+                    else:
+                        solver_idx = executed_tools.index("sqe_constraint_solver")
+                        final_idx = (
+                            executed_tools.index("final_answer")
+                            if "final_answer" in executed_tools
+                            else -1
+                        )
+                        if final_idx == -1 or final_idx <= solver_idx:
+                            is_solver_bypass = True
+
+            if is_solver_bypass:
+                vacuity_violations += 1
+                tool_compliant = False
+                logger.error(
+                    "Vacuity failure (solver bypass) on %s (sample %d/%d): "
+                    "reached final_answer without prior sqe_constraint_solver call (executed: %s)",
+                    row.id or f"row_{idx}",
+                    sample_idx + 1,
+                    n,
+                    executed_tools,
+                )
+            elif not tool_compliant:
+                tool_compliance_violations += 1
+                logger.error(
+                    "Tool compliance failure on %s (sample %d/%d): expected tools %s, executed %s",
+                    row.id or f"row_{idx}",
+                    sample_idx + 1,
+                    n,
+                    expected_tools,
+                    executed_tools,
+                )
+
+            is_match = (
+                answers_match(actual_answer, expected) and not security_failed and tool_compliant
+            )
             answer_mismatch = not answers_match(actual_answer, expected)
 
             if is_match:
@@ -110,6 +173,8 @@ def evaluate_pass_at_k(
         "exact_only": True,
         "semantic_counted": False,
         "ood_synthetic_success_violations": ood_synthetic_success_violations,
+        "vacuity_violations": vacuity_violations,
+        "tool_compliance_violations": tool_compliance_violations + vacuity_violations,
         "n": n,
         "k": k,
         "total_problems": total_problems,
@@ -303,6 +368,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         "exact_only": True,
         "semantic_counted": False,
         "ood_synthetic_success_violations": result_dict["ood_synthetic_success_violations"],
+        "vacuity_violations": result_dict.get("vacuity_violations", 0),
+        "tool_compliance_violations": result_dict.get("tool_compliance_violations", 0),
         "n": n,
         "k": k,
         "golden_path": str(golden_path),
@@ -327,10 +394,24 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Gate decision
     target_pass_k = result_dict["pass_at_k"].get(str(k), 0.0)
     violations = result_dict["ood_synthetic_success_violations"]
+    vacuity_violations = result_dict.get("vacuity_violations", 0)
+    compliance_violations = result_dict.get("tool_compliance_violations", 0)
 
     failed = False
     if violations > 0:
         logger.error("AQA Pass@K Gate FAILED: %d OOD synthetic-success violation(s)", violations)
+        failed = True
+    if vacuity_violations > 0:
+        logger.error(
+            "AQA Pass@K Gate FAILED: %d vacuity / solver-bypass violation(s)",
+            vacuity_violations,
+        )
+        failed = True
+    elif compliance_violations > 0:
+        logger.error(
+            "AQA Pass@K Gate FAILED: %d tool compliance violation(s)",
+            compliance_violations,
+        )
         failed = True
     if target_pass_k < threshold:
         logger.error(
@@ -345,11 +426,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 1
 
     logger.info(
-        "AQA Pass@K Gate PASSED (pass@1=%.4f, pass@%d=%.4f, violations=%d).",
+        "AQA Pass@K Gate PASSED (pass@1=%.4f, pass@%d=%.4f, violations=%d, vacuity_violations=%d).",
         result_dict["pass_at_k"]["1"],
         k,
         target_pass_k,
         violations,
+        vacuity_violations,
     )
     return 0
 
