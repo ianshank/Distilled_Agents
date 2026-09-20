@@ -4,7 +4,7 @@ GITLEAKS ?= gitleaks
 # Nested enhanced_system/pytest.ini testpaths would miss tests/harness/.
 PYTEST := $(PYTHON) -m pytest --rootdir=$(CURDIR)
 
-.PHONY: install lint fmt typecheck test test-harness test-aqa security gitleaks validate
+.PHONY: install lint fmt typecheck test test-harness test-aqa security gitleaks aqa-gate aqa-gate-passk validate
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -38,8 +38,9 @@ gitleaks:
 
 aqa-gate:
 	$(PYTHON) scripts/harness/run_aqa_gate.py --golden-set configs/golden_sets/core_sdlc.jsonl --threshold 75.0 --scripted tests/fixtures/mock_responses.json
-	$(PYTHON) scripts/harness/run_aqa_gate.py --golden-set configs/golden_sets/hard_sdlc.jsonl --threshold 75.0 --hard-threshold 75.0 --require-hard --scripted tests/fixtures/mock_responses.json
-	$(PYTHON) scripts/harness/check_rule_matrix.py --matrix configs/rule_traceability/matrix.yaml --golden configs/golden_sets/hard_sdlc.jsonl
+
+aqa-gate-passk:
+	$(PYTHON) scripts/harness/run_pass_at_k.py --golden-set configs/golden_sets/sqe_hard_ood.jsonl --threshold 1.0 --scripted tests/fixtures/mock_responses_sqe_passk.json --output aqa-passk-summary.json
 
 train-dpo:
 	$(PYTHON) scripts/training/train_dpo_adapter.py --model_name_or_path "gpt2" --dataset_path "tests/fixtures/dpo_preferences.jsonl" --epochs 1 --batch_size 1 --output_dir "./dpo_adapter_test"

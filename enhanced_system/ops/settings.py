@@ -50,7 +50,7 @@ class MangoMASSettings(BaseSettings):
     harness_apply_patches: bool = Field(default=False)
     harness_memory_bank: str = Field(default="")
 
-    # Golden pass@k evaluation settings (Phase 1)
+    # Golden pass@k evaluation settings (Phase 0 / I1)
     eval_pass_k: int = Field(default=3)
     eval_pass_n: int = Field(default=5)
     eval_pass_k_temperature: float = Field(default=0.8)

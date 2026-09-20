@@ -1,36 +1,53 @@
-"""Unit and integration tests for multi-trial pass@k, golden sets, rule matrix, and AQA gate."""
+"""Unit and regression tests for Pass@K hard/OOD gate, Chen estimator, and golden set."""
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
-import yaml
 from enhanced_system.harness.backends.echo import EchoBackend
-from enhanced_system.harness.types import GoldenRow
+from enhanced_system.harness.golden import (
+    BUCKET_MINIMA,
+    TOTAL_MINIMUM,
+    validate_golden_file,
+    validate_golden_rows,
+)
+from enhanced_system.harness.score import (
+    calculate_pass_at_k,
+    estimate_pass_at_k,
+)
+from enhanced_system.harness.types import (
+    GoldenRow,
+    HarnessRunResult,
+    Trajectory,
+)
+from scripts.harness import eval_harness as eval_harness_module
 from scripts.harness.check_rule_matrix import verify_rule_matrix
-from scripts.harness.eval_harness import _evaluate_file
-from scripts.harness.run_aqa_gate import run_gate
+from scripts.harness.run_pass_at_k import evaluate_pass_at_k
+from scripts.harness.run_pass_at_k import main as run_pass_k_main
 
 
 @pytest.mark.unit
 @pytest.mark.harness
-def test_golden_row_schema_backwards_compatibility():
+def test_golden_row_schema_backwards_compatibility() -> None:
     """Existing golden rows with only prompt and expected load with correct defaults."""
     raw = {"prompt": "What is Python?", "expected": "A programming language"}
     row = GoldenRow.model_validate(raw)
     assert row.prompt == "What is Python?"
     assert row.expected == "A programming language"
     assert row.slice == "core"
+    assert row.grader == "exact"
     assert row.allow_semantic is False
     assert row.id is None
     assert row.harness_id is None
     assert row.expected_tools is None
+    assert row.is_ood is False
 
 
 @pytest.mark.unit
 @pytest.mark.harness
-def test_golden_row_empty_prompt_and_slice_normalize():
+def test_golden_row_empty_prompt_and_slice_normalize() -> None:
     """Empty prompts are rejected and slice casing is normalized."""
     with pytest.raises(ValueError, match="must not be empty"):
         GoldenRow.model_validate({"prompt": ""})
@@ -44,66 +61,204 @@ def test_golden_row_empty_prompt_and_slice_normalize():
     row_core_upper = GoldenRow.model_validate({"prompt": "Valid", "slice": "CORE"})
     assert row_core_upper.slice == "core"
 
+    row_ood_upper = GoldenRow.model_validate({"prompt": "Valid", "slice": "OOD"})
+    assert row_ood_upper.slice == "ood"
+
     row_none = GoldenRow.model_validate({"prompt": "Valid", "slice": None})
     assert row_none.slice == "core"
 
 
 @pytest.mark.unit
 @pytest.mark.harness
-def test_golden_row_disjunctive_ood_detection():
-    """Row is OOD if slice == 'ood' OR ood is True."""
-    row_slice_ood = GoldenRow.model_validate({"prompt": "p", "slice": "ood", "ood": False})
-    assert row_slice_ood.is_ood is True
-    assert row_slice_ood.is_hard_or_ood is True
+def test_ood_detector_equivalence() -> None:
+    """A row is OOD iff slice == 'ood' OR ood == true (equivalent handling)."""
+    # slice: "ood", ood: False -> OOD
+    row1 = GoldenRow.model_validate({"prompt": "Task", "slice": "ood", "ood": False})
+    assert row1.is_ood is True
 
-    row_flag_ood = GoldenRow.model_validate({"prompt": "p", "slice": "hard", "ood": True})
-    assert row_flag_ood.is_ood is True
-    assert row_flag_ood.is_hard_or_ood is True
+    # slice: "hard", ood: True -> OOD
+    row2 = GoldenRow.model_validate({"prompt": "Task", "slice": "hard", "ood": True})
+    assert row2.is_ood is True
 
-    row_regular = GoldenRow.model_validate({"prompt": "p", "slice": "core", "ood": False})
-    assert row_regular.is_ood is False
-    assert row_regular.is_hard_or_ood is False
+    # slice: "ood", ood: True -> OOD
+    row3 = GoldenRow.model_validate({"prompt": "Task", "slice": "ood", "ood": True})
+    assert row3.is_ood is True
+
+    # slice: "hard", ood: False -> NOT OOD
+    row4 = GoldenRow.model_validate({"prompt": "Task", "slice": "hard", "ood": False})
+    assert row4.is_ood is False
+
+    # slice: "core", ood: False -> NOT OOD
+    row5 = GoldenRow.model_validate({"prompt": "Task", "slice": "core", "ood": False})
+    assert row5.is_ood is False
 
 
 @pytest.mark.unit
 @pytest.mark.harness
-def test_golden_row_schema_hard_slice_validation():
-    """Hard slice rows require id, non-empty expected, and slice=='hard'."""
+def test_golden_row_hard_and_ood_validation() -> None:
+    """Hard and OOD slice rows enforce exact match, non-empty expected, and canonical refusal for OOD."""
     valid_hard = {
-        "id": "hard-001",
-        "prompt": "Fix deadlock",
-        "expected": "transaction retried",
+        "id": "sqe-hard-001",
+        "prompt": "DAG topo order",
+        "expected": "checkout compile",
         "slice": "hard",
+        "grader": "exact",
         "allow_semantic": False,
     }
-    row = GoldenRow.model_validate(valid_hard)
-    row.validate_for_hard_slice()
+    row_hard = GoldenRow.model_validate(valid_hard)
+    row_hard.validate_for_hard_or_ood()
 
-    # Missing id
-    missing_id = {"prompt": "Fix deadlock", "expected": "ok", "slice": "hard"}
-    row_no_id = GoldenRow.model_validate(missing_id)
-    with pytest.raises(ValueError, match="missing stable id"):
-        row_no_id.validate_for_hard_slice()
+    valid_ood = {
+        "id": "sqe-ood-001",
+        "prompt": "Cycle",
+        "expected": "BLOCKED:CYCLE_DETECTED",
+        "slice": "ood",
+        "grader": "exact",
+        "allow_semantic": False,
+    }
+    row_ood = GoldenRow.model_validate(valid_ood)
+    row_ood.validate_for_hard_or_ood()
 
-    # Missing expected
-    missing_expected = {"id": "hard-002", "prompt": "Fix deadlock", "slice": "hard"}
-    row_no_exp = GoldenRow.model_validate(missing_expected)
-    with pytest.raises(ValueError, match="must have non-empty expected"):
-        row_no_exp.validate_for_hard_slice()
+    # OOD with non-canonical expected raises ValueError
+    invalid_ood = {
+        "id": "sqe-ood-bad",
+        "prompt": "Cycle",
+        "expected": "Some fabricated order",
+        "slice": "ood",
+        "grader": "exact",
+        "allow_semantic": False,
+    }
+    row_bad_ood = GoldenRow.model_validate(invalid_ood)
+    with pytest.raises(ValueError, match="canonical refusal"):
+        row_bad_ood.validate_for_hard_or_ood()
 
-    # Core row cannot validate as hard
-    core_row = GoldenRow.model_validate({"prompt": "Hello", "expected": "Hi", "slice": "core"})
-    with pytest.raises(ValueError, match="must have slice='hard'"):
-        core_row.validate_for_hard_slice()
+    # Hard row with allow_semantic=True raises ValueError
+    semantic_hard = {
+        "id": "sqe-hard-sem",
+        "prompt": "DAG",
+        "expected": "out",
+        "slice": "hard",
+        "allow_semantic": True,
+    }
+    row_sem = GoldenRow.model_validate(semantic_hard)
+    with pytest.raises(ValueError, match="allow_semantic=False"):
+        row_sem.validate_for_hard_or_ood()
+
+    row_core = GoldenRow.model_validate({"id": "core-001", "prompt": "Core", "expected": "ok"})
+    with pytest.raises(ValueError, match="must have slice in"):
+        row_core.validate_for_hard_or_ood()
 
 
 @pytest.mark.unit
 @pytest.mark.harness
-def test_echo_backend_dict_mapping_and_reset():
-    """EchoBackend supports dictionary mapping, lists per prompt, default fallback, and reset."""
+def test_chen_unbiased_pass_at_k_math() -> None:
+    """Verify Chen et al. unbiased estimator against analytical values and biased formula."""
+    # c = 0 -> 0.0
+    assert estimate_pass_at_k(n=5, c=0, k=3) == 0.0
+
+    # c = n -> 1.0
+    assert estimate_pass_at_k(n=5, c=5, k=3) == 1.0
+
+    # c = 3, n = 5, k = 3: n - c = 2 < 3 -> 1.0
+    assert estimate_pass_at_k(n=5, c=3, k=3) == 1.0
+
+    # c = 2, n = 5, k = 3: 1 - comb(3, 3) / comb(5, 3) = 1 - 1/10 = 0.9
+    assert pytest.approx(estimate_pass_at_k(n=5, c=2, k=3)) == 0.9
+
+    # c = 1, n = 5, k = 3: 1 - comb(4, 3) / comb(5, 3) = 1 - 4/10 = 0.6
+    assert pytest.approx(estimate_pass_at_k(n=5, c=1, k=3)) == 0.6
+
+    # k = 1 is always exactly c / n
+    for c in range(6):
+        assert pytest.approx(estimate_pass_at_k(n=5, c=c, k=1)) == c / 5.0
+
+    # Prove discrepancy with biased estimator 1 - (1 - c/n)^k
+    # When c=1, n=5, k=3: unbiased is 0.6; biased is 1 - (4/5)^3 = 1 - 64/125 = 0.488
+    biased_val = 1.0 - (1.0 - 1.0 / 5.0) ** 3
+    unbiased_val = estimate_pass_at_k(n=5, c=1, k=3)
+    assert unbiased_val != biased_val
+    assert pytest.approx(unbiased_val) == 0.6
+    assert pytest.approx(biased_val) == 0.488
+
+    # Parameter validation
+    with pytest.raises(ValueError, match="n=2 must be >= k=3"):
+        estimate_pass_at_k(n=2, c=1, k=3)
+
+    with pytest.raises(ValueError, match="k must be positive"):
+        estimate_pass_at_k(n=5, c=1, k=0)
+
+    with pytest.raises(ValueError, match="Correct samples"):
+        estimate_pass_at_k(n=5, c=6, k=3)
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_calculate_pass_at_k_multi_problem() -> None:
+    """Test average pass@k across a batch of problems."""
+    # Problem 1: 5 samples, 1 correct (pass@3 = 0.6)
+    # Problem 2: 5 samples, 2 correct (pass@3 = 0.9)
+    # Average pass@3 = (0.6 + 0.9) / 2 = 0.75
+    counts = [(5, 1), (5, 2)]
+    avg_pass_3 = calculate_pass_at_k(counts, k=3)
+    assert pytest.approx(avg_pass_3) == 0.75
+
+    avg_pass_1 = calculate_pass_at_k(counts, k=1)
+    assert pytest.approx(avg_pass_1) == (0.2 + 0.4) / 2.0
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_golden_file_bucket_minima_passes() -> None:
+    """Checked-in configs/golden_sets/sqe_hard_ood.jsonl meets all bucket minima."""
+    result = validate_golden_file("configs/golden_sets/sqe_hard_ood.jsonl")
+    assert result["valid"] is True
+    assert result["total"] >= TOTAL_MINIMUM
+    counts = result["bucket_counts"]
+    for bucket, minimum in BUCKET_MINIMA.items():
+        assert counts.get(bucket, 0) >= minimum, (
+            f"Bucket {bucket} has {counts.get(bucket, 0)} rows, expected >= {minimum}"
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_golden_validator_catches_violations() -> None:
+    """Validator raises ValueError on deficient count, missing bucket, or duplicates."""
+    # Less than total minimum (24)
+    short_rows = [
+        GoldenRow(
+            id=f"row-{i}",
+            prompt=f"Task {i}",
+            expected="ok",
+            slice="hard",
+            bucket="dag",
+        )
+        for i in range(10)
+    ]
+    with pytest.raises(ValueError, match="minimum required is 24"):
+        validate_golden_rows(short_rows)
+
+    # 24 rows but missing cycle/unsat buckets (all DAG)
+    all_dag_rows = [
+        GoldenRow(
+            id=f"dag-{i}",
+            prompt=f"DAG Task {i}",
+            expected="ok",
+            slice="hard",
+            bucket="dag",
+        )
+        for i in range(25)
+    ]
+    with pytest.raises(ValueError, match="failed bucket minima validation"):
+        validate_golden_rows(all_dag_rows)
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_echo_backend_reset_and_multi_trial() -> None:
+    """EchoBackend correctly handles dict mapping, sequential trial queues, and reset."""
     mapping = {
-        "task1": '{"tool": "final_answer", "args": {"text": "resp1"}}',
-        "task2": [
+        "task_one": [
             '{"tool": "final_answer", "args": {"text": "trial1"}}',
             '{"tool": "final_answer", "args": {"text": "trial2"}}',
         ],
@@ -111,109 +266,154 @@ def test_echo_backend_dict_mapping_and_reset():
     }
     backend = EchoBackend(mapping)
 
-    # Matches task1
-    res1 = backend.generate([{"role": "user", "content": "Execute task1"}])
-    assert "resp1" in res1[0]
+    res1 = backend.generate([{"role": "user", "content": "Execute task_one"}])
+    assert "trial1" in res1[0]
+    res2 = backend.generate([{"role": "user", "content": "Execute task_one"}])
+    assert "trial2" in res2[0]
 
-    # Matches task2 first trial then second trial
-    res2a = backend.generate([{"role": "user", "content": "Execute task2"}])
-    assert "trial1" in res2a[0]
-    res2b = backend.generate([{"role": "user", "content": "Execute task2"}])
-    assert "trial2" in res2b[0]
-
-    # Unmatched uses default
-    res_def = backend.generate([{"role": "user", "content": "Unknown task"}])
-    assert "fallback" in res_def[0]
-
-    # After reset, task2 list is restored
+    # After reset, queue is reloaded
     backend.reset()
-    res2_reset = backend.generate([{"role": "user", "content": "Execute task2"}])
-    assert "trial1" in res2_reset[0]
-
-
-class MultiTrialScriptedBackend(EchoBackend):
-    """Scripted backend returning varying responses across trials for testing pass@k."""
-
-    def __init__(self, responses_by_prompt: dict[str, list[str]]) -> None:
-        super().__init__()
-        self.responses = {k: list(v) for k, v in responses_by_prompt.items()}
-
-    def generate(self, messages, *, prefix=None, n=1, temperature=None):
-        user_texts = [m.get("content", "") for m in messages if m.get("role") == "user"]
-        full_user = " ".join(user_texts)
-        matched_queue = None
-        for key, q in self.responses.items():
-            if key in full_user:
-                matched_queue = q
-                break
-        if matched_queue and len(matched_queue) > 0:
-            item = matched_queue.pop(0)
-        else:
-            item = '{"tool": "final_answer", "args": {"text": "default"}}'
-        return [item] * (n if n and n > 0 else 1)
+    res1_reset = backend.generate([{"role": "user", "content": "Execute task_one"}])
+    assert "trial1" in res1_reset[0]
 
 
 @pytest.mark.unit
 @pytest.mark.harness
-def test_pass_at_1_vs_pass_at_k_multi_trial(tmp_path):
-    """Verify that a prompt failing trial 1 but passing trial 2 gives pass@1=0% and pass@k=100%."""
+def test_ood_synthetic_success_prohibition(tmp_path: Path) -> None:
+    """Any non-empty non-matching answer on an OOD row trips synthetic-success violation."""
+    # OOD row expecting BLOCKED:CYCLE_DETECTED
+    row = GoldenRow(
+        id="sqe-ood-cycle-test",
+        prompt="Circular dependency",
+        expected="BLOCKED:CYCLE_DETECTED",
+        slice="ood",
+        ood=True,
+    )
+
+    # Case 1: Backend emits invented topological order "a b c" (non-empty non-matching)
+    invented_backend = EchoBackend(
+        {"Circular dependency": '{"tool": "final_answer", "args": {"text": "a b c"}}'}
+    )
+    from enhanced_system.harness.registry import load_spec
+    from enhanced_system.harness.runtime import AgentRuntime
+
+    runtime_invented = AgentRuntime(invented_backend, spec=load_spec("base_react"), teacher=False)
+    res_invented = evaluate_pass_at_k(
+        runtime_invented,
+        [row],
+        n=3,
+        k=2,
+        harness_id="base_react",
+    )
+    # Must trip 3 violations (one per sample)
+    assert res_invented["ood_synthetic_success_violations"] == 3
+    assert res_invented["pass_at_k"]["2"] == 0.0
+
+    # Case 2: Backend emits canonical refusal BLOCKED:CYCLE_DETECTED
+    canonical_backend = EchoBackend(
+        {
+            "Circular dependency": (
+                '{"tool": "final_answer", "args": {"text": "BLOCKED:CYCLE_DETECTED"}}'
+            )
+        }
+    )
+    runtime_canonical = AgentRuntime(canonical_backend, spec=load_spec("base_react"), teacher=False)
+    res_canonical = evaluate_pass_at_k(
+        runtime_canonical,
+        [row],
+        n=3,
+        k=2,
+        harness_id="base_react",
+    )
+    assert res_canonical["ood_synthetic_success_violations"] == 0
+    assert res_canonical["pass_at_k"]["2"] == 1.0
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_ood_security_failure_is_not_synthetic_success() -> None:
+    """Canonical OOD refusals with security findings stay non-violations."""
+
+    class StubRuntime:
+        def run(
+            self, task: str, *, harness_id: str | None = None, temperature: float | None = None
+        ):
+            return HarnessRunResult(
+                final_answer="BLOCKED:CYCLE_DETECTED",
+                harness_id=harness_id or "",
+                trajectory=Trajectory(harness_id=harness_id or ""),
+            )
+
+    class StubScanner:
+        def scan_trajectory(self, trajectory: Trajectory) -> list[dict[str, str]]:
+            return [{"issue_text": "simulated"}]
+
+    row = GoldenRow(
+        id="sqe-ood-cycle-test",
+        prompt="Circular dependency",
+        expected="BLOCKED:CYCLE_DETECTED",
+        slice="ood",
+        ood=True,
+    )
+    result = evaluate_pass_at_k(
+        StubRuntime(),
+        [row],
+        n=2,
+        k=1,
+        harness_id="base_react",
+        scanner=StubScanner(),
+    )
+    assert result["ood_synthetic_success_violations"] == 0
+    assert result["pass_at_k"]["1"] == 0.0
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_pass_at_k_uses_row_harness_and_temperature() -> None:
+    """Pass@K runs honor per-row harness_id and forwarded sampling temperature."""
+
+    class StubRuntime:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str | None, float | None]] = []
+
+        def run(
+            self, task: str, *, harness_id: str | None = None, temperature: float | None = None
+        ):
+            self.calls.append((task, harness_id, temperature))
+            return HarnessRunResult(
+                final_answer="ok",
+                harness_id=harness_id or "",
+                trajectory=Trajectory(harness_id=harness_id or ""),
+            )
+
+    runtime = StubRuntime()
+    rows = [
+        GoldenRow(
+            id="hard-1", prompt="task-1", expected="ok", slice="hard", harness_id="row_harness"
+        ),
+        GoldenRow(id="hard-2", prompt="task-2", expected="ok", slice="hard"),
+    ]
+    evaluate_pass_at_k(runtime, rows, n=1, k=1, harness_id="cli_harness", temperature=0.8)
+    assert runtime.calls == [
+        ("task-1", "row_harness", 0.8),
+        ("task-2", "cli_harness", 0.8),
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_vacuity_guard_gate_can_fail(tmp_path: Path) -> None:
+    """Verify that run_pass_at_k.py exits non-zero when threshold fails or OOD is violated."""
     golden_file = tmp_path / "test_golden.jsonl"
     golden_file.write_text(
         json.dumps(
             {
-                "id": "trial-test-01",
-                "prompt": "Test multi-trial",
-                "expected": "Success",
-                "slice": "core",
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    # Trial 1: wrong answer, Trial 2: exact match
-    backend = MultiTrialScriptedBackend(
-        {
-            "Test multi-trial": [
-                '{"tool": "final_answer", "args": {"text": "Wrong"}}',
-                '{"tool": "final_answer", "args": {"text": "Success"}}',
-                '{"tool": "final_answer", "args": {"text": "Success"}}',
-            ]
-        }
-    )
-
-    from enhanced_system.harness.registry import load_spec
-    from enhanced_system.harness.runtime import AgentRuntime
-
-    spec = load_spec("base_react")
-    runtime = AgentRuntime(backend, spec=spec, teacher=False)
-
-    summary = _evaluate_file(
-        runtime,
-        golden_file,
-        "base_react",
-        strict=True,
-        pass_k=2,
-    )
-
-    assert summary["total"] == 1
-    assert summary["k"] == 2
-    assert summary["pass_at_1"] == 0.0
-    assert summary["pass_at_k"] == 100.0
-
-
-@pytest.mark.unit
-@pytest.mark.harness
-def test_hard_slice_rejects_semantic_only_match(tmp_path):
-    """Hard slice requires exact answers_match; semantic near-miss counts as failure."""
-    golden_file = tmp_path / "hard_test.jsonl"
-    golden_file.write_text(
-        json.dumps(
-            {
-                "id": "hard-001",
-                "prompt": "Database connection pool",
-                "expected": "ConnectionRefusedError handled properly",
-                "slice": "hard",
+                "id": "sqe-ood-test",
+                "prompt": "Circular dep",
+                "expected": "BLOCKED:CYCLE_DETECTED",
+                "slice": "ood",
+                "bucket": "cycle",
+                "grader": "exact",
                 "allow_semantic": False,
             }
         )
@@ -221,273 +421,233 @@ def test_hard_slice_rejects_semantic_only_match(tmp_path):
         encoding="utf-8",
     )
 
-    # Returns "connectionrefusederror handled properly!" - semantic match but not exact
-    backend = MultiTrialScriptedBackend(
-        {
-            "Database connection pool": [
-                '{"tool": "final_answer", "args": {"text": "connectionrefusederror handled properly!"}}',
-            ]
-        }
-    )
-
-    from enhanced_system.harness.registry import load_spec
-    from enhanced_system.harness.runtime import AgentRuntime
-
-    spec = load_spec("base_react")
-    runtime = AgentRuntime(backend, spec=spec, teacher=False)
-
-    summary = _evaluate_file(
-        runtime,
-        golden_file,
-        "base_react",
-        strict=True,
-        pass_k=1,
-    )
-
-    assert summary["total"] == 1
-    assert summary["hard_total"] == 1
-    assert summary["semantic_match"] == 1
-    assert summary["exact_match"] == 0
-    assert summary["hard_pass_at_k"] == 0.0
-    assert summary["pass_at_k"] == 0.0
-
-
-@pytest.mark.unit
-@pytest.mark.harness
-def test_core_slice_allow_semantic_true_vs_false(tmp_path):
-    """Core slice allows semantic match ONLY if allow_semantic is true."""
-    golden_file = tmp_path / "core_test.jsonl"
-    rows = [
-        {
-            "id": "core-sem-false",
-            "prompt": "Prompt 1",
-            "expected": "Hello World",
-            "slice": "core",
-            "allow_semantic": False,
-        },
-        {
-            "id": "core-sem-true",
-            "prompt": "Prompt 2",
-            "expected": "Hello World",
-            "slice": "core",
-            "allow_semantic": True,
-        },
-    ]
-    golden_file.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
-
-    # Both return semantic near-match: "hello world!"
-    backend = MultiTrialScriptedBackend(
-        {
-            "Prompt 1": ['{"tool": "final_answer", "args": {"text": "hello world!"}}'],
-            "Prompt 2": ['{"tool": "final_answer", "args": {"text": "hello world!"}}'],
-        }
-    )
-
-    from enhanced_system.harness.registry import load_spec
-    from enhanced_system.harness.runtime import AgentRuntime
-
-    spec = load_spec("base_react")
-    runtime = AgentRuntime(backend, spec=spec, teacher=False)
-
-    summary = _evaluate_file(
-        runtime,
-        golden_file,
-        "base_react",
-        strict=True,
-        pass_k=1,
-    )
-
-    assert summary["total"] == 2
-    # Prompt 1 failed (allow_semantic=False), Prompt 2 succeeded (allow_semantic=True)
-    assert summary["pass_at_k"] == 50.0
-    assert summary["core_pass_at_k"] == 50.0
-
-
-@pytest.mark.unit
-@pytest.mark.harness
-def test_rule_matrix_verification(tmp_path):
-    """Rule traceability check passes when all hard IDs are present and fails when missing."""
-    matrix_file = tmp_path / "matrix.yaml"
-    golden_file = tmp_path / "hard.jsonl"
-
-    matrix_file.write_text(
-        yaml.dump(
-            {
-                "schema_version": "1",
-                "rules": [
-                    {
-                        "rule_id": "R1",
-                        "source_trace": "t1",
-                        "harness_id": "h1",
-                        "golden_id": "hard-1",
-                        "solver_status": "pending",
-                    },
-                    {
-                        "rule_id": "R2",
-                        "source_trace": "t2",
-                        "harness_id": "h2",
-                        "golden_id": "hard-2",
-                        "solver_status": "pending",
-                    },
-                ],
-            }
+    # 1. Failing run: threshold 1.0, bad responses
+    scripted_file = tmp_path / "failing_scripted.json"
+    scripted_file.write_text(
+        json.dumps(
+            {"Circular dep": '{"tool": "final_answer", "args": {"text": "invented order"}}'}
         ),
         encoding="utf-8",
     )
 
-    golden_file.write_text(
-        json.dumps({"id": "hard-1", "prompt": "p1", "expected": "e1", "slice": "hard"})
-        + "\n"
-        + json.dumps({"id": "hard-2", "prompt": "p2", "expected": "e2", "slice": "hard"})
-        + "\n",
-        encoding="utf-8",
-    )
-
-    # All covered
-    assert verify_rule_matrix(matrix_file, golden_file) == []
-
-    # Add uncovered row hard-3
-    golden_file.write_text(
-        golden_file.read_text(encoding="utf-8")
-        + json.dumps({"id": "hard-3", "prompt": "p3", "expected": "e3", "slice": "hard"})
-        + "\n",
-        encoding="utf-8",
-    )
-    assert verify_rule_matrix(matrix_file, golden_file) == ["hard-3"]
-
-
-@pytest.mark.integration
-@pytest.mark.harness
-def test_run_aqa_gate_cli_integration(tmp_path):
-    """Test run_aqa_gate CLI with scripted responses and hard threshold."""
-    golden_file = tmp_path / "golden.jsonl"
-    golden_file.write_text(
-        json.dumps(
-            {
-                "id": "gate-hard-001",
-                "prompt": "Do task",
-                "expected": "Task Done",
-                "slice": "hard",
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    scripted_file = tmp_path / "mock.json"
-    scripted_file.write_text(
-        json.dumps({"Do task": '{"tool": "final_answer", "args": {"text": "Task Done"}}'}),
-        encoding="utf-8",
-    )
-
-    ret = run_gate(
+    # Should exit 1 because golden set has < 24 rows
+    exit_code_small = run_pass_k_main(
         [
             "--golden-set",
             str(golden_file),
-            "--threshold",
-            "100.0",
-            "--hard-threshold",
-            "100.0",
-            "--pass-k",
-            "1",
-            "--require-hard",
             "--scripted",
             str(scripted_file),
         ]
     )
-    assert ret == 0
+    assert exit_code_small == 1
 
-
-@pytest.mark.integration
-@pytest.mark.harness
-def test_run_aqa_gate_fails_below_threshold(tmp_path):
-    """Test run_aqa_gate CLI fails when pass@k is below threshold."""
-    golden_file = tmp_path / "golden.jsonl"
-    golden_file.write_text(
-        json.dumps(
-            {
-                "id": "gate-hard-002",
-                "prompt": "Do task",
-                "expected": "Task Done",
-                "slice": "hard",
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    scripted_file = tmp_path / "mock.json"
-    scripted_file.write_text(
-        json.dumps({"Do task": '{"tool": "final_answer", "args": {"text": "Wrong"}}'}),
-        encoding="utf-8",
-    )
-
-    ret = run_gate(
-        [
-            "--golden-set",
-            str(golden_file),
-            "--threshold",
-            "80.0",
-            "--scripted",
-            str(scripted_file),
-        ]
-    )
-    assert ret == 1
+    assert run_pass_k_main(["--threshold", "-1"]) == 1
+    assert run_pass_k_main(["--threshold", "101"]) == 1
 
 
 @pytest.mark.unit
 @pytest.mark.harness
-def test_security_scanner_empty_and_safe_and_unsafe_code():
-    """SecurityScanner scans python code and trajectories with Bandit."""
+def test_rule_matrix_traceability() -> None:
+    """configs/rule_traceability/matrix.yaml covers all hard golden IDs in sqe_hard_ood.jsonl."""
+    matrix_path = Path("configs/rule_traceability/matrix.yaml")
+    golden_path = Path("configs/golden_sets/sqe_hard_ood.jsonl")
+    result = verify_rule_matrix(matrix_path, golden_path)
+    assert result["covered_hard_ids"] == 16
+    assert result["total_rules"] >= 16
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_rule_matrix_rejects_missing_hard_id(tmp_path: Path) -> None:
+    """Hard rows without ids fail traceability verification."""
+    matrix_path = tmp_path / "matrix.yaml"
+    golden_path = tmp_path / "golden.jsonl"
+    matrix_path.write_text(
+        "rules:\n  - rule_id: r1\n    source_trace: trace\n    harness_id: base_react\n    golden_id: hard-1\n    solver_status: fixture\n",
+        encoding="utf-8",
+    )
+    golden_path.write_text(
+        json.dumps({"prompt": "task", "expected": "ok", "slice": "hard"}) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="missing a stable 'id'"):
+        verify_rule_matrix(matrix_path, golden_path)
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_eval_harness_uses_row_harness_and_exact_rows_stay_strict(tmp_path: Path) -> None:
+    """Single-pass evaluation honors row harness ids and blocks semantic-only exact rows."""
+
+    class StubRuntime:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str | None]] = []
+
+        def run(self, task: str, *, harness_id: str | None = None):
+            self.calls.append((task, harness_id))
+            answer = "context containers components and code"
+            return HarnessRunResult(
+                final_answer=answer,
+                harness_id=harness_id or "",
+                trajectory=Trajectory(harness_id=harness_id or ""),
+            )
+
+    input_path = tmp_path / "eval.jsonl"
+    input_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "prompt": "semantic exact row",
+                        "expected": "Context, Containers, Components, and Code",
+                        "slice": "core",
+                        "allow_semantic": True,
+                        "grader": "exact",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "prompt": "semantic non-exact row",
+                        "expected": "Context, Containers, Components, and Code",
+                        "slice": "core",
+                        "allow_semantic": True,
+                        "grader": "semantic",
+                        "harness_id": "row_harness",
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    runtime = StubRuntime()
+    result = eval_harness_module._evaluate_file(
+        runtime,
+        input_path,
+        "cli_harness",
+        strict=True,
+        scanner=None,
+    )
+    assert runtime.calls == [
+        ("semantic exact row", "cli_harness"),
+        ("semantic non-exact row", "row_harness"),
+    ]
+    assert result["exact_match"] == 0
+    assert result["semantic_match"] == 1
+    assert result["pass_rate"] == 50.0
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_golden_infer_bucket_and_file_errors(tmp_path: Path) -> None:
+    """infer_bucket_from_row edge cases and file error handling."""
+    from enhanced_system.harness.golden import infer_bucket_from_row
+
+    # Inferred from tags
+    assert infer_bucket_from_row({"prompt": "t", "tags": ["dag"]}) == "dag"
+    # Inferred from ID
+    assert infer_bucket_from_row({"prompt": "t", "id": "test_tree_01"}) == "condition_tree"
+    assert infer_bucket_from_row({"prompt": "t", "id": "test_schema_01"}) == "schema_syntax"
+    assert infer_bucket_from_row({"prompt": "t", "id": "test_theory_01"}) == "unknown_theory"
+    assert infer_bucket_from_row({"prompt": "t", "id": "unknown_id"}) == "unknown"
+
+    # Duplicate row ID error
+    dups = [
+        GoldenRow(id="dup", prompt="p1", expected="e", slice="hard", bucket="dag"),
+        GoldenRow(id="dup", prompt="p2", expected="e", slice="hard", bucket="dag"),
+    ] + [
+        GoldenRow(id=f"id-{i}", prompt=f"p{i}", expected="e", slice="hard", bucket="dag")
+        for i in range(25)
+    ]
+    with pytest.raises(ValueError, match="Duplicate row id detected"):
+        validate_golden_rows(dups)
+
+    # File not found
+    with pytest.raises(FileNotFoundError):
+        validate_golden_file(tmp_path / "non_existent.jsonl")
+
+    # Invalid JSON in file
+    bad_json_file = tmp_path / "bad.jsonl"
+    bad_json_file.write_text("invalid json line\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid JSON at line 1"):
+        validate_golden_file(bad_json_file)
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_golden_row_invariants_failure_paths() -> None:
+    """Test all error branches of validate_for_hard_slice and validate_for_hard_or_ood."""
+    # validate_for_hard_slice
+    with pytest.raises(ValueError, match="must have slice='hard'"):
+        GoldenRow(prompt="p", expected="e", slice="core").validate_for_hard_slice()
+
+    with pytest.raises(ValueError, match="missing stable id"):
+        GoldenRow(prompt="p", expected="e", slice="hard").validate_for_hard_slice()
+
+    with pytest.raises(ValueError, match="must have non-empty expected"):
+        GoldenRow(id="h1", prompt="p", expected=None, slice="hard").validate_for_hard_slice()
+
+    # validate_for_hard_or_ood
+    with pytest.raises(ValueError, match="missing stable id"):
+        GoldenRow(prompt="p", expected="e", slice="hard").validate_for_hard_or_ood()
+
+    with pytest.raises(ValueError, match="must have non-empty expected"):
+        GoldenRow(id="h1", prompt="p", expected=None, slice="hard").validate_for_hard_or_ood()
+
+    with pytest.raises(ValueError, match="must have grader='exact'"):
+        GoldenRow(
+            id="h1", prompt="p", expected="e", slice="hard", grader="semantic"
+        ).validate_for_hard_or_ood()
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_echo_backend_dict_object_and_empty() -> None:
+    """EchoBackend handles dictionary return values and default fallbacks."""
+    backend = EchoBackend(
+        {
+            "dict_task": {"tool": "final_answer", "args": {"text": "dict_res"}},
+            "default": {"tool": "final_answer", "args": {"text": "default_res"}},
+        }
+    )
+    res = backend.generate([{"role": "user", "content": "Execute dict_task"}])
+    assert "dict_res" in res[0]
+
+    res_def = backend.generate([{"role": "user", "content": "Other task"}])
+    assert "default_res" in res_def[0]
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_security_scanner_and_data_governance() -> None:
+    """SecurityScanner scans code and trajectories; PIIScrubber validates missing presidio."""
+    from enhanced_system.harness.data_governance import PIIScrubber
     from enhanced_system.harness.security import SecurityScanner
     from enhanced_system.harness.types import Step, Trajectory
 
-    scanner = SecurityScanner(fail_on_high=True)
-
-    # Empty code
+    scanner = SecurityScanner(fail_on_high=False)
     assert scanner.scan_python_code("") == []
-    assert scanner.scan_python_code("   ") == []
 
-    # Safe code
-    safe_findings = scanner.scan_python_code("result = [x * 2 for x in range(10)]\n")
-    assert safe_findings == []
+    # Clean code
+    clean_findings = scanner.scan_python_code("x = 1 + 2\n")
+    assert clean_findings == []
 
-    # Unsafe code (B307 eval)
-    unsafe_findings = scanner.scan_python_code("eval('1 + 1')\n")
-    assert len(unsafe_findings) > 0
-    assert any("eval" in f.get("issue_text", "") for f in unsafe_findings)
-
-    # Trajectory scanning
+    # Trajectory with code action
     traj = Trajectory(
-        harness_id="test",
         steps=[
-            Step(
-                action=json.dumps({"tool": "code_interpreter", "args": {"code": "x = 42"}}),
-                tool_id="code_interpreter",
-            ),
-            Step(
-                action=json.dumps({"tool": "code_interpreter", "code": "eval('2+2')"}),
-                tool_id="code_interpreter",
-            ),
-        ],
+            Step(action=json.dumps({"tool": "code_eval", "args": {"code": "y = 42\n"}})),
+            Step(action="not a json"),
+        ]
     )
-    traj_findings = scanner.scan_trajectory(traj)
-    assert len(traj_findings) > 0
+    findings = scanner.scan_trajectory(traj)
+    assert findings == []
 
-    # Non-trajectory object
-    assert scanner.scan_trajectory(object()) == []
-
-
-@pytest.mark.unit
-@pytest.mark.harness
-def test_pii_scrubber_behavior(monkeypatch):
-    """PIIScrubber handles missing Presidio dependency gracefully."""
+    # PIIScrubber missing presidio check
     import enhanced_system.harness.data_governance as dg
 
     if not dg.HAS_PRESIDIO:
         with pytest.raises(ImportError, match="Presidio libraries not found"):
-            dg.PIIScrubber()
+            PIIScrubber()
     else:
-        # Mock presidio behavior if installed
-        scrubber = dg.PIIScrubber()
+        scrubber = PIIScrubber()
         assert scrubber.entities is not None

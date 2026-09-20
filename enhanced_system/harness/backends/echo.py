@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, Optional, Sequence
 
 
@@ -57,7 +58,10 @@ class EchoBackend:
             if matched_val is not None:
                 if isinstance(matched_val, list):
                     if matched_val:
-                        item = str(matched_val.pop(0))
+                        elem = matched_val.pop(0)
+                        item = json.dumps(elem) if isinstance(elem, dict) else str(elem)
+                elif isinstance(matched_val, dict):
+                    item = json.dumps(matched_val)
                 else:
                     item = str(matched_val)
         elif self._queue:
