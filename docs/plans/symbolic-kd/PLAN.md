@@ -24,6 +24,7 @@ without a new ADR.
 | Knobs | `MANGOMAS_*` / `MangoMASSettings` only — no call-site literals |
 | Tools | Frozen `TOOL_REGISTRY` only; primary dispose tool id `sqe_constraint_solver` |
 | Pass@K gate | Chen unbiased estimator defaults $n=5$, gate $k=3$, exact match only on hard/OOD |
+| Reject codes | Standardized enum per `openspec/changes/_shared/blocked-reject-codes.md` |
 | DualDistill | Same task + `expected` + two teachers |
 | Vacuity refusal | A gate that cannot fail must not be called pass@k |
 | Teachers | Apache-2.0 / MIT open weights (Qwen3, R1-distills); document license |

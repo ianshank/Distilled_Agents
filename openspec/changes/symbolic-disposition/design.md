@@ -1,4 +1,4 @@
-# Design — symbolic-disposition
+# Design: symbolic-disposition
 
 ## Architecture
 
@@ -31,6 +31,8 @@ User task
   - SAT path: `ok: true`, `status: "SAT"`, `order` set to lexicographically least valid topological order, `reject_code: null`.
   - UNSAT path: `ok: false`, `status: "UNSAT"`, `order: null`, `assignment: null`, `reject_code` set to code (e.g. `CYCLE_DETECTED` or `UNSAT`), `details` explaining reason.
 - **Reject codes and fail-closed mapping:**
+  - Standardized reject codes conform to `openspec/changes/_shared/blocked-reject-codes.md`:
+    `CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`.
   - `SCHEMA_VIOLATION`: Malformed input or limit breach -> raise `ValueError` -> runtime `tool_error` -> expected `BLOCKED:SCHEMA_VIOLATION`.
   - `SYNTAX_INVALID`: Unparseable tree/atom -> raise `ValueError` -> runtime `tool_error` -> expected `BLOCKED:SYNTAX_INVALID`.
   - `CYCLE_DETECTED`: Cyclic graph -> return `ok: false`, `status: "UNSAT"`, `reject_code: "CYCLE_DETECTED"` -> expected `BLOCKED:CYCLE_DETECTED`.

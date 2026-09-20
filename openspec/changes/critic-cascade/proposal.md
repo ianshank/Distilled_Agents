@@ -13,8 +13,9 @@ Config-gated cascade on collect and DualDistill compose: schema/tool allowlist
 validity, outcome grade, explicit reject telemetry with `critic_reject_code`,
 structured logging of drops (including `DUALDISTILL_DROP_0_0` for existing (0,0)
 drops and `OUTCOME_MISMATCH` for collect outcome filter drops) to JSONL sink
-`artifacts/critic_rejects.jsonl`. Codes for later teacher-rule critic: `UNSAT`,
-`SYNTAX_INVALID`, `CYCLE_DETECTED`, `SCHEMA_VIOLATION`, `UNSUPPORTED_THEORY`.
+`artifacts/critic_rejects.jsonl`. Standard reject codes conform to
+`openspec/changes/_shared/blocked-reject-codes.md`: `CYCLE_DETECTED`, `UNSAT`,
+`SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`.
 Preserve recovery traces when final outcome matches (existing collect philosophy).
 
 ## Sequencing note

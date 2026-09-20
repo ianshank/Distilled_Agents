@@ -15,8 +15,9 @@ proposer. Repo disposition is schema-only; tools are checklist stubs.
   operations; no `exec`, `eval`, or subprocess execution.
 - Dedicated harness config `configs/harnesses/sqe_dispose.yaml` allowlisting
   `sqe_constraint_solver` and `final_answer`. Keep `sqe_validate.yaml` checklist-only.
-- Standardized reject codes: `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `CYCLE_DETECTED`,
-  `UNSAT`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT` with fail-closed mapping to
+- Standardized reject codes: `CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`,
+  `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT` conforming to
+  `openspec/changes/_shared/blocked-reject-codes.md`, with fail-closed mapping to
   `BLOCKED:<CODE>` or runtime `tool_error`.
 - ADR 0006 addendum: cognitive proposes; tool body disposes; OOD -> fail-closed
   refusal via `final_answer` policy (`BLOCKED:<CODE>`), never confabulate SAT.

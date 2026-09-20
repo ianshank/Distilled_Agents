@@ -1,8 +1,8 @@
-# Tasks — critic-cascade
+# Tasks: critic-cascade
 
 - [ ] 1. Add `enhanced_system/harness/critic.py` (or similar) with pure
   functions: `check_tool_allowlist`, `check_outcome`, `check_expected_tools`
-  — no Hub calls in unit tests.
+  - no Hub calls in unit tests.
 - [ ] 2. Wire cascade and reject logging into `collect_trajectories.py` behind
   `MANGOMAS_CRITIC_ENABLED` (default false -> true once tests land); log at least
   `critic_reject_code: OUTCOME_MISMATCH` when outcome filter drops a row.
@@ -11,8 +11,9 @@
   invent a second drop rule).
 - [ ] 4. Append structured reject records to JSONL sink `artifacts/critic_rejects.jsonl`
   (or `--reject-log` override).
-- [ ] 5. Support reject codes for later teacher-rule critic: `UNSAT`,
-  `SYNTAX_INVALID`, `CYCLE_DETECTED`, `SCHEMA_VIOLATION`, `UNSUPPORTED_THEORY`.
+- [ ] 5. Support reject codes for later teacher-rule critic conforming to
+  `openspec/changes/_shared/blocked-reject-codes.md`: `CYCLE_DETECTED`, `UNSAT`,
+  `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`.
 - [ ] 6. Keep rows with intermediate parse/tool faults when outcome matches.
 - [ ] 7. Emit counters: `critic_rejected_*`, `critic_kept_recovery` alongside
   per-row `critic_reject_code` log entries.

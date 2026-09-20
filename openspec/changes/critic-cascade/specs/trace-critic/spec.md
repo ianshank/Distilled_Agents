@@ -1,4 +1,4 @@
-# Spec delta — trace-critic
+# Spec delta: trace-critic
 
 ## ADDED Requirements
 
@@ -50,13 +50,14 @@ final outcome matches `expected`.
 
 ### Requirement: Teacher-rule critic codes defined
 
-Later teacher-rule critic stages SHALL draw reject codes from the standardized set:
-`UNSAT`, `SYNTAX_INVALID`, `CYCLE_DETECTED`, `SCHEMA_VIOLATION`, `UNSUPPORTED_THEORY`.
+Later teacher-rule critic stages SHALL draw reject codes from the shared standard
+specification `openspec/changes/_shared/blocked-reject-codes.md`: `CYCLE_DETECTED`,
+`UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`.
 
 #### Scenario: Standardized reason code emitted
 
 - **WHEN** a teacher-rule check fails
-- **THEN** the logged `critic_reject_code` is one of the standardized enum tokens
+- **THEN** the logged `critic_reject_code` is one of the standardized enum tokens from `openspec/changes/_shared/blocked-reject-codes.md`
 
 ## Sequencing note
 

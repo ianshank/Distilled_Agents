@@ -18,9 +18,13 @@ vacuous "Pass@K" label on a 4-row pass_rate wrapper not wired into CI.
 
 ## Scope
 
-Golden corpus (`configs/golden_sets/sqe_hard_ood.jsonl`) + Chen unbiased Pass@K
-eval metrics ($n=5$, gate $k=3$, report $k=1,3$) + CI scripted AQA + OOD synthetic-success
-prohibition + matrix stub + render hash check. No solver tools. No trainer changes.
+Golden corpus (`configs/golden_sets/sqe_hard_ood.jsonl`, >=24 rows meeting per-bucket
+minima) + Chen unbiased Pass@K eval metrics ($n=5$, gate $k=3$, report $k=1,3$) via
+single CLI `scripts/harness/run_pass_at_k.py` (Makefile `aqa-gate-passk`) + disjunctive
+OOD row detector (`slice: "ood"` OR `ood: true`) + OOD synthetic-success prohibition
+(canonical `BLOCKED:<CODE>` from `openspec/changes/_shared/blocked-reject-codes.md`) +
+matrix stub + render hash check. Correct `run_aqa_gate.py` docstring only (single-pass).
+No solver tools. No trainer changes.
 
 ## Non-goals
 

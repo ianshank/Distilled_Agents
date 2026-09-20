@@ -1,12 +1,12 @@
-# Spec delta — solver-dispose
+# Spec delta: solver-dispose
 
 ## ADDED Requirements
 
 ### Requirement: Primary tool identity and pure-Python registry
 
 The harness SHALL register primary tool id `sqe_constraint_solver` in `TOOL_REGISTRY`,
-distinct from `sqe_checklist`. Any reference to generic `ConstraintCheckTool` is deprecated
-or aliased to `sqe_constraint_solver`. The tool default engine SHALL be pure Python
+distinct from `sqe_checklist`. The primary tool id SHALL be `sqe_constraint_solver`
+identically across all interfaces and documentation. The tool default engine SHALL be pure Python
 implementing DAG topological ordering and boolean condition trees with no Z3 or clingo
 dependency, and MUST NOT use `exec`, `eval`, shell, or subprocess execution.
 
@@ -31,8 +31,8 @@ and `details` (dict).
 
 ### Requirement: Reject codes and fail-closed behavior
 
-The tool SHALL employ reject codes: `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `CYCLE_DETECTED`,
-`UNSAT`, `UNSUPPORTED_THEORY`, and `RESOURCE_LIMIT`.
+The tool SHALL employ reject codes conforming to `openspec/changes/_shared/blocked-reject-codes.md`:
+`CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, and `RESOURCE_LIMIT`.
 It SHALL never return `ok: true` or fabricate an `order` for cyclic or unsatisfiable inputs.
 
 #### Scenario: Cycle detection is not SAT
@@ -60,8 +60,10 @@ whose `action.tool_ids` allowlist contains `sqe_constraint_solver` and `final_an
 
 ### Requirement: OOD degrades to canonical refusal, not confabulation
 
+A row is identified as OOD if `slice` equals `"ood"` OR `ood` is `true`.
 Harness instructions and policy MUST map OOD conditions to explicit canonical refusal
-tokens `BLOCKED:<CODE>` (e.g. `BLOCKED:CYCLE_DETECTED`, `BLOCKED:UNSAT`). The policy
+tokens `BLOCKED:<CODE>` defined in `openspec/changes/_shared/blocked-reject-codes.md`
+(e.g. `BLOCKED:CYCLE_DETECTED`, `BLOCKED:UNSAT`). The policy
 MUST NOT fabricate a SAT solution after receiving an error or UNSAT result.
 
 #### Scenario: Refusal token emitted on OOD

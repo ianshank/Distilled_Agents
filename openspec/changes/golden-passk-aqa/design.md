@@ -1,4 +1,4 @@
-# Design — golden-passk-aqa
+# Design: golden-passk-aqa
 
 ## Decisions
 
@@ -18,7 +18,7 @@
 
 2. **Dataset layout and composition:** Require new golden set file
    `configs/golden_sets/sqe_hard_ood.jsonl` with $\ge 24$ rows across hard and
-   OOD buckets:
+   OOD buckets meeting normative per-bucket minima:
    - Hard dependency DAG satisfy ($\ge 6$ rows): lexicographically least valid
      topological order, space-separated node ids.
    - Hard condition tree satisfy ($\ge 6$ rows): nested AND/OR/NOT assignment
@@ -29,24 +29,29 @@
    - OOD schema/syntax ($\ge 2$ rows): expected refusal token `BLOCKED:SCHEMA_VIOLATION`
      or `BLOCKED:SYNTAX_INVALID`.
    - OOD unknown theory ($\ge 2$ rows): expected refusal token `BLOCKED:UNSUPPORTED_THEORY`.
+   Total rows in `sqe_hard_ood.jsonl` MUST be $\ge 24$. Standard refusal tokens
+   and reject codes MUST conform to `openspec/changes/_shared/blocked-reject-codes.md`.
    Every hard and OOD row must specify `grader: "exact"` (`allow_semantic: false`).
    Keep `configs/golden_sets/core_sdlc.jsonl` as easy regression.
 
-3. **Synthetic-success prohibition for OOD:** For every row with `ood: true`,
-   the expected target is canonical refusal token `BLOCKED:<CODE>`. Any sample
-   emitting a non-empty, non-matching `final_answer` is an OOD synthetic-success
-   violation and causes CI gate failure.
+3. **Deterministic OOD detector and synthetic-success prohibition:** A row is
+   OOD if and only if `slice` equals `"ood"` OR `ood` is `true`. Implementer tests
+   and evaluation filters must treat both fields equivalently.
+   For every row detected as OOD, the expected target is canonical refusal token
+   `BLOCKED:<CODE>` from `openspec/changes/_shared/blocked-reject-codes.md`.
+   Any sample emitting a non-empty, non-matching `final_answer` is an OOD
+   synthetic-success violation and causes CI gate failure.
 
-4. **CLI and AQA gate:** Prefer dedicated CLI `scripts/harness/run_pass_at_k.py`
-   or extend `run_aqa_gate.py` with `--pass-at-k`, `--samples`, `--slice`.
-   Emits summary JSON containing `pass_at_k`, `exact_only: true`,
-   `semantic_counted: false`, and `ood_synthetic_success_violations`.
+4. **CLI and AQA gate:** Use dedicated CLI `scripts/harness/run_pass_at_k.py`
+   exclusively for Pass@K evaluation. Do not extend or add Pass@K modes to `run_aqa_gate.py`;
+   `run_aqa_gate.py` remains single-pass pass_rate and receives only a docstring correction.
+   `scripts/harness/run_pass_at_k.py` emits summary JSON containing `pass_at_k`,
+   `exact_only: true`, `semantic_counted: false`, and `ood_synthetic_success_violations`.
    Exit nonzero if `pass_at_k["3"]` is below threshold or if any OOD
    synthetic-success violation occurs.
    Phase 0 CI uses scripted fixtures under `tests/fixtures/mock_responses_sqe_passk.json`
    with threshold 1.0; neural threshold is deferred until student model exists.
-   Makefile target `aqa-gate-passk` invokes this gate.
-   Correct `scripts/harness/run_aqa_gate.py` docstring (single-pass today).
+   Makefile target `aqa-gate-passk` invokes `scripts/harness/run_pass_at_k.py`.
 
 5. **SAG vs pass@k:** Do not equate `harness_sag_samples` with pass@k.
    pass@k is an eval harness concern; SAG remains parse-majority at step time.
@@ -65,8 +70,8 @@
 
 New optional knobs (defaults conservative):
 
-- `MANGOMAS_EVAL_PASS_K` (int, default 3) — eval only
-- `MANGOMAS_EVAL_PASS_N` (int, default 5) — samples per problem for Chen estimator
+- `MANGOMAS_EVAL_PASS_K` (int, default 3) - eval only
+- `MANGOMAS_EVAL_PASS_N` (int, default 5) - samples per problem for Chen estimator
 - `MANGOMAS_EVAL_PASS_K_TEMPERATURE` (float, default 0.8) when k>1
 
 No call-site literals for these values.
