@@ -71,7 +71,8 @@ Kang `I_agent` is `planning.instruction` (YAML + schema; `additionalProperties: 
 | DualDistill | `compose_dualdistill.py`: same `x`, two teachers, grader `G(y,a)`, `y1 ⊕ t ⊕ y2`, drop `(0,0)` | Concatenating architect vs SWE JSONL (that is multi-task SFT) |
 | SCoRe-SFT | `collect_score.py`: student rollout, teacher **review prompt** on the full chain, resume prefix, prefs byproduct | Treating `step.fault` as the task failure; GRPO / SCoRe-RL |
 | AMD-lite | `build_memory.py`: student workflow prefix + function memory on `tool_error` | `HarnessTailor` dropping tools after two errors |
-| SDAR / AgentArk PAD / TRL GKD | Deferred. SDPO with observations as `privileged_context` is the honest TRL mapping | Launcher hyperparams; gated OPSD on GRPO |
+| SDAR / AgentArk PAD | Deferred. SDPO with observations as `privileged_context` is the honest TRL mapping | Launcher hyperparams; gated OPSD on GRPO |
+| TRL GKD / on-policy KD | Optional behind ADR 0008 (`trl==0.15.2`, `MANGOMAS_GKD_ENABLED`, alpha default 0.0, label-masked, vocab-checked) | Enabling by default before pass@k gates green; cross-vocab KL; SageMaker 4.26/1.13 |
 | Symbolic dispose / Solver | Pure-Python `constraint_check` / `sqe_constraint_solver` in `TOOL_REGISTRY` + fail-closed `BLOCKED:<CODE>` refusal | Neurosymbolic student network; mandatory Z3/clingo in CI; in-process `exec`/`eval` sandbox |
 | AgentDistill MCP | Frozen `TOOL_REGISTRY`; human-reviewed tool ids only | Autoload / `exec` |
 
@@ -212,4 +213,4 @@ Student explores; teacher `generate`s a review of the **full chain** and the cor
 
 ## Still deferred
 
-Execution-consistent SAG; CodeAct subprocess sandbox; SageMaker `trajectory_mode`; TRL/peft pin + SDPO/GKD; live search; MCP autotools; `InputValidator` regex edits; turning on `distillation_alpha` in trajectory mode before KL is label-masked and vocab-aligned.
+Execution-consistent SAG; CodeAct subprocess sandbox; SageMaker `trajectory_mode`; SDAR / AgentArk PAD; live search; MCP autotools; `InputValidator` regex edits. (TRL GKD is implemented optionally behind ADR 0008).

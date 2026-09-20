@@ -10,3 +10,6 @@ tqdm>=4.65.0
 pyyaml>=6.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
+# Note: trl==0.15.2 is pinned in pyproject.toml [alignment] for local GKD / trajectory distillation;
+# SageMaker 4.26/1.13 image remains a non-goal (ADR 0008).
+

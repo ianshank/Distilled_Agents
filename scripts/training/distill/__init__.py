@@ -10,6 +10,12 @@ __all__ = [
     "texts_from_examples",
     "AgentDistillationTrainer",
     "DistillationTrainer",
+    "AgentGKDTrainer",
+    "GKDTrainingConfig",
+    "compute_label_masked_gkd_loss",
+    "validate_vocab_alignment",
+    "verify_trl_version_pin",
+    "EXPECTED_TRL_VERSION",
 ]
 
 
@@ -21,4 +27,30 @@ def __getattr__(name: str):
         return (
             AgentDistillationTrainer if name == "AgentDistillationTrainer" else DistillationTrainer
         )
+    if name in {
+        "AgentGKDTrainer",
+        "GKDTrainingConfig",
+        "compute_label_masked_gkd_loss",
+        "validate_vocab_alignment",
+        "verify_trl_version_pin",
+        "EXPECTED_TRL_VERSION",
+    }:
+        from .gkd_adapter import (
+            EXPECTED_TRL_VERSION,
+            AgentGKDTrainer,
+            GKDTrainingConfig,
+            compute_label_masked_gkd_loss,
+            validate_vocab_alignment,
+            verify_trl_version_pin,
+        )
+
+        _map = {
+            "AgentGKDTrainer": AgentGKDTrainer,
+            "GKDTrainingConfig": GKDTrainingConfig,
+            "compute_label_masked_gkd_loss": compute_label_masked_gkd_loss,
+            "validate_vocab_alignment": validate_vocab_alignment,
+            "verify_trl_version_pin": verify_trl_version_pin,
+            "EXPECTED_TRL_VERSION": EXPECTED_TRL_VERSION,
+        }
+        return _map[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

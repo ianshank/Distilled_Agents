@@ -16,7 +16,7 @@ House plan/review:
 | `changes/golden-passk-aqa` | P1 | proposed |
 | `changes/critic-cascade` | P2 | proposed |
 | `changes/symbolic-disposition` | P3 | proposed |
-| `changes/trl-gkd-usage` | P4 | proposed (gated) |
+| `changes/trl-gkd-usage` | P4 | implemented |
 
 Archive under `changes/archive/` only after the change’s CI/acceptance is green
 on `main` and NEXT_STEPS is updated.

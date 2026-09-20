@@ -183,10 +183,10 @@ class AgentDistillationTrainer:
 
     def train(self):
         logger.info("Starting agent distillation training")
-        if not getattr(self.args, "trajectory_mode", False):
+        if self.args.distillation_alpha > 0:
             self._validate_distillation_compatibility()
         teacher_model = None
-        if self.args.distillation_alpha > 0 and not getattr(self.args, "trajectory_mode", False):
+        if self.args.distillation_alpha > 0:
             teacher_model = self.load_teacher_model()
         student_model = self.load_student_model()
         if self.args.use_lora:
@@ -222,17 +222,42 @@ class AgentDistillationTrainer:
             report_to="wandb" if self.args.use_wandb else None,
             logging_dir=f"{self.args.output_dir}/logs",
         )
-        trainer = DistillationTrainer(
-            model=student_model,
-            teacher_model=teacher_model,
-            args=training_args,
-            train_dataset=train_dataset,
-            eval_dataset=self.prepare_eval_dataset() if self.args.eval_file else None,
-            tokenizer=tokenizer,
-            data_collator=data_collator,
-            distillation_alpha=self.args.distillation_alpha,
-            temperature=self.args.temperature,
-        )
+        use_gkd = getattr(self.args, "use_gkd", False)
+        if use_gkd:
+            from .gkd_adapter import AgentGKDTrainer, GKDTrainingConfig, verify_trl_version_pin
+
+            verify_trl_version_pin(strict=False)
+            gkd_config = GKDTrainingConfig.from_settings(
+                distillation_alpha=self.args.distillation_alpha,
+                enabled=True,
+            )
+            trainer = AgentGKDTrainer(
+                model=student_model,
+                teacher_model=teacher_model,
+                args=training_args,
+                train_dataset=train_dataset,
+                eval_dataset=self.prepare_eval_dataset() if self.args.eval_file else None,
+                tokenizer=tokenizer,
+                data_collator=data_collator,
+                distillation_alpha=self.args.distillation_alpha,
+                beta=getattr(self.args, "gkd_beta", None) or gkd_config.beta,
+                temperature=getattr(self.args, "temperature", None) or gkd_config.temperature,
+                lmbda=getattr(self.args, "gkd_lmbda", None) or gkd_config.lmbda,
+                seq_kd=getattr(self.args, "gkd_seq_kd", None) or gkd_config.seq_kd,
+                gkd_config=gkd_config,
+            )
+        else:
+            trainer = DistillationTrainer(
+                model=student_model,
+                teacher_model=teacher_model,
+                args=training_args,
+                train_dataset=train_dataset,
+                eval_dataset=self.prepare_eval_dataset() if self.args.eval_file else None,
+                tokenizer=tokenizer,
+                data_collator=data_collator,
+                distillation_alpha=self.args.distillation_alpha,
+                temperature=self.args.temperature,
+            )
         trainer.train()
         final_output_dir = os.path.join(self.args.output_dir, "final")
         trainer.save_model(final_output_dir)

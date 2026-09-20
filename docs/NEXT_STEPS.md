@@ -16,6 +16,8 @@ Disposition-first symbolic knowledge distillation is tracked here:
 
 *Note (Phase P3 completed):* P3 `symbolic-disposition` has implemented pure-Python constraint checking (`constraint_check`) and DAG topological sort + boolean constraint solving (`sqe_constraint_solver`), dedicated harness YAML specs (`qc_constraints`, `sqe_dispose`), fail-closed OOD refusal (`BLOCKED:<CODE>`), hard golden coverage, rule traceability mapping, candidate rule extraction (`scripts/harness/extract_rules.py`), and ADR 0007. Unlocks Phase P4 (`trl-gkd-usage`).
 
+*Note (Phase P4 completed):* P4 `trl-gkd-usage` has pinned `trl==0.15.2`, implemented the GKD/on-policy adapter (`enhanced_system/training/gkd_adapter.py`, `scripts/training/distill/gkd_adapter.py`, `scripts/training/train_gkd_adapter.py`), enforced label-masked divergence and fail-safe vocab mismatch checks, preserved default alpha=0.0 and fail-closed GKD gating, and documented ADR 0008.
+
 ---
 
 Tracked follow-ups so this change stays reviewable without mixing large refactors.
@@ -49,9 +51,8 @@ Train and harness now share `prompt_render` (see [README_AGENT_DISTILLATION.md](
 - CodeAct sandbox (no `eval`/`exec` in-process). Execution-consistent SAG (vote on observations, not parse majority).
 - Multiprocess collect needs `fcntl` (or equivalent) around `JsonlTraceStore`; in-process `threading.Lock` is enough for unit tests.
 - SAG is parse/schema majority vote (`N=1` default), not Kang execute-and-vote.
-- Local SDPO/GKD only after an explicit TRL/peft pin PR. Defer GRPO, SCoRe-RL, SDAR, AgentArk PAD, MCP autotools.
-- DualDistill compose is same-task + expected + two teachers. Do not treat mixed-role JSONL concat as DualDistill.
-- Do not turn on `distillation_alpha` in trajectory mode before KL is label-masked and vocab-aligned.
+- TRL GKD / on-policy distillation is optionally available behind ADR 0008 (pinned `trl==0.15.2`). Defer GRPO, SCoRe-RL, SDAR, AgentArk PAD, MCP autotools.
+- Trajectory mode KL is now label-masked and vocab-aligned with default `alpha=0.0`; enable only when operator explicitly configures `MANGOMAS_TRAJECTORY_DISTILL_ALPHA > 0` on compatible model pairs.
 
 ## Dead architecture surface
 
