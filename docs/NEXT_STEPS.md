@@ -14,6 +14,8 @@ Disposition-first symbolic knowledge distillation is tracked here:
 
 *Note (Phase P2 completed):* P2 `critic-cascade` has implemented pure critic helpers (`enhanced_system/harness/critic.py`), allowlist and outcome cascade filtering on `collect_trajectories.py`, DualDistill (0,0) drop telemetry, recovery trace retention (`critic_kept_recovery`), structured JSONL reject sink (`artifacts/critic_rejects.jsonl`), and standard reject codes per `_shared/blocked-reject-codes.md`. Unlocks Phase P3 (`symbolic-disposition`).
 
+*Note (Phase P3 completed):* P3 `symbolic-disposition` has implemented pure-Python constraint checking (`constraint_check`) and DAG topological sort + boolean constraint solving (`sqe_constraint_solver`), dedicated harness YAML specs (`qc_constraints`, `sqe_dispose`), fail-closed OOD refusal (`BLOCKED:<CODE>`), hard golden coverage, rule traceability mapping, candidate rule extraction (`scripts/harness/extract_rules.py`), and ADR 0007. Unlocks Phase P4 (`trl-gkd-usage`).
+
 ---
 
 Tracked follow-ups so this change stays reviewable without mixing large refactors.

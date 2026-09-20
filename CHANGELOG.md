@@ -8,6 +8,19 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 ## [Unreleased]
 
 ### Added
+- **Phase P3 `symbolic-disposition`:** Pure-Python constraint checking, symbolic disposition tools, fail-closed refusal on OOD, and hard golden coverage.
+- Added `ConstraintCheckTool` (`constraint_check`) and `SqeConstraintSolverTool` (`sqe_constraint_solver`) in `enhanced_system/harness/tools/constraint.py` and exported through `TOOL_REGISTRY`.
+- Supported pure-Python DAG topological sorting (lexicographically least order via Kahn's algorithm with a min-heap) and boolean condition tree solving without external native solver binaries.
+- Enforced standard reject codes conforming to `openspec/changes/_shared/blocked-reject-codes.md` (`CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`).
+- Added dedicated harness YAML specifications in `configs/harnesses/qc_constraints.yaml`, `enhanced_system/config/harnesses/qc_constraints.yaml`, `configs/harnesses/sqe_dispose.yaml`, and `enhanced_system/config/harnesses/sqe_dispose.yaml`.
+- Enforced fail-closed refusal mapping (`BLOCKED:<CODE>`) on out-of-distribution (OOD) tasks, preventing confabulation of false SAT results.
+- Expanded `configs/golden_sets/hard_sdlc.jsonl` with hard and OOD rows for `qc_constraints`, backed by deterministic fixtures in `tests/fixtures/mock_responses.json`.
+- Updated rule traceability matrix `configs/rule_traceability/matrix.yaml` with active and fixture rules for all new hard golden items.
+- Added `scripts/harness/extract_rules.py` stub script extracting rule candidates from teacher traces without auto-promotion.
+- Added comprehensive unit tests in `enhanced_system/tests/unit/test_harness_tools.py` including falsifier tests guaranteeing cyclic and unsat inputs never report SAT.
+- Documented ADR 0007 (`docs/adr/0007-symbolic-dispose-tools.md`).
+
+### Added
 - **Phase P2 `critic-cascade`:** Pure critic helpers, allowlist cascade filtering, reject telemetry, and recovery trace retention.
 - Added reusable critic helpers in `enhanced_system/harness/critic.py`: `check_tool_allowlist`, `check_outcome`, `check_expected_tools`, `is_recovery_trace`, and composite `evaluate_trace` without external Hub dependencies.
 - Added canonical `CriticRejectCode` enum and standard reject code validation conforming to `openspec/changes/_shared/blocked-reject-codes.md` (`CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`, `OUTCOME_MISMATCH`, `DUALDISTILL_DROP_0_0`).
