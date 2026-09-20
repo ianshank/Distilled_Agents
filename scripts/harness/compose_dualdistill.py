@@ -9,24 +9,52 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from enhanced_system.harness.critic import CriticTelemetry
 from enhanced_system.harness.dualdistill import compose_pair, expected_text
 from enhanced_system.harness.jsonl import iter_jsonl_dicts
+from enhanced_system.ops.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    settings = get_settings()
     parser = argparse.ArgumentParser(description="Compose dual-teacher trajectories")
     parser.add_argument("--first", required=True, help="Teacher A JSONL")
     parser.add_argument("--second", required=True, help="Teacher B JSONL")
     parser.add_argument("--output", required=True)
+    parser.add_argument(
+        "--reject-log",
+        default=settings.critic_reject_log,
+        help="JSONL sink path for critic reject telemetry (default: artifacts/critic_rejects.jsonl)",
+    )
+    critic_group = parser.add_mutually_exclusive_group()
+    critic_group.add_argument(
+        "--critic",
+        dest="critic_enabled",
+        action="store_true",
+        default=None,
+        help="Enable critic filtering and rejection telemetry",
+    )
+    critic_group.add_argument(
+        "--no-critic",
+        dest="critic_enabled",
+        action="store_false",
+        default=None,
+        help="Disable critic filtering and rejection telemetry",
+    )
     args = parser.parse_args(argv)
+    critic_enabled = (
+        args.critic_enabled if args.critic_enabled is not None else settings.critic_enabled
+    )
+    telemetry = CriticTelemetry(sink_path=args.reject_log, enabled=critic_enabled)
     try:
         first_rows = _index_rows(Path(args.first))
         second_rows = _index_rows(Path(args.second))
     except (OSError, ValueError) as exc:
         logger.error("%s", exc)
+        telemetry.emit_summary()
         return 1
     written = 0
     unmatched = len(set(second_rows) - set(first_rows))
@@ -42,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
             if not expected.strip():
                 logger.warning("skipping unlabeled prompt")
                 continue
-            composed = compose_pair(left, right, expected=expected)
+            composed = compose_pair(left, right, expected=expected, telemetry=telemetry)
             if composed is None:
                 continue
             handle.write(json.dumps(composed, ensure_ascii=True) + "\n")
@@ -50,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     if unmatched:
         logger.warning("%s unmatched prompts across teacher files", unmatched)
     logger.info("wrote %s composed rows to %s", written, out_path)
+    telemetry.emit_summary()
     return 0
 
 

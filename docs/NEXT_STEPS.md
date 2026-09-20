@@ -12,6 +12,8 @@ Disposition-first symbolic knowledge distillation is tracked here:
 
 *Note (Phase P1 completed):* P1 `golden-passk-aqa` has implemented genuine multi-trial pass@1 and pass@k, expanded core and hard golden corpora, rule traceability verification, and CI-load-bearing scripted AQA gating. Unlocks Phase P2 (`critic-cascade`).
 
+*Note (Phase P2 completed - I2):* Critic rejection telemetry (`critic-cascade`) wired into `collect_trajectories.py` and `compose_dualdistill.py`, emitting explicit reason codes `OUTCOME_MISMATCH` and `DUALDISTILL_DROP_0_0` to `artifacts/critic_rejects.jsonl`. Recovery traces preserved on matching final outcomes. Standard teacher-rule codes mapped per shared contract. Unlocks solver disposition (I3).
+
 ---
 
 Tracked follow-ups so this change stays reviewable without mixing large refactors.

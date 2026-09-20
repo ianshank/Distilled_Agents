@@ -55,6 +55,10 @@ class MangoMASSettings(BaseSettings):
     eval_pass_n: int = Field(default=5)
     eval_pass_k_temperature: float = Field(default=0.8)
 
+    # Critic cascade telemetry settings (Phase 0 I2)
+    critic_enabled: bool = Field(default=False)
+    critic_reject_log: str = Field(default="artifacts/critic_rejects.jsonl")
+
     # Distillation expansion settings (Phase 1)
     lora_rank: int = Field(default=16)
     lora_alpha: int = Field(default=32)
