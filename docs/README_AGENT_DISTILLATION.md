@@ -196,15 +196,7 @@ python scripts/harness/compose_dualdistill.py \
   --first teacher_a.jsonl --second teacher_b.jsonl --output composed.jsonl
 ```
 
-Rows without `expected` are skipped. Collect must preserve `expected` on traces (`trajectory_to_legacy(..., expected=...)`). When both teachers fail the reference grade (0,0), the pair is dropped and emits `critic_reject_code: "DUALDISTILL_DROP_0_0"` into `artifacts/critic_rejects.jsonl`. Their agentic teacher is OpenHands+interpreter; checklist tools cannot play `\pi_A`.
-
-## Critic rejection telemetry (Phase 0 I2)
-
-Config-gated via `MANGOMAS_CRITIC_ENABLED` (or `--critic`), the critic cascade records explicit reason codes into `artifacts/critic_rejects.jsonl`:
-- `OUTCOME_MISMATCH`: Emitted by `collect_trajectories.py` outcome filter when `final_answer` fails `answers_match`.
-- `DUALDISTILL_DROP_0_0`: Emitted by `compose_dualdistill.py` when both teachers score 0 on the task.
-- Recovery traces (intermediate `parse_error` / `tool_error` but matching final answer) are kept, incrementing `critic_kept_recovery`.
-- Standard teacher-rule reject codes follow `openspec/changes/_shared/blocked-reject-codes.md`: `CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`.
+Rows without `expected` are skipped. Collect must preserve `expected` on traces (`trajectory_to_legacy(..., expected=...)`). Their agentic teacher is OpenHands+interpreter; checklist tools cannot play `\pi_A`.
 
 ## SCoRe-SFT collect (after BC, not instead of it)
 
