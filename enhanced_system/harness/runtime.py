@@ -60,6 +60,7 @@ class AgentRuntime:
         harness_id: Optional[str] = None,
         resume_steps: Optional[list[Step]] = None,
         inject_action: Optional[str] = None,
+        temperature: Optional[float] = None,
     ) -> HarnessRunResult:
         """Validate the user task, then loop until final_answer or max_steps."""
         recorded, spec, teacher = self._prepare(task, harness_id=harness_id)
@@ -113,12 +114,15 @@ class AgentRuntime:
                 raw = pending
                 pending = None
                 if raw is None:
+                    effective_temperature = (
+                        temperature if temperature is not None else spec.policy.sag_temperature
+                    )
                     raw, _name = generate_action(
                         self.backend,
                         messages,
                         allowed,
                         samples=spec.policy.sag_samples or 1,
-                        temperature=spec.policy.sag_temperature,
+                        temperature=effective_temperature,
                         prefix=prefix,
                     )
                 thought, action, tool_id, args = self._parse_generation(raw, prefix, allowed)

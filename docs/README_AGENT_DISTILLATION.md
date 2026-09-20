@@ -99,6 +99,57 @@ python scripts/harness/eval_harness.py --input prompts.jsonl --harness-id base_r
 
 Outcome filter skips a row when `expected` is present **and** `final_answer` misses it. Intermediate `parse_error` / `tool_error` are **kept** when the outcome matches — recovery is the point. No `expected` ⇒ no outcome skip. Kept rows still carry `expected` so compose can grade.
 
+## Golden Sets and Pass@K Multi-Trial Eval (Phase P1)
+
+Golden evaluation rows follow `GoldenRow`:
+- `prompt`: string (required)
+- `expected`: string (required for labeled rows)
+- `id`: stable identifier (required for `slice: hard`)
+- `harness_id`: optional harness YAML id
+- `expected_tools`: optional list of tool names
+- `slice`: `"core"` | `"hard"` (default `"core"`)
+- `allow_semantic`: bool (default `false`)
+
+Evaluating golden sets with multi-trial pass@k:
+
+```bash
+python scripts/harness/eval_harness.py \
+  --input configs/golden_sets/core_sdlc.jsonl \
+  --harness-id base_react \
+  --pass-k 5
+```
+
+Evaluation rules:
+- `k` trials are run independently per row (sampling temperature from `MANGOMAS_EVAL_PASS_K_TEMPERATURE`, default `0.8` when `k>1`, `0.0` for `k=1`).
+- `pass@1`: fraction of rows succeeding on trial 1.
+- `pass@k`: fraction of rows succeeding on at least 1 of the `k` trials (or Chen unbiased estimate across $n$ samples).
+- **Hard and OOD slices**: success strictly requires exact `answers_match` and no security failures (`semantic_match` alone is a failure; unlabeled non-truncated rows do not count). OOD rows must produce canonical `BLOCKED:<CODE>` refusal tokens.
+- **Core slice**: `semantic_match` counts as success only when the row explicitly specifies `allow_semantic: true`.
+
+AQA Regression Gate runs both core and hard golden sets in CI with deterministic mock fixtures:
+
+```bash
+python scripts/harness/run_aqa_gate.py \
+  --golden-set configs/golden_sets/core_sdlc.jsonl \
+  --threshold 75.0 \
+  --scripted tests/fixtures/mock_responses.json
+
+python scripts/harness/run_aqa_gate.py \
+  --golden-set configs/golden_sets/hard_sdlc.jsonl \
+  --threshold 75.0 \
+  --hard-threshold 75.0 \
+  --require-hard \
+  --scripted tests/fixtures/mock_responses.json
+```
+
+Traceability rule matrix (`configs/rule_traceability/matrix.yaml`) verifies every hard golden row is backed by a tracked rule and source trace:
+
+```bash
+python scripts/harness/check_rule_matrix.py \
+  --matrix configs/rule_traceability/matrix.yaml \
+  --golden configs/golden_sets/hard_sdlc.jsonl
+```
+
 ## AMD-lite (after format + eval)
 
 ```bash

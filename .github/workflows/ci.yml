@@ -89,3 +89,21 @@ jobs:
         run: gitleaks detect --source . --verbose --redact --config .gitleaks.toml
       - name: pip-audit
         run: pip-audit --skip-editable || true
+
+  aqa-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install package
+        run: pip install -e ".[dev]"
+      - name: Rule traceability matrix verification
+        run: python scripts/harness/check_rule_matrix.py --matrix configs/rule_traceability/matrix.yaml --golden configs/golden_sets/hard_sdlc.jsonl
+      - name: AQA gate core golden set
+        run: python scripts/harness/run_aqa_gate.py --golden-set configs/golden_sets/core_sdlc.jsonl --threshold 75.0 --scripted tests/fixtures/mock_responses.json
+      - name: AQA gate hard golden set
+        run: python scripts/harness/run_aqa_gate.py --golden-set configs/golden_sets/hard_sdlc.jsonl --threshold 75.0 --hard-threshold 75.0 --require-hard --scripted tests/fixtures/mock_responses.json
+
