@@ -75,7 +75,7 @@ class SqeConstraintSolverTool:
 
         if has_constraints:
             parsed_constraints, all_atoms = self._parse_constraints(
-                raw_constraints, max_constraints
+                raw_constraints, max_constraints, record_op, max_depth
             )
 
         input_assignment: dict[str, bool] = {}
@@ -202,7 +202,7 @@ class SqeConstraintSolverTool:
             raise ValueError("SCHEMA_VIOLATION: limits must be an object")
 
         for k, v in raw_limits.items():
-            if not isinstance(v, int) or v <= 0:
+            if type(v) is not int or v <= 0:
                 raise ValueError(f"SCHEMA_VIOLATION: limit '{k}' must be a positive integer")
 
         return {
@@ -252,15 +252,6 @@ class SqeConstraintSolverTool:
                     raise ValueError("SCHEMA_VIOLATION: edge endpoints must be non-empty strings")
                 edges.append([e[0].strip(), e[1].strip()])
 
-        if len(nodes) > max_nodes:
-            raise ValueError(
-                f"SCHEMA_VIOLATION: node count {len(nodes)} exceeds max_nodes limit {max_nodes}"
-            )
-        if len(edges) > max_edges:
-            raise ValueError(
-                f"SCHEMA_VIOLATION: edge count {len(edges)} exceeds max_edges limit {max_edges}"
-            )
-
         if not nodes and edges:
             seen: set[str] = set()
             for u, v in edges:
@@ -278,6 +269,15 @@ class SqeConstraintSolverTool:
                     raise ValueError(
                         f"SCHEMA_VIOLATION: edge references node '{v}' not in graph.nodes"
                     )
+
+        if len(nodes) > max_nodes:
+            raise ValueError(
+                f"SCHEMA_VIOLATION: node count {len(nodes)} exceeds max_nodes limit {max_nodes}"
+            )
+        if len(edges) > max_edges:
+            raise ValueError(
+                f"SCHEMA_VIOLATION: edge count {len(edges)} exceeds max_edges limit {max_edges}"
+            )
 
         return nodes, edges
 
@@ -304,7 +304,11 @@ class SqeConstraintSolverTool:
         return result
 
     def _parse_constraints(
-        self, raw_constraints: Any, max_constraints: int
+        self,
+        raw_constraints: Any,
+        max_constraints: int,
+        record_op: Callable[..., None],
+        max_depth: int,
     ) -> tuple[list[dict[str, Any]], set[str]]:
         if not isinstance(raw_constraints, list):
             raise ValueError("SCHEMA_VIOLATION: constraints must be a list")
@@ -318,6 +322,7 @@ class SqeConstraintSolverTool:
         all_atoms: set[str] = set()
 
         for idx, item in enumerate(raw_constraints):
+            record_op()
             if not isinstance(item, dict):
                 raise ValueError(
                     f"SCHEMA_VIOLATION: constraint item at index {idx} must be an object"
@@ -410,7 +415,9 @@ class SqeConstraintSolverTool:
         # Resolve ID references and validate no reference cycles
         resolved_nodes: list[dict[str, Any]] = []
         for node in parsed:
-            resolved = self._resolve_node_refs(node, id_map, set(), all_atoms)
+            resolved = self._resolve_node_refs(
+                node, id_map, set(), all_atoms, record_op, max_depth, depth=0
+            )
             resolved_nodes.append(resolved)
 
         return resolved_nodes, all_atoms
@@ -421,7 +428,14 @@ class SqeConstraintSolverTool:
         id_map: dict[str, dict[str, Any]],
         visiting: set[str],
         all_atoms: set[str],
+        record_op: Callable[..., None],
+        max_depth: int,
+        depth: int = 0,
     ) -> dict[str, Any]:
+        if depth > max_depth:
+            raise ValueError(f"RESOURCE_LIMIT: maximum recursion depth ({max_depth}) exceeded")
+        record_op()
+
         node_id = node.get("id")
         if node_id:
             if node_id in visiting:
@@ -441,9 +455,13 @@ class SqeConstraintSolverTool:
             if isinstance(arg, str):
                 if arg not in id_map:
                     raise ValueError(f"SYNTAX_INVALID: constraint references undefined id '{arg}'")
-                child = self._resolve_node_refs(id_map[arg], id_map, set(visiting), all_atoms)
+                child = self._resolve_node_refs(
+                    id_map[arg], id_map, set(visiting), all_atoms, record_op, max_depth, depth + 1
+                )
             elif isinstance(arg, dict):
-                child = self._resolve_inline_node(arg, id_map, set(visiting), all_atoms)
+                child = self._resolve_inline_node(
+                    arg, id_map, set(visiting), all_atoms, record_op, max_depth, depth + 1
+                )
             else:
                 raise ValueError("SYNTAX_INVALID: invalid argument type for 'not'")
             new_node["args"] = [child]
@@ -455,9 +473,19 @@ class SqeConstraintSolverTool:
                         raise ValueError(
                             f"SYNTAX_INVALID: constraint references undefined id '{arg}'"
                         )
-                    child = self._resolve_node_refs(id_map[arg], id_map, set(visiting), all_atoms)
+                    child = self._resolve_node_refs(
+                        id_map[arg],
+                        id_map,
+                        set(visiting),
+                        all_atoms,
+                        record_op,
+                        max_depth,
+                        depth + 1,
+                    )
                 elif isinstance(arg, dict):
-                    child = self._resolve_inline_node(arg, id_map, set(visiting), all_atoms)
+                    child = self._resolve_inline_node(
+                        arg, id_map, set(visiting), all_atoms, record_op, max_depth, depth + 1
+                    )
                 else:
                     raise ValueError(f"SYNTAX_INVALID: invalid argument type for '{op}'")
                 children.append(child)
@@ -471,7 +499,14 @@ class SqeConstraintSolverTool:
         id_map: dict[str, dict[str, Any]],
         visiting: set[str],
         all_atoms: set[str],
+        record_op: Callable[..., None],
+        max_depth: int,
+        depth: int = 0,
     ) -> dict[str, Any]:
+        if depth > max_depth:
+            raise ValueError(f"RESOURCE_LIMIT: maximum recursion depth ({max_depth}) exceeded")
+        record_op()
+
         op = node.get("op")
         if not op or not isinstance(op, str):
             raise ValueError("SCHEMA_VIOLATION: inline constraint missing valid 'op'")
@@ -503,9 +538,19 @@ class SqeConstraintSolverTool:
                         raise ValueError(
                             f"SYNTAX_INVALID: constraint references undefined id '{arg}'"
                         )
-                    child = self._resolve_node_refs(id_map[arg], id_map, set(visiting), all_atoms)
+                    child = self._resolve_node_refs(
+                        id_map[arg],
+                        id_map,
+                        set(visiting),
+                        all_atoms,
+                        record_op,
+                        max_depth,
+                        depth + 1,
+                    )
                 elif isinstance(arg, dict):
-                    child = self._resolve_inline_node(arg, id_map, set(visiting), all_atoms)
+                    child = self._resolve_inline_node(
+                        arg, id_map, set(visiting), all_atoms, record_op, max_depth, depth + 1
+                    )
                 else:
                     raise ValueError("SYNTAX_INVALID: invalid argument type for 'not'")
                 new_node["args"] = [child]
@@ -530,9 +575,19 @@ class SqeConstraintSolverTool:
                         raise ValueError(
                             f"SYNTAX_INVALID: constraint references undefined id '{arg}'"
                         )
-                    child = self._resolve_node_refs(id_map[arg], id_map, set(visiting), all_atoms)
+                    child = self._resolve_node_refs(
+                        id_map[arg],
+                        id_map,
+                        set(visiting),
+                        all_atoms,
+                        record_op,
+                        max_depth,
+                        depth + 1,
+                    )
                 elif isinstance(arg, dict):
-                    child = self._resolve_inline_node(arg, id_map, set(visiting), all_atoms)
+                    child = self._resolve_inline_node(
+                        arg, id_map, set(visiting), all_atoms, record_op, max_depth, depth + 1
+                    )
                 else:
                     raise ValueError(f"SYNTAX_INVALID: invalid argument type for '{op_lower}'")
                 children.append(child)

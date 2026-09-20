@@ -525,6 +525,30 @@ def test_reject_code_resource_limit():
             }
         )
 
+    # Inferred node count check after deduplication
+    with pytest.raises(
+        ValueError, match="^SCHEMA_VIOLATION: node count 3 exceeds max_nodes limit 2"
+    ):
+        tool.run(
+            {
+                "graph": {
+                    "edges": [["A", "B"], ["B", "C"]],
+                },
+                "limits": {"max_nodes": 2},
+            }
+        )
+
+    # Boolean not accepted as integer limit
+    with pytest.raises(
+        ValueError, match="^SCHEMA_VIOLATION: limit 'max_nodes' must be a positive integer"
+    ):
+        tool.run(
+            {
+                "graph": {"nodes": ["A"]},
+                "limits": {"max_nodes": True},
+            }
+        )
+
     # Recursion depth cap exceeded during boolean tree evaluation
     nested_node: dict[str, Any] = {"op": "atom", "atom": "leaf"}
     for _ in range(10):

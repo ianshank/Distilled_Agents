@@ -198,11 +198,6 @@ python scripts/harness/collect_score.py \
 
 Student explores; teacher `generate`s a review of the **full chain** and the corrected action is injected at the first **semantic** miss (wrong/missing final answer), not `DispatchError` recovered on the way. Resume from the verified prefix. Preference pairs (`σ_k` vs `σ'_k`) are a byproduct for later DPO/GRPO — not a separate EasyDistill job. Defer SCoRe-RL, GRPO, SDAR.
 
-## Evaluation Gates
-
-- **Single-pass regression:** `make aqa-gate` runs `scripts/harness/run_aqa_gate.py` against `configs/golden_sets/core_sdlc.jsonl`.
-- **Pass@K Hard/OOD gate (Phase 0 / I1):** `make aqa-gate-passk` runs `scripts/harness/run_pass_at_k.py` against `configs/golden_sets/sqe_hard_ood.jsonl` using the Chen et al. unbiased estimator ($n=5, k=3$). Hard and OOD slices enforce exact answers_match, disallow semantic matches, and prohibit OOD synthetic-success violations.
-
 ## Symbolic Disposition and Fail-Closed OOD (Phase 0 I3)
 
 Phase 0 I3 introduces `sqe_constraint_solver` as a deterministic disposition tool:
@@ -215,6 +210,11 @@ Phase 0 I3 introduces `sqe_constraint_solver` as a deterministic disposition too
   - `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, and `RESOURCE_LIMIT`: raised as `ValueError("<CODE>: ...")` triggering runtime `tool_error`.
 - Trajectories ending with canonical refusal `BLOCKED:<CODE>` receive runtime fault token `blocked`.
 - Fail-closed OOD behavior: OOD rows (disjunctively `slice == "ood"` or `ood == true`) refuse with `BLOCKED:<CODE>` without confabulating SAT solutions.
+
+## Evaluation Gates
+
+- **Single-pass regression:** `make aqa-gate` runs `scripts/harness/run_aqa_gate.py` against `configs/golden_sets/core_sdlc.jsonl` and `hard_sdlc.jsonl`.
+- **Pass@K Hard/OOD gate (Phase 0 / I1):** `make aqa-gate-passk` runs `scripts/harness/run_pass_at_k.py` against `configs/golden_sets/sqe_hard_ood.jsonl` using the Chen et al. unbiased estimator ($n=5, k=3$). Hard and OOD slices enforce exact answers_match, disallow semantic matches, and prohibit OOD synthetic-success violations.
 
 ## Still deferred
 
