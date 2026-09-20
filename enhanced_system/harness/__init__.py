@@ -8,10 +8,12 @@ from enhanced_system.harness.registry import load_spec
 from enhanced_system.harness.runtime import AgentRuntime
 from enhanced_system.harness.tailor import HarnessTailor
 from enhanced_system.harness.traces import JsonlTraceStore
+from enhanced_system.harness.types import GoldenRow
 
 __all__ = [
     "AgentRuntime",
     "EchoBackend",
+    "GoldenRow",
     "HarnessFactory",
     "HarnessTailor",
     "JsonlTraceStore",

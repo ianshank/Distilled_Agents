@@ -10,6 +10,8 @@ Disposition-first symbolic knowledge distillation is tracked here:
 
 **Order:** P0 green trunk → P1 golden + real pass@k AQA in CI → P2 critic cascade → P3 solver dispose tools → P4 TRL GKD *usage* (gated). Phase 6 SageMaker registry / A/B MUST NOT leapfrog P0–P3. Do not treat #16’s AQA docstring as pass@k delivery.
 
+*Note (Phase P1 completed):* P1 `golden-passk-aqa` has implemented genuine multi-trial pass@1 and pass@k, expanded core and hard golden corpora, rule traceability verification, and CI-load-bearing scripted AQA gating. Unlocks Phase P2 (`critic-cascade`).
+
 ---
 
 Tracked follow-ups so this change stays reviewable without mixing large refactors.

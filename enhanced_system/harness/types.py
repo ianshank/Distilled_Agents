@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PlanConfig(BaseModel):
@@ -79,3 +79,42 @@ class HarnessRunResult(BaseModel):
     harness_id: str = ""
     truncated: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class GoldenRow(BaseModel):
+    """Schema for golden evaluation dataset rows (core and hard slices)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    prompt: str
+    expected: Optional[str] = None
+    id: Optional[str] = None
+    harness_id: Optional[str] = None
+    expected_tools: Optional[list[str]] = None
+    slice: Literal["core", "hard"] = "core"
+    allow_semantic: bool = False
+
+    @field_validator("prompt")
+    @classmethod
+    def validate_prompt(cls, v: str) -> str:
+        if not v or not str(v).strip():
+            raise ValueError("GoldenRow prompt must not be empty")
+        return str(v).strip()
+
+    @field_validator("slice", mode="before")
+    @classmethod
+    def normalize_slice(cls, v: Any) -> str:
+        if isinstance(v, str):
+            v_lower = v.strip().lower()
+            if v_lower in ("core", "hard"):
+                return v_lower
+        return "core" if v is None else str(v)
+
+    def validate_for_hard_slice(self) -> None:
+        """Validate hard-slice invariant: non-empty id, non-empty expected, slice == 'hard'."""
+        if self.slice != "hard":
+            raise ValueError(f"Row {self.id or '<unnamed>'} must have slice='hard'")
+        if not self.id or not str(self.id).strip():
+            raise ValueError(f"Hard slice row missing stable id (prompt: {self.prompt!r})")
+        if self.expected is None or not str(self.expected).strip():
+            raise ValueError(f"Hard slice row {self.id} must have non-empty expected answer")

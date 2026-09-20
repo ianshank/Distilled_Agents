@@ -1,6 +1,10 @@
-[
-  "{\"tool\": \"final_answer\", \"args\": {\"text\": \"ZeroDivisionError handled\"}}",
-  "{\"tool\": \"final_answer\", \"args\": {\"text\": \"Hello World\"}}",
-  "{\"tool\": \"final_answer\", \"args\": {\"text\": \"Context, Containers, Components, and Code\"}}",
-  "{\"tool\": \"final_answer\", \"args\": {\"text\": \"assert\"}}"
-]
+{
+  "Fix the issue in src/main.py where integer division causes a crash when dividing by zero.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"ZeroDivisionError handled\"}}",
+  "Generate a python script that prints 'Hello World' and run it.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"Hello World\"}}",
+  "Explain what a C4 architecture diagram is.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"Context, Containers, Components, and Code\"}}",
+  "Write a unit test for a simple addition function in pytest.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"assert\"}}",
+  "Refactor database connection pool to handle ConnectionRefusedError with retry logic.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"ConnectionRefusedError retry handler installed\"}}",
+  "Implement input sanitization preventing SQL injection in user search query.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"parameterized query enforced\"}}",
+  "Detect memory leak in background worker task loop and add cleanup.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"worker loop memory cleanup registered\"}}",
+  "Resolve deadlock condition in concurrent order processing transaction.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"transaction isolation and deadlock retry implemented\"}}"
+}
