@@ -50,6 +50,21 @@ def compose_pair(
             extra={"critic_reject_code": CriticRejectCode.DUALDISTILL_DROP_0_0.value},
         )
         if reject_sink is not None:
+            first_traj = first.get("trajectory")
+            second_traj = second.get("trajectory")
+            harness_id = (
+                (
+                    first_traj.get("harness_id")
+                    if isinstance(first_traj, dict)
+                    else first.get("harness_id")
+                )
+                or (
+                    second_traj.get("harness_id")
+                    if isinstance(second_traj, dict)
+                    else second.get("harness_id")
+                )
+                or "sqe_dispose"
+            )
             reject_sink.record(
                 CriticRejectCode.DUALDISTILL_DROP_0_0.value,
                 prompt,
@@ -57,6 +72,7 @@ def compose_pair(
                     "first_final": final_text(first),
                     "second_final": final_text(second),
                     "expected": expected,
+                    "harness_id": harness_id,
                 },
             )
         return None
@@ -77,10 +93,11 @@ def _stitch(
     steps = list(left.steps)
     steps.append(Step(thought=transition, action=""))
     steps.extend(right.steps)
+    task = left.task or right.task or str(first.get("prompt") or second.get("prompt") or "")
     merged = Trajectory(
         schema_version=left.schema_version,
         harness_id=left.harness_id or right.harness_id,
-        task=left.task or right.task,
+        task=task,
         instruction=left.instruction or right.instruction,
         steps=steps,
         final_answer=right.final_answer or left.final_answer,

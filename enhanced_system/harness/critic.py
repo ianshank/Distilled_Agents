@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -210,9 +211,7 @@ def check_expected_tools(
         return CriticDecision(passed=True)
 
     steps, _final_ans, _faults = _normalize_steps_and_final(trajectory)
-    actual_tools = [
-        step.tool_id for step in steps if step.tool_id and not step.fault and step.tool_id != ""
-    ]
+    actual_tools = [step.tool_id for step in steps if step.tool_id and step.tool_id != ""]
 
     if ordered:
         if actual_tools != expected_tools:
@@ -292,11 +291,17 @@ class RejectSink:
         metadata: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         """Record and persist a structured reject row."""
+        meta = dict(metadata or {})
         entry: dict[str, Any] = {
             "critic_reject_code": reject_code,
             "prompt": prompt,
-            "metadata": metadata or {},
+            "timestamp": meta.get("timestamp") or time.time(),
+            "metadata": meta,
         }
+        if "harness_id" in meta:
+            entry["harness_id"] = meta["harness_id"]
+        elif "model" in meta:
+            entry["model"] = meta["model"]
         self.records.append(entry)
 
         if self.path is not None:

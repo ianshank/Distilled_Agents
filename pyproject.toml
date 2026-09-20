@@ -132,6 +132,7 @@ markers = [
     "benchmark: Performance benchmarks",
     "harness: Agent harness runtime and trajectory tests",
     "regression: CLI/skill contract regressions",
+    "e2_sqe: Tests for E2 sqe_dispose collect/compose critic pipelines",
 ]
 asyncio_mode = "auto"
 addopts = "-v --strict-markers --tb=short"

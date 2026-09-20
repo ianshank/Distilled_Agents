@@ -82,11 +82,21 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to JSONL reject log (default: MANGOMAS_CRITIC_REJECT_LOG or artifacts/critic_rejects.jsonl)",
     )
     args = parser.parse_args(argv)
-    try:
-        scripted = json.loads(args.scripted) if args.scripted else None
-    except json.JSONDecodeError as exc:
-        logger.error("invalid --scripted JSON: %s", exc)
-        return 1
+    scripted = None
+    if args.scripted:
+        scripted_path = Path(args.scripted)
+        if scripted_path.is_file():
+            try:
+                scripted = json.loads(scripted_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.error("invalid scripted responses file %s: %s", scripted_path, exc)
+                return 1
+        else:
+            try:
+                scripted = json.loads(args.scripted)
+            except json.JSONDecodeError as exc:
+                logger.error("invalid --scripted JSON: %s", exc)
+                return 1
     out_path = Path(args.output)
 
     scrubber = None
@@ -267,6 +277,7 @@ def _collect_rows(
                                     "line_no": line_no,
                                     "final_answer": result.final_answer,
                                     "expected": expected_str,
+                                    "harness_id": harness_id,
                                 },
                             )
                         if metrics is not None:
