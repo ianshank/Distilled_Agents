@@ -9,6 +9,44 @@
 
 ---
 
+
+## 0. Precursor PR status and Implementer sequencing
+
+### PR #21 — non-compliant precursor (do not merge as Phase 0 gate)
+
+[PR #21](https://github.com/ianshank/Distilled_Agents/pull/21) (`cursor/golden-passk-aqa-45f9`) is an early Pass@K attempt. It is **CONFLICTING** with `main` and **does not** satisfy Critic-cleared OpenSpec on `main` (PR #20). Treat it as a precursor to **rebase-and-rewrite or replace**, not as the Phase 0 gate.
+
+| OpenSpec pin (PR #20 / `_shared`) | PR #21 actual | Verdict |
+| --- | --- | --- |
+| Sole Pass@K CLI `scripts/harness/run_pass_at_k.py` + `make aqa-gate-passk` | Extends `scripts/harness/run_aqa_gate.py` / `eval_harness.py` with `--pass-k` | Non-compliant |
+| Chen unbiased estimator, gate `n=5`, `k=3`, report k=1 and k=3 | Multi-trial rates via `MANGOMAS_EVAL_PASS_K` default 5; no dedicated Chen CLI | Non-compliant |
+| Golden `configs/golden_sets/sqe_hard_ood.jsonl` with bucket minima (DAG≥6 / tree≥6 / mixed≥4 / OOD cycle≥2 / unsat≥2 / schema-syntax≥2 / unknown-theory≥2, total≥24) | `configs/golden_sets/hard_sdlc.jsonl` (4 hard rows, no OOD buckets) | Non-compliant |
+| OOD iff `slice=="ood"` OR `ood==true`; OOD success = exact `BLOCKED:<CODE>` only | Hard slice only (`core`\|`hard`); no OOD / `BLOCKED` synthetic-success gate | Non-compliant |
+| `critic_reject_code` + `artifacts/critic_rejects.jsonl` (`OUTCOME_MISMATCH`, `DUALDISTILL_DROP_0_0`) | Absent | Missing |
+| Tool `sqe_constraint_solver` + harness `configs/harnesses/sqe_dispose.yaml` | Absent | Missing |
+| Shared codes path `openspec/changes/_shared/blocked-reject-codes.md` | Not wired | Missing |
+
+**Disposition:** close #21 after a compliant Implementer PR lands, or strip #21 to reusable scraps (EchoBackend `reset()`, prompt_render sync test, golden schema typing) and re-land under the contracts below. Do **not** merge #21 onto `main` as-is.
+
+### Implementer PR sequence (Phase 0 only)
+
+Land in order. Each PR must stay within Phase 0; no training / GKD / Serve / Edge-AI / INV-16.
+
+| Order | Working title | OpenSpec package(s) | Must land | Clears kill artifact |
+| --- | --- | --- | --- | --- |
+| **I1** | Pass@K hard/OOD gate | `golden-passk-aqa` | `scripts/harness/run_pass_at_k.py`, `make aqa-gate-passk`, CI job, `configs/golden_sets/sqe_hard_ood.jsonl` (+ bucket validator), docstring-only fix to `run_aqa_gate.py`, scripted fixtures `tests/fixtures/mock_responses_sqe_passk.json`, summary JSON with `pass_at_k`, `exact_only`, `semantic_counted`, `ood_synthetic_success_violations` | Kill #1: upload `aqa-passk-summary.json` from green `aqa-gate-passk` |
+| **I2** | Critic reject telemetry | `critic-cascade` | `critic_reject_code` on collect/compose drops; sink `artifacts/critic_rejects.jsonl`; codes `OUTCOME_MISMATCH` + existing DualDistill `(0,0)` only as `DUALDISTILL_DROP_0_0` (no second drop rule); `MANGOMAS_CRITIC_ENABLED` | Kill #2: upload `critic_rejects.jsonl` proving both codes |
+| **I3** | Symbolic dispose tool | `symbolic-disposition` | Register `sqe_constraint_solver` (pure-Python DAG topo + boolean trees; no Z3/clingo/`exec`/`eval`/`subprocess`); `configs/harnesses/sqe_dispose.yaml` allowlisting solver + `final_answer`; map rejects to `BLOCKED:<CODE>` per `_shared/blocked-reject-codes.md` | Kill #3: solver unit report + OOD `ood_synthetic_success_violations==0` on same green gate run |
+
+**Hard dependencies**
+
+1. I3 must not be marked done until I1 hard-slice Pass@K job exists and is green on scripted fixtures.
+2. I2 may land after I1 metrics exist; it must not wait on I3.
+3. Reuse from #21 only after re-homing onto I1 contracts (no Pass@K inside `run_aqa_gate.py`).
+4. Kill criteria stay **HOLD** until I1–I3 CI artifacts are green on an Implementer PR (docs-only merges do not clear them).
+5. Phase 2–3 remain locked regardless of I1–I3 green.
+
+
 ## 1. Scope fence
 
 ### In scope (Phase 0 gate build)
@@ -246,15 +284,15 @@ Conductor unlock rule:
 
 ## 9. Implementer handoff checklist
 
-1. Add `configs/golden_sets/sqe_hard_ood.jsonl` + bucket-minima validator test.
-2. Add `scripts/harness/run_pass_at_k.py` + `make aqa-gate-passk` + CI job + mock fixtures; fix `run_aqa_gate.py` docstring only.
-3. Wire `critic_reject_code` + `artifacts/critic_rejects.jsonl` in collect/compose.
-4. Register `sqe_constraint_solver`; add `configs/harnesses/sqe_dispose.yaml`; map rejects to `BLOCKED:<CODE>` per shared table.
-5. Upload kill artifacts; do not claim solver “done” until hard-slice Pass@K is green.
-6. Land ADR 0007 (or 0006 addendum) describing dispose tools and fail-closed OOD; claim number at land.
-7. Leave `trl-gkd-usage`, Serve, Edge-AI, and INV-16 untouched.
+Follow **I1 → I2 → I3** in §0. Do not merge PR #21 as the gate.
 
----
+1. **I1:** Add `configs/golden_sets/sqe_hard_ood.jsonl` + bucket-minima validator; add `scripts/harness/run_pass_at_k.py` + `make aqa-gate-passk` + CI job + mock fixtures; fix `run_aqa_gate.py` docstring only (no Pass@K mode).
+2. **I2:** Wire `critic_reject_code` + `artifacts/critic_rejects.jsonl` in collect/compose (`OUTCOME_MISMATCH`, `DUALDISTILL_DROP_0_0` only for existing (0,0) drop).
+3. **I3:** Register `sqe_constraint_solver`; add `configs/harnesses/sqe_dispose.yaml`; map rejects to `BLOCKED:<CODE>` per shared table; mark solver done only when I1 hard-slice gate is green.
+4. Upload kill artifacts (`aqa-passk-summary.json`, `critic_rejects.jsonl`, solver/OOD evidence); leave kill criteria HOLD until all three are green.
+5. Land ADR 0007 (or 0006 addendum) describing dispose tools and fail-closed OOD; claim number at land.
+6. Leave `trl-gkd-usage`, Serve, Edge-AI, and INV-16 untouched.
+
 
 ## 10. References
 
