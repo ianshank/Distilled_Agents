@@ -55,6 +55,16 @@ class MangoMASSettings(BaseSettings):
     eval_pass_n: int = Field(default=5)
     eval_pass_k_temperature: float = Field(default=0.8)
 
+    # Distillation expansion settings (Phase 1)
+    lora_rank: int = Field(default=16)
+    lora_alpha: int = Field(default=32)
+    lora_dropout: float = Field(default=0.1)
+    use_dora: bool = Field(default=False)
+    quantize_4bit: bool = Field(default=False)
+    distill_temperature: float = Field(default=2.0)
+    dpo_beta: float = Field(default=0.1)
+    lora_target_modules: str = Field(default="")
+
     # Trace critic settings (Phase 2 / Phase 0 I2)
     critic_enabled: bool = Field(default=True)
     critic_reject_log: str = Field(default="artifacts/critic_rejects.jsonl")
