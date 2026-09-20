@@ -69,6 +69,10 @@ class MangoMASSettings(BaseSettings):
     dpo_beta: float = Field(default=0.1)
     lora_target_modules: str = Field(default="")
 
+    # Trace critic settings (Phase 2)
+    critic_enabled: bool = Field(default=True)
+    critic_reject_log: str = Field(default="artifacts/critic_rejects.jsonl")
+
     def role_arn(self, account_id: str) -> str:
         return f"arn:aws:iam::{account_id}:role/{self.execution_role_name}"
 

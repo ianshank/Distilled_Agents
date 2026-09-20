@@ -10,15 +10,19 @@ from pathlib import Path
 
 from enhanced_system.harness.convert import trajectory_to_legacy
 from enhanced_system.harness.critic import (
+    CriticMetrics,
     CriticRejectCode,
-    CriticTelemetry,
+    RejectSink,
+    check_expected_tools,
     check_outcome,
     check_tool_allowlist,
     is_recovery_trace,
 )
+from enhanced_system.harness.dispatch import allowed_tools
 from enhanced_system.harness.factory import HarnessFactory
 from enhanced_system.harness.jsonl import JsonlRowError, iter_jsonl_dicts
 from enhanced_system.harness.registry import load_spec
+from enhanced_system.harness.score import answers_match
 from enhanced_system.harness.traces import JsonlTraceStore, raw_store_path
 from enhanced_system.ops.settings import get_settings
 
@@ -60,30 +64,24 @@ def main(argv: list[str] | None = None) -> int:
         help="Use presidio to redact PII from the collected trajectories",
     )
     parser.add_argument(
-        "--reject-log",
-        default=settings.critic_reject_log,
-        help="JSONL sink path for critic reject telemetry (default: artifacts/critic_rejects.jsonl)",
-    )
-    critic_group = parser.add_mutually_exclusive_group()
-    critic_group.add_argument(
         "--critic",
         dest="critic_enabled",
         action="store_true",
         default=None,
-        help="Enable critic filtering and rejection telemetry",
+        help="Enable trace critic cascade (default: from MANGOMAS_CRITIC_ENABLED)",
     )
-    critic_group.add_argument(
+    parser.add_argument(
         "--no-critic",
         dest="critic_enabled",
         action="store_false",
+        help="Disable trace critic cascade",
+    )
+    parser.add_argument(
+        "--reject-log",
         default=None,
-        help="Disable critic filtering and rejection telemetry",
+        help="Path to JSONL reject log (default: MANGOMAS_CRITIC_REJECT_LOG or artifacts/critic_rejects.jsonl)",
     )
     args = parser.parse_args(argv)
-    critic_enabled = (
-        args.critic_enabled if args.critic_enabled is not None else settings.critic_enabled
-    )
-    telemetry = CriticTelemetry(sink_path=args.reject_log, enabled=critic_enabled)
     try:
         scripted = json.loads(args.scripted) if args.scripted else None
     except json.JSONDecodeError as exc:
@@ -117,31 +115,53 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("%s", exc)
         return 1
     try:
+        critic_enabled = (
+            settings.critic_enabled if args.critic_enabled is None else args.critic_enabled
+        )
+        reject_path = (
+            args.reject_log or settings.critic_reject_log or "artifacts/critic_rejects.jsonl"
+        )
+        reject_sink = RejectSink(reject_path) if critic_enabled or args.reject_log else None
+        metrics = CriticMetrics()
+
+        spec = getattr(runtime, "spec", None)
+        if spec is None and args.harness_id:
+            try:
+                spec = load_spec(args.harness_id, settings)
+            except (FileNotFoundError, OSError, ValueError):
+                spec = None
+        allowed_tool_ids = allowed_tools(spec.action.tool_ids) if spec is not None else None
+
         rows = _collect_rows(
             runtime,
             Path(args.input),
             args.harness_id,
             args.strict,
             scrubber=scrubber,
-            telemetry=telemetry,
+            critic_enabled=critic_enabled,
+            reject_sink=reject_sink,
+            metrics=metrics,
+            allowed_tool_ids=allowed_tool_ids,
         )
     except JsonlRowError as exc:
         logger.error("%s", exc)
-        telemetry.emit_summary()
         return 1
     except OSError as exc:
         logger.error("%s", exc)
-        telemetry.emit_summary()
         return 1
     if rows is None:
-        telemetry.emit_summary()
         return 1
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=True) + "\n")
     logger.info("wrote %s rows to %s", len(rows), out_path)
-    telemetry.emit_summary()
+    if critic_enabled:
+        logger.info(
+            "critic summary: %s",
+            ", ".join(f"{k}={v}" for k, v in sorted(metrics.as_dict().items())),
+            extra={"critic_metrics": metrics.as_dict()},
+        )
     return 0
 
 
@@ -151,80 +171,129 @@ def _collect_rows(
     harness_id: str,
     strict: bool,
     scrubber: object | None = None,
-    telemetry: CriticTelemetry | None = None,
+    *,
+    critic_enabled: bool = False,
+    reject_sink: RejectSink | None = None,
+    metrics: CriticMetrics | None = None,
+    allowed_tool_ids: set[str] | None = None,
 ) -> list[dict[str, object]] | None:
     rows: list[dict[str, object]] = []
-    allowed_tools: set[str] | None = None
-    try:
-        allowed_tools = set(load_spec(harness_id).action.tool_ids)
-    except Exception:
-        allowed_tools = None
-
     for line_no, payload in iter_jsonl_dicts(path, require_prompt=True, strict=strict):
         try:
             prompt = str(payload["prompt"])
             result = runtime.run(prompt, harness_id=harness_id)  # type: ignore[attr-defined]
             expected = payload.get("expected")
-
-            # Critic check: Tool allowlist
-            if telemetry is not None and telemetry.enabled and allowed_tools is not None:
-                valid_tools, code, reason = check_tool_allowlist(result.trajectory, allowed_tools)
-                if not valid_tools:
-                    logger.warning(
-                        "skipping tool allowlist violation at line %s (critic_reject_code: %s): %s",
-                        line_no,
-                        code.value if code else CriticRejectCode.SCHEMA_VIOLATION.value,
-                        reason,
-                    )
-                    telemetry.record_reject(
-                        code=code or CriticRejectCode.SCHEMA_VIOLATION,
-                        prompt=prompt,
-                        expected=str(expected) if expected is not None else None,
-                        final_answer=result.final_answer,
-                        metadata={
-                            "line_no": line_no,
-                            "harness_id": harness_id,
-                            "reason": reason,
-                        },
-                    )
-                    if strict:
-                        return None
-                    continue
-
-            # Outcome check
-            if expected is not None and str(expected).strip():
-                valid_outcome, code, reason = check_outcome(result.final_answer, str(expected))
-                if not valid_outcome:
-                    logger.warning(
-                        "skipping outcome mismatch at line %s (critic_reject_code: %s)",
-                        line_no,
-                        CriticRejectCode.OUTCOME_MISMATCH.value,
-                    )
-                    if telemetry is not None:
-                        telemetry.record_reject(
-                            code=CriticRejectCode.OUTCOME_MISMATCH,
-                            prompt=prompt,
-                            expected=str(expected),
-                            final_answer=result.final_answer,
-                            metadata={
-                                "line_no": line_no,
-                                "harness_id": harness_id,
-                                "reason": reason,
-                            },
-                        )
-                    if strict:
-                        return None
-                    continue
-
-            is_rec = is_recovery_trace(
-                result.trajectory, expected=str(expected) if expected is not None else None
+            expected_str = (
+                str(expected).strip() if expected is not None and str(expected).strip() else None
             )
-            if telemetry is not None:
-                telemetry.record_kept(
-                    prompt=prompt,
-                    is_recovery=is_rec,
-                    metadata={"line_no": line_no, "faults": result.trajectory.faults},
-                )
+            expected_tools = payload.get("expected_tools")
+
+            if critic_enabled:
+                # 1. Allowlist check
+                if allowed_tool_ids is not None:
+                    allow_dec = check_tool_allowlist(result.trajectory, allowed_tool_ids)
+                    if not allow_dec:
+                        code = allow_dec.reject_code or CriticRejectCode.SCHEMA_VIOLATION.value
+                        logger.warning(
+                            "critic rejected allowlist at line %s: critic_reject_code: %s (%s)",
+                            line_no,
+                            code,
+                            allow_dec.reason,
+                            extra={"critic_reject_code": code},
+                        )
+                        if reject_sink is not None:
+                            reject_sink.record(
+                                code,
+                                prompt,
+                                metadata={
+                                    "line_no": line_no,
+                                    "reason": allow_dec.reason,
+                                    "harness_id": harness_id,
+                                    "expected": expected,
+                                },
+                            )
+                        if metrics is not None:
+                            metrics.record_reject(code)
+                            metrics.record_reject("allowlist")
+                        if strict:
+                            return None
+                        continue
+
+                # 2. Expected tools check (if row specifies expected_tools)
+                if expected_tools is not None and isinstance(expected_tools, list):
+                    tools_dec = check_expected_tools(result.trajectory, expected_tools)
+                    if not tools_dec:
+                        code = tools_dec.reject_code or CriticRejectCode.SCHEMA_VIOLATION.value
+                        logger.warning(
+                            "critic rejected expected_tools at line %s: critic_reject_code: %s (%s)",
+                            line_no,
+                            code,
+                            tools_dec.reason,
+                            extra={"critic_reject_code": code},
+                        )
+                        if reject_sink is not None:
+                            reject_sink.record(
+                                code,
+                                prompt,
+                                metadata={
+                                    "line_no": line_no,
+                                    "reason": tools_dec.reason,
+                                    "expected_tools": expected_tools,
+                                },
+                            )
+                        if metrics is not None:
+                            metrics.record_reject(code)
+                            metrics.record_reject("expected_tools")
+                        if strict:
+                            return None
+                        continue
+
+                # 3. Outcome check when expected is present
+                if expected_str is not None:
+                    outcome_dec = check_outcome(result.final_answer, expected_str)
+                    if not outcome_dec:
+                        code = outcome_dec.reject_code or CriticRejectCode.OUTCOME_MISMATCH.value
+                        logger.warning(
+                            "skipping outcome mismatch at line %s: critic_reject_code: %s",
+                            line_no,
+                            code,
+                            extra={"critic_reject_code": code},
+                        )
+                        if reject_sink is not None:
+                            reject_sink.record(
+                                code,
+                                prompt,
+                                metadata={
+                                    "line_no": line_no,
+                                    "final_answer": result.final_answer,
+                                    "expected": expected_str,
+                                },
+                            )
+                        if metrics is not None:
+                            metrics.record_reject(code)
+                        if strict:
+                            return None
+                        continue
+
+                # 4. Check for recovery trace when outcome matches
+                if expected_str is not None and is_recovery_trace(result.trajectory, expected_str):
+                    if metrics is not None:
+                        metrics.record_recovery()
+                    logger.info(
+                        "critic_kept_recovery at line %s for prompt: %s",
+                        line_no,
+                        prompt,
+                        extra={"critic_kept_recovery": True, "line_no": line_no},
+                    )
+
+            else:
+                # Backwards compatible path: simple outcome match check
+                if expected_str is not None:
+                    if not answers_match(result.final_answer, expected_str):
+                        logger.warning("skipping outcome mismatch at line %s", line_no)
+                        if strict:
+                            return None
+                        continue
 
             row_dict = trajectory_to_legacy(result.trajectory, expected=expected)
             if scrubber is not None:

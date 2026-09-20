@@ -6,10 +6,9 @@ import logging
 from typing import Any, Optional
 
 from enhanced_system.harness.convert import serialize_thought_action
-from enhanced_system.harness.critic import CriticRejectCode, CriticTelemetry
+from enhanced_system.harness.critic import CriticRejectCode
 from enhanced_system.harness.score import answers_match
 from enhanced_system.harness.types import Step, Trajectory
-from enhanced_system.ops.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -38,52 +37,29 @@ def compose_pair(
     second: dict[str, Any],
     *,
     expected: str,
-    telemetry: Optional[CriticTelemetry] = None,
-    critic_enabled: Optional[bool] = None,
+    reject_sink: Optional[Any] = None,
 ) -> Optional[dict[str, Any]]:
     """Compose y1 and y2 using DualDistill's (g1, g2) table. Drop (0, 0)."""
     grade_first = answers_match(final_text(first), expected)
     grade_second = answers_match(final_text(second), expected)
-    prompt = str(first.get("prompt") or second.get("prompt") or "")
     if not grade_first and not grade_second:
-        logger.info(
-            "critic_reject_code: %s prompt=%r",
-            CriticRejectCode.DUALDISTILL_DROP_0_0.value,
+        prompt = str(first.get("prompt") or second.get("prompt") or "")
+        logger.warning(
+            "DualDistill dropped pair (0,0): critic_reject_code: DUALDISTILL_DROP_0_0 for prompt: %s",
             prompt,
+            extra={"critic_reject_code": CriticRejectCode.DUALDISTILL_DROP_0_0.value},
         )
-        should_record = (telemetry is not None and telemetry.enabled) or (
-            telemetry is None
-            and (critic_enabled or (critic_enabled is None and get_settings().critic_enabled))
-        )
-        metadata = {
-            "first_final": final_text(first),
-            "second_final": final_text(second),
-            "rule": "dual_teacher_both_failed_0_0",
-        }
-        if telemetry is not None:
-            telemetry.record_reject(
-                code=CriticRejectCode.DUALDISTILL_DROP_0_0,
-                prompt=prompt,
-                expected=expected,
-                metadata=metadata,
-            )
-        elif should_record:
-            settings = get_settings()
-            sink_telemetry = CriticTelemetry(
-                sink_path=settings.critic_reject_log,
-                enabled=True,
-            )
-            sink_telemetry.record_reject(
-                code=CriticRejectCode.DUALDISTILL_DROP_0_0,
-                prompt=prompt,
-                expected=expected,
-                metadata=metadata,
+        if reject_sink is not None:
+            reject_sink.record(
+                CriticRejectCode.DUALDISTILL_DROP_0_0.value,
+                prompt,
+                metadata={
+                    "first_final": final_text(first),
+                    "second_final": final_text(second),
+                    "expected": expected,
+                },
             )
         return None
-
-    if telemetry is not None:
-        telemetry.record_kept(prompt=prompt)
-
     if grade_first and not grade_second:
         kept = dict(first)
         kept["expected"] = expected

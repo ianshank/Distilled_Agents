@@ -1,6 +1,6 @@
 # Proposal: critic-cascade
 
-**Status:** proposed  
+**Status:** implemented  
 **Date:** 2026-09-20  
 **Depends on:** `golden-passk-aqa` (metrics exist)
 **Plan:** Phase 2  

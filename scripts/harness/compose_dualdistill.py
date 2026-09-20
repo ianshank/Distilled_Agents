@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from enhanced_system.harness.critic import CriticTelemetry
+from enhanced_system.harness.critic import CriticMetrics, RejectSink
 from enhanced_system.harness.dualdistill import compose_pair, expected_text
 from enhanced_system.harness.jsonl import iter_jsonl_dicts
 from enhanced_system.ops.settings import get_settings
@@ -26,36 +26,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", required=True)
     parser.add_argument(
         "--reject-log",
-        default=settings.critic_reject_log,
-        help="JSONL sink path for critic reject telemetry (default: artifacts/critic_rejects.jsonl)",
-    )
-    critic_group = parser.add_mutually_exclusive_group()
-    critic_group.add_argument(
-        "--critic",
-        dest="critic_enabled",
-        action="store_true",
         default=None,
-        help="Enable critic filtering and rejection telemetry",
-    )
-    critic_group.add_argument(
-        "--no-critic",
-        dest="critic_enabled",
-        action="store_false",
-        default=None,
-        help="Disable critic filtering and rejection telemetry",
+        help="Path to JSONL reject log (default: MANGOMAS_CRITIC_REJECT_LOG or artifacts/critic_rejects.jsonl)",
     )
     args = parser.parse_args(argv)
-    critic_enabled = (
-        args.critic_enabled if args.critic_enabled is not None else settings.critic_enabled
-    )
-    telemetry = CriticTelemetry(sink_path=args.reject_log, enabled=critic_enabled)
     try:
         first_rows = _index_rows(Path(args.first))
         second_rows = _index_rows(Path(args.second))
     except (OSError, ValueError) as exc:
         logger.error("%s", exc)
-        telemetry.emit_summary()
         return 1
+
+    reject_path = args.reject_log or settings.critic_reject_log or "artifacts/critic_rejects.jsonl"
+    reject_sink = RejectSink(reject_path)
+    metrics = CriticMetrics()
+
     written = 0
     unmatched = len(set(second_rows) - set(first_rows))
     out_path = Path(args.output)
@@ -70,15 +55,20 @@ def main(argv: list[str] | None = None) -> int:
             if not expected.strip():
                 logger.warning("skipping unlabeled prompt")
                 continue
-            composed = compose_pair(left, right, expected=expected, telemetry=telemetry)
+            composed = compose_pair(left, right, expected=expected, reject_sink=reject_sink)
             if composed is None:
+                metrics.record_reject("DUALDISTILL_DROP_0_0")
                 continue
             handle.write(json.dumps(composed, ensure_ascii=True) + "\n")
             written += 1
     if unmatched:
         logger.warning("%s unmatched prompts across teacher files", unmatched)
-    logger.info("wrote %s composed rows to %s", written, out_path)
-    telemetry.emit_summary()
+    logger.info(
+        "wrote %s composed rows to %s (critic_rejected_dualdistill_0_0=%s)",
+        written,
+        out_path,
+        metrics.critic_rejected_dualdistill_0_0,
+    )
     return 0
 
 

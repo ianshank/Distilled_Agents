@@ -8,15 +8,18 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 ## [Unreleased]
 
 ### Added
-- **Phase 0 I2 `critic-cascade`:** Critic rejection telemetry and drop reason codes for trajectory collect and DualDistill compose.
-- Added `enhanced_system/harness/critic.py` with pure functions (`check_outcome`, `check_tool_allowlist`, `check_expected_tools`, `is_recovery_trace`), `CriticRejectCode` enum conforming to `openspec/changes/_shared/blocked-reject-codes.md` (`OUTCOME_MISMATCH`, `DUALDISTILL_DROP_0_0`, `CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`), and `CriticTelemetry` JSONL sink and counter logger.
-- Wired critic reject telemetry into `scripts/harness/collect_trajectories.py` emitting `critic_reject_code: "OUTCOME_MISMATCH"` on outcome mismatch and `critic_reject_code: "SCHEMA_VIOLATION"` on tool allowlist failure; gated behind `MANGOMAS_CRITIC_ENABLED` (or CLI `--critic` / `--no-critic`).
-- Retained recovery traces where intermediate faults occurred but final outcome matches expected, incrementing `critic_kept_recovery`.
-- Wired critic reject telemetry into `enhanced_system/harness/dualdistill.py` and `scripts/harness/compose_dualdistill.py` emitting `critic_reject_code: "DUALDISTILL_DROP_0_0"` strictly when both teachers fail the task (without inventing any alternate drop rule).
-- Added structured JSONL sink defaulting to `artifacts/critic_rejects.jsonl` (or `--reject-log` override / `MANGOMAS_CRITIC_REJECT_LOG`).
-- Configured CI artifact upload for `artifacts/critic_rejects.jsonl` in `.github/workflows/ci.yml`.
-- Added unit and EchoBackend integration tests in `tests/unit/test_critic_telemetry.py` validating telemetry emission and artifact generation.
+- **Phase P2 `critic-cascade`:** Pure critic helpers, allowlist cascade filtering, reject telemetry, and recovery trace retention.
+- Added reusable critic helpers in `enhanced_system/harness/critic.py`: `check_tool_allowlist`, `check_outcome`, `check_expected_tools`, `is_recovery_trace`, and composite `evaluate_trace` without external Hub dependencies.
+- Added canonical `CriticRejectCode` enum and standard reject code validation conforming to `openspec/changes/_shared/blocked-reject-codes.md` (`CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`, `OUTCOME_MISMATCH`, `DUALDISTILL_DROP_0_0`).
+- Wired trace critic cascade into `scripts/harness/collect_trajectories.py` behind `MANGOMAS_CRITIC_ENABLED` (via `get_settings().critic_enabled`, default `True`), supporting `--critic`, `--no-critic`, and `--reject-log` CLI options.
+- Structured reject records appended to JSONL sink `artifacts/critic_rejects.jsonl` (or `--reject-log` override) containing `critic_reject_code`, `prompt`, and `metadata`.
+- DualDistill compose path in `enhanced_system/harness/dualdistill.py` and `scripts/harness/compose_dualdistill.py` now logs `critic_reject_code: DUALDISTILL_DROP_0_0` and appends to reject sink when dropping `(0, 0)` pairs without inventing a second drop rule.
+- Preserved recovery traces when final outcome matches `expected` despite intermediate `parse_error` or `tool_error`, incrementing `critic_kept_recovery`.
+- Emitted aggregated and per-event structured counters: `critic_rejected_outcome_mismatch`, `critic_rejected_allowlist`, `critic_rejected_expected_tools`, `critic_rejected_dualdistill_0_0`, and `critic_kept_recovery`.
+- Added comprehensive unit and harness tests in `enhanced_system/tests/unit/test_harness_critic.py` covering all spec falsifiers and cascade stages.
+- Exported critic primitives in `enhanced_system/harness/__init__.py`.
 
+### Added
 - **Phase P1 `golden-passk-aqa`:** Honest multi-trial evaluation, golden sets expansion, and CI-load-bearing AQA gate.
 - Expanded golden JSONL schema (`prompt`, `expected`, optional `id`, `harness_id`, `expected_tools`, `slice` [`core`|`hard`], `allow_semantic`) with backwards-compatible Pydantic model `GoldenRow`.
 - Expanded `configs/golden_sets/` with `core_sdlc.jsonl` and `hard_sdlc.jsonl`, backed by deterministic mock responses in `tests/fixtures/mock_responses.json`.
