@@ -99,7 +99,7 @@ pytest -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness
 ruff check enhanced_system scripts tests
 ```
 
-Global coverage `fail_under` is 60. Harness package coverage is 90 via `.coveragerc.harness`. Invoke pytest from the repo root so `tests/harness/` is collected.
+Global coverage `fail_under` is 60. Harness package coverage is 80 via `.coveragerc.harness`. Invoke pytest from the repo root so `tests/harness/` is collected.
 
 ## Key Components
 
@@ -107,15 +107,19 @@ Global coverage `fail_under` is 60. Harness package coverage is 90 via `.coverag
 To support enterprise-grade ML operations, the pipeline now enforces:
 - **PII Redaction**: `enhanced_system/harness/data_governance.py` integrates Presidio to scrub high-risk PII from trajectories before dataset compilation. *(Note: Transformer-based NLP models run synchronously here and may inject 100-300ms of latency per tool-loop).*
 - **Output Security Scanning**: `enhanced_system/harness/security.py` uses Bandit to scan generated agent outputs, blocking malicious payload injection during evaluation.
+- **Narrow Critic Hook**: A `/narrow-critic` subagent review loop enforces Style/Security standards and acts as a Tier A Pre-PR validation gate.
 - **Strict Supply Chain**: `trust_remote_code=False` is enforced at the framework level and requires explicit environment variable overrides.
 
-### DPO Orchestration (Phase 3)
+### DPO & GKD Orchestration (Phase 3 & P4)
 - `scripts/training/distill/dpo_collator.py` dynamically aligns chosen/rejected trajectory subsets into Chat Templates for Direct Preference Optimization using `trl`.
 - `train_dpo_adapter.py` seamlessly layers DPOTrainer workflows over base PEFT/LoRA models to penalize tool-hallucination paths.
+- `enhanced_system/training/gkd_adapter.py` and `scripts/training/train_gkd_adapter.py` enable Generalized Knowledge Distillation (ADR 0008) with label-masked divergence loss.
 
-### AQA & Golden Set Validation (Phase 4)
-- **AQA Regression Gating**: `configs/golden_sets/core_sdlc.jsonl` provides deterministic validation via Pass@K thresholds for core agent workflows (`make aqa-gate`).
-- Evaluators now track `semantic_match` alongside exact matching and enforce Tool Sequence Accuracy across trajectory replays.
+### AQA & Golden Set Validation (Phase 4 & Phase 0)
+- **AQA Regression Gating**: `configs/golden_sets/core_sdlc.jsonl` and `hard_sdlc.jsonl` provide deterministic validation via Pass@K thresholds for core agent workflows (`make aqa-gate`).
+- **Pass@K Gate**: Multi-sample evaluation on `sqe_hard_ood.jsonl` via `scripts/harness/run_pass_at_k.py` (`make aqa-gate-passk`) using the Chen et al. unbiased estimator.
+- **Regression Suite**: `tests/test_regression_suite.py` prevents regressions on timing-safe auth (SEC-001), error propagation (SEC-002), prompt size bounds (SEC-003), scanner degradation (CQ-001), PII degradation (CQ-002), dynamic AWS account ID (CQ-004), and empty dataset guards (TRN-001).
+- Evaluators track `semantic_match` alongside exact matching and enforce Tool Sequence Accuracy across trajectory replays.
 
 ### Serving & Observability (Phase 5)
 - The local inference container (`scripts/inference.py`) exposes a Prometheus `/metrics` endpoint tracking requests, errors, and LLM-scaled latencies.

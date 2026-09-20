@@ -48,3 +48,8 @@ dist/
 *.egg
 data/training/trajectories/
 configs/harnesses/archive/
+scratch/
+wandb/
+artifacts/
+dpo_adapter/
+dpo_adapter_test/

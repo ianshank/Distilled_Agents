@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import os
@@ -162,6 +163,10 @@ class AgentDistillationTrainer:
             logger.info(
                 "Trajectory mode: filtered %s -> %s rows", len(dataset["train"]), len(filtered)
             )
+            if len(filtered) == 0:
+                raise ValueError(
+                    "Trajectory dataset filtered to 0 rows. Ensure the input JSONL contains valid trajectory 'turns' instead of bare prompts."
+                )
             return filtered
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
 
@@ -200,6 +205,12 @@ class AgentDistillationTrainer:
             data_collator = TrajectoryDataCollator(tokenizer, max_length=self.args.max_length)
         else:
             data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+        eval_strategy_key = (
+            "eval_strategy"
+            if "eval_strategy" in inspect.signature(TrainingArguments.__init__).parameters
+            else "evaluation_strategy"
+        )
+        extra_eval_args = {eval_strategy_key: "steps" if self.args.eval_file else "no"}
         training_args = TrainingArguments(
             output_dir=self.args.output_dir,
             overwrite_output_dir=True,
@@ -213,7 +224,6 @@ class AgentDistillationTrainer:
             logging_steps=self.args.logging_steps,
             save_steps=self.args.save_steps,
             save_total_limit=self.args.save_total_limit,
-            evaluation_strategy="steps" if self.args.eval_file else "no",
             eval_steps=self.args.eval_steps if self.args.eval_file else None,
             load_best_model_at_end=bool(self.args.eval_file),
             fp16=self.args.use_fp16,
@@ -221,6 +231,7 @@ class AgentDistillationTrainer:
             remove_unused_columns=False,
             report_to="wandb" if self.args.use_wandb else None,
             logging_dir=f"{self.args.output_dir}/logs",
+            **extra_eval_args,
         )
         use_gkd = getattr(self.args, "use_gkd", False)
         if use_gkd:
@@ -318,7 +329,7 @@ class DistillationTrainer(Trainer):
         self.distillation_alpha = distillation_alpha
         self.temperature = temperature
 
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         student_outputs = model(**inputs)
         teacher_outputs = None
         if self.teacher_model is not None and self.distillation_alpha > 0:

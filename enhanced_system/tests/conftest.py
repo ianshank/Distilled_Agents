@@ -59,6 +59,23 @@ def test_config() -> dict[str, Any]:
     }
 
 
+@pytest.fixture(autouse=True)
+def _mock_aws_account_id(monkeypatch):
+    """Provide a test-safe AWS account ID for SageMaker launcher tests.
+
+    Per AGENTS.md: 'Contract tests must monkeypatch boto3.'
+    CQ-004 removed the hardcoded '000000000000' fallback, so tests
+    must set this env var to avoid needing real AWS credentials.
+    """
+    monkeypatch.setenv("MANGOMAS_AWS_ACCOUNT_ID", "123456789012")
+    # Clear cached settings so the test gets fresh values
+    from enhanced_system.ops.settings import get_settings
+
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
 @pytest.fixture
 def cache_config() -> dict[str, Any]:
     """Provide cache-specific configuration."""

@@ -14,8 +14,8 @@ From the repository root:
 make validate
 ```
 
-That is lint + scoped mypy (`ops`, `core/cache`, `harness`) + pytest AQA (global `fail_under=60` then harness `.coveragerc.harness` 90) + bandit + gitleaks.
+That is lint + scoped mypy (`ops`, `core/cache`, `harness`) + pytest AQA (global `fail_under=60` then harness `.coveragerc.harness` 80) + regression suite + AQA gates (`core_sdlc`, `hard_sdlc`, and `sqe_hard_ood` Pass@K) + bandit + gitleaks.
 
-The composite `.github/actions/mangomas-validate` wraps the same target for skills. GitHub Actions still runs lint, types, unit+integration@60, harness@90, and security as first-class jobs.
+The composite `.github/actions/mangomas-validate` wraps the same target for skills. GitHub Actions still runs lint, types, unit+integration@60, harness@80, aqa-gate, aqa-passk, and security as first-class jobs.
 
 Bandit-only scans stay on `mangomas-scan` (`scripts/infrastructure/security_scan.py`).

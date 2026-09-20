@@ -105,3 +105,9 @@ configs/harnesses/archive/
 *.raw.traces.jsonl
 *.prefs.jsonl
 memory_bank.json
+
+# Local scratch and training artifacts
+scratch/
+wandb/
+dpo_adapter/
+dpo_adapter_test/

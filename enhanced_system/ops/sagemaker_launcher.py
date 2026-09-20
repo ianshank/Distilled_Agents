@@ -110,13 +110,20 @@ class MangoMASSageMakerLauncher:
         return configs
 
     def _account_id(self) -> str:
+        # CQ-004: Check MANGOMAS_ env var first, then STS, never hardcode
+        env_account = os.getenv("MANGOMAS_AWS_ACCOUNT_ID")
+        if env_account:
+            return env_account
         try:
             import boto3
 
             account = boto3.client("sts", region_name=self.region).get_caller_identity()["Account"]
             return str(account)
-        except Exception:
-            return "000000000000"
+        except Exception as exc:
+            raise ValueError(
+                "Cannot determine AWS account ID. Set MANGOMAS_AWS_ACCOUNT_ID "
+                "or ensure valid AWS credentials are configured."
+            ) from exc
 
     def _get_execution_role(self) -> str:
         if self.role_arn:
