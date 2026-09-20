@@ -99,6 +99,34 @@ python scripts/harness/eval_harness.py --input prompts.jsonl --harness-id base_r
 
 Outcome filter skips a row when `expected` is present **and** `final_answer` misses it. Intermediate `parse_error` / `tool_error` are **kept** when the outcome matches — recovery is the point. No `expected` ⇒ no outcome skip. Kept rows still carry `expected` so compose can grade.
 
+## Trace Critic Cascade (Phase P2)
+
+Trace criticism provides deterministic validation and explicit reject telemetry during trajectory collection and DualDistill composition.
+
+### 1. Reusable Pure Critic Helpers (`enhanced_system/harness/critic.py`)
+
+- **Allowlist Validity (`check_tool_allowlist`)**: Validates that all tool invocations and parsed actions in a trajectory belong to the harness's declared allowlist (including `final_answer`). Any unauthorized or unknown tool immediately fails with `SCHEMA_VIOLATION`.
+- **Expected Tools Check (`check_expected_tools`)**: Confirms that required tools were executed (supports both set inclusion and strict ordering). Fails with `SCHEMA_VIOLATION` if missing.
+- **Outcome Grading (`check_outcome`)**: Exact match grading against reference `expected` answer (or semantic match if `allow_semantic: true`). Misses fail with `OUTCOME_MISMATCH`.
+- **Recovery Trace Preservation (`is_recovery_trace`)**: Intermediate `parse_error` or `tool_error` steps are retained if the final answer matches `expected`. Increments the `critic_kept_recovery` counter.
+
+### 2. Standard Reject Codes (`openspec/changes/_shared/blocked-reject-codes.md`)
+
+Structured reject records and telemetry log canonical codes from the shared contract:
+- Deterministic solver / teacher-rule codes: `CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`.
+- Upstream pipeline codes: `OUTCOME_MISMATCH`, `DUALDISTILL_DROP_0_0`.
+
+### 3. Collection and Telemetry Sink (`collect_trajectories.py` & `compose_dualdistill.py`)
+
+- Gated by `MANGOMAS_CRITIC_ENABLED` (via `get_settings().critic_enabled`, default `True`; override with `--critic` / `--no-critic`).
+- Drops are appended as structured JSONL records to `artifacts/critic_rejects.jsonl` (or `--reject-log` / `MANGOMAS_CRITIC_REJECT_LOG`):
+  ```json
+  {"critic_reject_code": "OUTCOME_MISMATCH", "prompt": "...", "metadata": {"line_no": 1, "expected": "...", "final_answer": "..."}}
+  ```
+- DualDistill `compose_pair` drops `(0, 0)` with `critic_reject_code: DUALDISTILL_DROP_0_0` without inventing a second drop rule.
+- Counters emitted: `critic_rejected_outcome_mismatch`, `critic_rejected_allowlist`, `critic_rejected_expected_tools`, `critic_rejected_dualdistill_0_0`, and `critic_kept_recovery`.
+
+
 ## Golden Sets and Pass@K Multi-Trial Eval (Phase P1)
 
 Golden evaluation rows follow `GoldenRow`:
