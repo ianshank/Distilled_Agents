@@ -200,7 +200,7 @@ Student explores; teacher `generate`s a review of the **full chain** and the cor
 
 ## Evaluation Gates
 
-- **Single-pass regression:** `make aqa-gate` runs `scripts/harness/run_aqa_gate.py` against `configs/golden_sets/core_sdlc.jsonl`.
+- **Single-pass regression:** `make aqa-gate` runs `scripts/harness/run_aqa_gate.py` against `configs/golden_sets/core_sdlc.jsonl` and `hard_sdlc.jsonl`.
 - **Pass@K Hard/OOD gate (Phase 0 / I1):** `make aqa-gate-passk` runs `scripts/harness/run_pass_at_k.py` against `configs/golden_sets/sqe_hard_ood.jsonl` using the Chen et al. unbiased estimator ($n=5, k=3$). Hard and OOD slices enforce exact answers_match, disallow semantic matches, and prohibit OOD synthetic-success violations.
 
 ## Symbolic Disposition and Fail-Closed OOD (Phase 0 I3)
