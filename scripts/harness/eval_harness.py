@@ -15,6 +15,7 @@ from enhanced_system.harness.jsonl import JsonlRowError, iter_jsonl_dicts
 from enhanced_system.harness.score import answers_match
 from enhanced_system.harness.types import GoldenRow
 from enhanced_system.ops.settings import get_settings
+from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +118,7 @@ def _evaluate_file(
     for line_no, payload in rows:
         try:
             row = GoldenRow.model_validate(payload)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValidationError, ValueError) as exc:
             logger.warning("skipping line %s: %s", line_no, exc)
             if strict:
                 raise
