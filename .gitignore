@@ -96,6 +96,7 @@ sagemaker_training_results.json
 security_report.json
 gitleaks-report.json
 artifacts/
+aqa-passk-summary.json
 
 # Harness rollouts (local collection)
 data/training/trajectories/

@@ -128,55 +128,42 @@ Structured reject records and telemetry log canonical codes from the shared cont
 - Counters emitted: `critic_rejected_outcome_mismatch`, `critic_rejected_allowlist`, `critic_rejected_expected_tools`, `critic_rejected_dualdistill_0_0`, and `critic_kept_recovery`.
 
 
-## Golden Sets and Pass@K Multi-Trial Eval (Phase P1)
+## Golden Sets and Pass@K Multi-Trial Eval (Phase 0 / I1)
 
 Golden evaluation rows follow `GoldenRow`:
 - `prompt`: string (required)
 - `expected`: string (required for labeled rows)
-- `id`: stable identifier (required for `slice: hard`)
+- `id`: stable identifier (required for `slice: hard` and `slice: ood`)
 - `harness_id`: optional harness YAML id
 - `expected_tools`: optional list of tool names
-- `slice`: `"core"` | `"hard"` (default `"core"`)
+- `slice`: `"core"` | `"hard"` | `"ood"` (default `"core"`)
 - `allow_semantic`: bool (default `false`)
+- `grader`: `"exact"` (required for hard/ood)
+- `ood`: bool (`true` for OOD rows)
 
-Evaluating golden sets with multi-trial pass@k:
+Evaluating golden sets with multi-trial Pass@K (sole CLI `scripts/harness/run_pass_at_k.py`):
 
 ```bash
-python scripts/harness/eval_harness.py \
-  --input configs/golden_sets/core_sdlc.jsonl \
+python scripts/harness/run_pass_at_k.py \
+  --golden-set configs/golden_sets/sqe_hard_ood.jsonl \
   --harness-id base_react \
-  --pass-k 5
+  --threshold 1.0 \
+  --scripted tests/fixtures/mock_responses_sqe_passk.json \
+  --output aqa-passk-summary.json
 ```
 
 Evaluation rules:
-- `k` trials are run independently per row (sampling temperature from `MANGOMAS_EVAL_PASS_K_TEMPERATURE`, default `0.8` when `k>1`, `0.0` for `k=1`).
-- `pass@1`: fraction of rows succeeding on trial 1.
-- `pass@k`: fraction of rows succeeding on at least 1 of the `k` trials (or Chen unbiased estimate across $n$ samples).
-- **Hard and OOD slices**: success strictly requires exact `answers_match` and no security failures (`semantic_match` alone is a failure; unlabeled non-truncated rows do not count). OOD rows must produce canonical `BLOCKED:<CODE>` refusal tokens.
-- **Core slice**: `semantic_match` counts as success only when the row explicitly specifies `allow_semantic: true`.
-
-AQA Regression Gate runs both core and hard golden sets in CI with deterministic mock fixtures:
-
-```bash
-python scripts/harness/run_aqa_gate.py \
-  --golden-set configs/golden_sets/core_sdlc.jsonl \
-  --threshold 75.0 \
-  --scripted tests/fixtures/mock_responses.json
-
-python scripts/harness/run_aqa_gate.py \
-  --golden-set configs/golden_sets/hard_sdlc.jsonl \
-  --threshold 75.0 \
-  --hard-threshold 75.0 \
-  --require-hard \
-  --scripted tests/fixtures/mock_responses.json
-```
+- Chen et al. unbiased estimator across $n$ samples ($n=5, k=3$).
+- **Hard and OOD slices**: success strictly requires exact `answers_match` and no security failures (`semantic_match` alone is a failure; unlabeled non-truncated rows do not count). OOD rows must produce canonical `BLOCKED:<CODE>` refusal tokens per `_shared/blocked-reject-codes.md`.
+- **OOD synthetic-success prohibition**: any non-empty non-matching answer on an OOD row increments `ood_synthetic_success_violations` and fails the gate.
+- **Core slice**: single-pass regression gate via `make aqa-gate` (`scripts/harness/run_aqa_gate.py`).
 
 Traceability rule matrix (`configs/rule_traceability/matrix.yaml`) verifies every hard golden row is backed by a tracked rule and source trace:
 
 ```bash
 python scripts/harness/check_rule_matrix.py \
   --matrix configs/rule_traceability/matrix.yaml \
-  --golden configs/golden_sets/hard_sdlc.jsonl
+  --golden configs/golden_sets/sqe_hard_ood.jsonl
 ```
 
 ## AMD-lite (after format + eval)
@@ -209,6 +196,11 @@ python scripts/harness/collect_score.py \
 ```
 
 Student explores; teacher `generate`s a review of the **full chain** and the corrected action is injected at the first **semantic** miss (wrong/missing final answer), not `DispatchError` recovered on the way. Resume from the verified prefix. Preference pairs (`σ_k` vs `σ'_k`) are a byproduct for later DPO/GRPO — not a separate EasyDistill job. Defer SCoRe-RL, GRPO, SDAR.
+
+## Evaluation Gates
+
+- **Single-pass regression:** `make aqa-gate` runs `scripts/harness/run_aqa_gate.py` against `configs/golden_sets/core_sdlc.jsonl`.
+- **Pass@K Hard/OOD gate (Phase 0 / I1):** `make aqa-gate-passk` runs `scripts/harness/run_pass_at_k.py` against `configs/golden_sets/sqe_hard_ood.jsonl` using the Chen et al. unbiased estimator ($n=5, k=3$). Hard and OOD slices enforce exact answers_match, disallow semantic matches, and prohibit OOD synthetic-success violations.
 
 ## Still deferred
 

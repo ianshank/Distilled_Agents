@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Any, Optional
 
 from enhanced_system.harness.types import Step, Trajectory
@@ -11,6 +12,35 @@ from enhanced_system.harness.types import Step, Trajectory
 def answers_match(actual: str, expected: str) -> bool:
     """Exact-match grader used for outcome filter and DualDistill."""
     return actual.strip() == expected.strip()
+
+
+def estimate_pass_at_k(n: int, c: int, k: int) -> float:
+    """Calculate Chen et al. unbiased pass@k estimator for a single problem.
+
+    Formula (arXiv:2107.03374):
+        pass@k = 1 - comb(n - c, k) / comb(n, k)
+    If n - c < k, comb(n - c, k) == 0, so pass@k = 1.0.
+    """
+    if n < k:
+        raise ValueError(f"Total samples n={n} must be >= k={k}")
+    if k <= 0:
+        raise ValueError(f"k must be positive, got {k}")
+    if c < 0 or c > n:
+        raise ValueError(f"Correct samples c={c} must be between 0 and n={n}")
+    if n - c < k:
+        return 1.0
+    return 1.0 - float(math.comb(n - c, k)) / float(math.comb(n, k))
+
+
+def calculate_pass_at_k(problem_sample_counts: list[tuple[int, int]], k: int) -> float:
+    """Calculate average unbiased pass@k across multiple problems.
+
+    Each element of problem_sample_counts is (n, c): total samples and correct samples.
+    """
+    if not problem_sample_counts:
+        return 0.0
+    total = sum(estimate_pass_at_k(n, c, k) for n, c in problem_sample_counts)
+    return total / len(problem_sample_counts)
 
 
 def semantic_match(actual: str, expected: str) -> bool:

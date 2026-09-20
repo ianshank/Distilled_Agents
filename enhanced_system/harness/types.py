@@ -1,4 +1,4 @@
-"""Pydantic types for harness specifications and traces."""
+"""MangoMAS harness data types and schemas."""
 
 from __future__ import annotations
 
@@ -8,22 +8,22 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PlanConfig(BaseModel):
-    """Planning slice of a harness (H.P)."""
+    """Planning configuration for a harness spec."""
 
     style: str = "react"
+    instruction: str = ""
     max_steps: Optional[int] = None
     first_thought_prefix: bool = False
-    instruction: str = ""
 
 
 class ActionConfig(BaseModel):
-    """Action slice of a harness (H.A)."""
+    """Action space configuration for a harness spec."""
 
     tool_ids: list[str] = Field(default_factory=list)
 
 
 class MemoryConfig(BaseModel):
-    """Memory slice of a harness (H.M)."""
+    """Memory configuration for a harness spec."""
 
     window_turns: Optional[int] = None
     write_observations: bool = True
@@ -31,18 +31,18 @@ class MemoryConfig(BaseModel):
 
 
 class PolicyConfig(BaseModel):
-    """Runtime policy knobs (SAG / teacher FTP)."""
+    """Policy execution configuration for a harness spec."""
 
-    sag_samples: Optional[int] = None
-    sag_temperature: Optional[float] = None
     teacher: bool = False
+    sag_samples: Optional[int] = None
+    sag_temperature: float = 0.0
 
 
 class HarnessSpec(BaseModel):
-    """YAML-backed harness specification."""
+    """Full declarative specification of an agent harness."""
 
-    id: str
     schema_version: str = "1"
+    id: str
     planning: PlanConfig = Field(default_factory=PlanConfig)
     action: ActionConfig = Field(default_factory=ActionConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
@@ -50,13 +50,13 @@ class HarnessSpec(BaseModel):
 
 
 class Step(BaseModel):
-    """One reason-act-observe step."""
+    """Single step in an agent trajectory."""
 
     thought: str = ""
     action: str = ""
     observation: str = ""
+    fault: Optional[str] = None
     tool_id: str = ""
-    fault: str = ""
 
 
 class Trajectory(BaseModel):
@@ -81,6 +81,18 @@ class HarnessRunResult(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+CANONICAL_REJECT_CODES = (
+    "CYCLE_DETECTED",
+    "UNSAT",
+    "SCHEMA_VIOLATION",
+    "SYNTAX_INVALID",
+    "UNSUPPORTED_THEORY",
+    "RESOURCE_LIMIT",
+)
+
+CANONICAL_REFUSAL_TOKENS = tuple(f"BLOCKED:{code}" for code in CANONICAL_REJECT_CODES)
+
+
 class GoldenRow(BaseModel):
     """Schema for golden evaluation dataset rows (core, hard, and ood slices)."""
 
@@ -92,12 +104,13 @@ class GoldenRow(BaseModel):
     harness_id: Optional[str] = None
     expected_tools: Optional[list[str]] = None
     slice: Literal["core", "easy", "hard", "ood"] = "core"
-    allow_semantic: bool = False
-    grader: Optional[str] = None
+    grader: str = "exact"
     tags: Optional[list[str]] = None
     solver_fixture: Optional[str] = None
     ood: bool = False
+    bucket: Optional[str] = None
     notes: Optional[str] = None
+    allow_semantic: bool = False
 
     @field_validator("prompt")
     @classmethod
@@ -117,7 +130,7 @@ class GoldenRow(BaseModel):
 
     @property
     def is_ood(self) -> bool:
-        """Disjunctive OOD rule: row is OOD iff slice == 'ood' OR ood is True."""
+        """A row is OOD iff slice == 'ood' OR ood == true."""
         return self.slice == "ood" or bool(self.ood)
 
     @property
@@ -127,9 +140,25 @@ class GoldenRow(BaseModel):
 
     def validate_for_hard_slice(self) -> None:
         """Validate hard-slice invariant: non-empty id, non-empty expected, slice == 'hard'."""
-        if self.slice != "hard" and not self.is_ood:
-            raise ValueError(f"Row {self.id or '<unnamed>'} must have slice='hard' or ood")
+        if self.slice != "hard":
+            raise ValueError(f"Row {self.id or '<unnamed>'} must have slice='hard'")
         if not self.id or not str(self.id).strip():
-            raise ValueError(f"Hard/OOD slice row missing stable id (prompt: {self.prompt!r})")
+            raise ValueError(f"Hard slice row missing stable id (prompt: {self.prompt!r})")
         if self.expected is None or not str(self.expected).strip():
-            raise ValueError(f"Hard/OOD slice row {self.id} must have non-empty expected answer")
+            raise ValueError(f"Hard slice row {self.id} must have non-empty expected answer")
+
+    def validate_for_hard_or_ood(self) -> None:
+        """Validate invariants for hard or OOD slice rows in Pass@K gate."""
+        if not self.id or not str(self.id).strip():
+            raise ValueError(f"Row missing stable id (prompt: {self.prompt!r})")
+        if self.expected is None or not str(self.expected).strip():
+            raise ValueError(f"Row {self.id} must have non-empty expected answer")
+        if self.grader != "exact":
+            raise ValueError(f"Row {self.id} must have grader='exact', got {self.grader!r}")
+        if self.allow_semantic:
+            raise ValueError(f"Row {self.id} must have allow_semantic=False")
+        if self.is_ood and self.expected not in CANONICAL_REFUSAL_TOKENS:
+            raise ValueError(
+                f"OOD row {self.id} expected must be canonical refusal in {CANONICAL_REFUSAL_TOKENS}, "
+                f"got {self.expected!r}"
+            )

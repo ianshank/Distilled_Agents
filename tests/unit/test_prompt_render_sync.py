@@ -14,7 +14,6 @@ DISTILL_RENDER = REPO_ROOT / "scripts" / "training" / "distill" / "prompt_render
 
 def _normalize_module_code(text: str) -> str:
     """Normalize the top-level docstring which cross-references the other file."""
-    # Strip module docstring at top
     stripped = re.sub(r'^"""[\s\S]*?"""\s*', "", text.strip())
     return stripped.strip()
 

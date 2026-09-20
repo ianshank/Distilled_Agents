@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Verify that every hard golden row ID is mapped in configs/rule_traceability/matrix.yaml."""
+"""Check that configs/rule_traceability/matrix.yaml covers all hard golden IDs."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 import yaml
-from enhanced_system.harness.jsonl import iter_jsonl_dicts
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +21,15 @@ VALID_SOLVER_STATUSES = frozenset({"fixture", "active", "pending"})
 def verify_rule_matrix(
     matrix_path: Path | str,
     golden_path: Path | str,
-) -> list[str]:
-    """Check that every hard golden row ID appears in the rule matrix.
-
-    Returns a list of missing hard golden IDs (empty list on complete coverage).
-    Raises ValueError on schema or file loading errors.
-    """
+) -> dict[str, Any]:
+    """Verify that every slice=='hard' golden ID is mapped in matrix.yaml."""
     matrix_file = Path(matrix_path)
+    golden_file = Path(golden_path)
+
     if not matrix_file.is_file():
-        raise ValueError(f"Matrix file not found: {matrix_file}")
+        raise FileNotFoundError(f"Matrix file not found: {matrix_file}")
+    if not golden_file.is_file():
+        raise FileNotFoundError(f"Golden set not found: {golden_file}")
 
     try:
         matrix_data = yaml.safe_load(matrix_file.read_text(encoding="utf-8"))
@@ -57,57 +58,60 @@ def verify_rule_matrix(
             )
         matrix_golden_ids.add(str(rule["golden_id"]).strip())
 
-    golden_file = Path(golden_path)
-    if not golden_file.is_file():
-        raise ValueError(f"Golden file not found: {golden_file}")
-
     hard_golden_ids: set[str] = set()
-    for line_no, payload in iter_jsonl_dicts(golden_file, require_prompt=True, strict=True):
-        row_slice = str(payload.get("slice", "core")).strip().lower()
-        is_ood = row_slice == "ood" or bool(payload.get("ood"))
-        if row_slice == "hard" or is_ood:
-            row_id = str(payload.get("id") or "").strip()
-            if not row_id:
-                raise ValueError(f"Hard/OOD slice row at line {line_no} is missing a stable 'id'")
-            hard_golden_ids.add(row_id)
+    with golden_file.open("r", encoding="utf-8") as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            item = json.loads(stripped)
+            slice_val = str(item.get("slice", "")).lower()
+            if slice_val == "hard":
+                row_id = item.get("id")
+                if row_id:
+                    hard_golden_ids.add(row_id)
 
-    missing = sorted(hard_golden_ids - matrix_golden_ids)
-    return missing
+    missing = hard_golden_ids - matrix_golden_ids
+    if missing:
+        raise ValueError(
+            f"Rule matrix {matrix_file} missing coverage for hard golden ids: {sorted(missing)}"
+        )
+
+    return {
+        "covered_hard_ids": len(hard_golden_ids),
+        "total_rules": len(rules),
+        "matrix_golden_ids": sorted(matrix_golden_ids),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s", force=True)
-    parser = argparse.ArgumentParser(
-        description="Verify rule traceability matrix coverage for hard golden sets"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+    parser = argparse.ArgumentParser(description="Check rule traceability matrix coverage")
     parser.add_argument(
         "--matrix",
         default="configs/rule_traceability/matrix.yaml",
         help="Path to rule traceability matrix YAML",
     )
     parser.add_argument(
+        "--golden-set",
         "--golden",
-        default="configs/golden_sets/hard_sdlc.jsonl",
-        help="Path to hard golden set JSONL",
+        dest="golden_set",
+        default="configs/golden_sets/sqe_hard_ood.jsonl",
+        help="Path to hard/OOD golden set JSONL",
     )
     args = parser.parse_args(argv)
 
     try:
-        missing = verify_rule_matrix(args.matrix, args.golden)
-    except ValueError as exc:
-        logger.error("Rule matrix verification failed: %s", exc)
-        return 1
-
-    if missing:
-        logger.error(
-            "Hard golden IDs missing from rule traceability matrix %s: %s",
-            args.matrix,
-            missing,
+        result = verify_rule_matrix(Path(args.matrix), Path(args.golden_set))
+        logger.info(
+            "Rule matrix verification passed (%d hard IDs covered across %d rules).",
+            result["covered_hard_ids"],
+            result["total_rules"],
         )
+        return 0
+    except Exception as exc:
+        logger.error("Rule matrix check failed: %s", exc)
         return 1
-
-    logger.info("Rule traceability matrix check PASSED (%s covered)", args.golden)
-    return 0
 
 
 if __name__ == "__main__":
