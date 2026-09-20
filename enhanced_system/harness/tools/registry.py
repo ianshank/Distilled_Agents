@@ -5,6 +5,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from enhanced_system.harness.tools.constraint import (
+    ConstraintCheckTool,
+    SqeConstraintSolverTool,
+)
+
 
 class JsonSchemaTool:
     """Validate that payload JSON includes required keys."""
@@ -109,6 +114,8 @@ TOOL_REGISTRY: dict[str, type[Any]] = {
     SqeChecklistTool.tool_id: SqeChecklistTool,
     ArchitectStructureTool.tool_id: ArchitectStructureTool,
     PmAcceptanceTool.tool_id: PmAcceptanceTool,
+    ConstraintCheckTool.tool_id: ConstraintCheckTool,
+    SqeConstraintSolverTool.tool_id: SqeConstraintSolverTool,
     FinalAnswerTool.tool_id: FinalAnswerTool,
 }
 

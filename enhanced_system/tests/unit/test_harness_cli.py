@@ -574,3 +574,34 @@ def test_trajectory_mode_reads_distill_alpha_env():
     trainer = (REPO / "scripts" / "training" / "distill" / "trainer.py").read_text(encoding="utf-8")
     assert "TrajectoryDataCollator" in trainer
     assert 'getattr(self.args, "trajectory_mode", False)' in trainer
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_extract_rules_cli(tmp_path, capsys):
+    from scripts.harness.extract_rules import extract_candidate_rules, main
+
+    input_jsonl = tmp_path / "traces.jsonl"
+    input_jsonl.write_text(
+        json.dumps({"id": "row-1", "prompt": "Verify DB index", "source_trace": "t1.jsonl"})
+        + "\n"
+        + json.dumps({"prompt": "Check cache invalidation"})
+        + "\n"
+    )
+
+    candidates = extract_candidate_rules(input_jsonl, default_harness_id="qc_constraints")
+    assert len(candidates) == 2
+    assert candidates[0]["golden_id"] == "row-1"
+    assert candidates[0]["harness_id"] == "qc_constraints"
+    assert candidates[0]["solver_status"] == "pending"
+    assert candidates[1]["golden_id"].startswith("cand-")
+
+    out_yaml = tmp_path / "candidates.yaml"
+    exit_code = main(["--input", str(input_jsonl), "--output", str(out_yaml)])
+    assert exit_code == 0
+    assert out_yaml.is_file()
+
+    # Test stdout print
+    exit_code_stdout = main(["--input", str(input_jsonl)])
+    assert exit_code_stdout == 0
+    assert "CAND-RULE-" in capsys.readouterr().out

@@ -14,6 +14,7 @@ from enhanced_system.harness.jsonl import iter_jsonl_dicts
 logger = logging.getLogger(__name__)
 
 REQUIRED_MATRIX_FIELDS = ("rule_id", "source_trace", "harness_id", "golden_id", "solver_status")
+VALID_SOLVER_STATUSES = frozenset({"fixture", "active", "pending"})
 
 
 def verify_rule_matrix(
@@ -48,6 +49,12 @@ def verify_rule_matrix(
         missing_fields = [f for f in REQUIRED_MATRIX_FIELDS if not rule.get(f)]
         if missing_fields:
             raise ValueError(f"Rule item {idx} missing required fields: {missing_fields}")
+        status = str(rule.get("solver_status", "")).strip().lower()
+        if status not in VALID_SOLVER_STATUSES:
+            raise ValueError(
+                f"Rule item {idx} has invalid solver_status '{status}'; "
+                f"must be one of {sorted(VALID_SOLVER_STATUSES)} and cannot be 'none'"
+            )
         matrix_golden_ids.add(str(rule["golden_id"]).strip())
 
     golden_file = Path(golden_path)

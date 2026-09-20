@@ -69,6 +69,11 @@ class MangoMASSettings(BaseSettings):
     critic_enabled: bool = Field(default=True)
     critic_reject_log: str = Field(default="artifacts/critic_rejects.jsonl")
 
+    # Symbolic disposition settings (Phase 3)
+    constraint_max_nodes: int = Field(default=64)
+    constraint_max_edges: int = Field(default=256)
+    constraint_max_constraints: int = Field(default=128)
+
     def role_arn(self, account_id: str) -> str:
         return f"arn:aws:iam::{account_id}:role/{self.execution_role_name}"
 
