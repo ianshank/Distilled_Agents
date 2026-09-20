@@ -588,6 +588,9 @@ def test_golden_row_invariants_failure_paths() -> None:
         GoldenRow(id="h1", prompt="p", expected=None, slice="hard").validate_for_hard_slice()
 
     # validate_for_hard_or_ood
+    with pytest.raises(ValueError, match="must have slice in"):
+        GoldenRow(id="h1", prompt="p", expected="e", slice="core").validate_for_hard_or_ood()
+
     with pytest.raises(ValueError, match="missing stable id"):
         GoldenRow(prompt="p", expected="e", slice="hard").validate_for_hard_or_ood()
 

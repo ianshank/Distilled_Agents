@@ -38,6 +38,8 @@ gitleaks:
 
 aqa-gate:
 	$(PYTHON) scripts/harness/run_aqa_gate.py --golden-set configs/golden_sets/core_sdlc.jsonl --threshold 75.0 --scripted tests/fixtures/mock_responses.json
+	$(PYTHON) scripts/harness/run_aqa_gate.py --golden-set configs/golden_sets/hard_sdlc.jsonl --threshold 75.0 --scripted tests/fixtures/mock_responses.json
+	$(PYTHON) scripts/harness/check_rule_matrix.py --matrix configs/rule_traceability/matrix.yaml --golden configs/golden_sets/hard_sdlc.jsonl
 
 aqa-gate-passk:
 	$(PYTHON) scripts/harness/run_pass_at_k.py --golden-set configs/golden_sets/sqe_hard_ood.jsonl --threshold 1.0 --scripted tests/fixtures/mock_responses_sqe_passk.json --output aqa-passk-summary.json

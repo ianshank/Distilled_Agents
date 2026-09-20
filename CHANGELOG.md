@@ -22,7 +22,7 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Added
 - **Phase P3 / I3 `symbolic-disposition`:** Pure-Python constraint checking, symbolic disposition tools, fail-closed refusal on OOD, and hard golden coverage.
-- Added `ConstraintCheckTool` (`constraint_check`) and `SqeConstraintSolverTool` (`sqe_constraint_solver`) in `enhanced_system/harness/tools/constraint.py` and exported through `TOOL_REGISTRY`.
+- Added `ConstraintCheckTool` (`constraint_check`) and `SqeConstraintSolverTool` (`sqe_constraint_solver`) in `enhanced_system/harness/tools/solver.py` and exported through `TOOL_REGISTRY`.
 - Supported pure-Python DAG topological sorting (lexicographically least order via Kahn's algorithm with a min-heap) and boolean condition tree solving without external native solver binaries.
 - Enforced standard reject codes conforming to `openspec/changes/_shared/blocked-reject-codes.md` (`CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`).
 - Added dedicated harness YAML specifications in `configs/harnesses/qc_constraints.yaml`, `enhanced_system/config/harnesses/qc_constraints.yaml`, `configs/harnesses/sqe_dispose.yaml`, and `enhanced_system/config/harnesses/sqe_dispose.yaml`.
