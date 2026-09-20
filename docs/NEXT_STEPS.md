@@ -1,5 +1,17 @@
 # Next steps (out of this harness + operator pack)
 
+## Programme of record — Symbolic KD (2026-09-20)
+
+Disposition-first symbolic knowledge distillation is tracked here:
+
+- Plan: [docs/plans/symbolic-kd/PLAN.md](plans/symbolic-kd/PLAN.md)
+- Peer review: [docs/plans/symbolic-kd/REVIEW.md](plans/symbolic-kd/REVIEW.md)
+- OpenSpec index: [openspec/README.md](../openspec/README.md)
+
+**Order:** P0 green trunk → P1 golden + real pass@k AQA in CI → P2 critic cascade → P3 solver dispose tools → P4 TRL GKD *usage* (gated). Phase 6 SageMaker registry / A/B MUST NOT leapfrog P0–P3. Do not treat #16’s AQA docstring as pass@k delivery.
+
+---
+
 Tracked follow-ups so this change stays reviewable without mixing large refactors.
 
 ## Remaining module splits
