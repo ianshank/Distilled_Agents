@@ -126,7 +126,7 @@ def _evaluate_file(
         row_harness_id = row.harness_id or harness_id
         try:
             result = runtime.run(  # type: ignore[attr-defined]
-                row.prompt,
+                str(row.prompt),
                 harness_id=row_harness_id,
             )
         except ValueError as exc:
