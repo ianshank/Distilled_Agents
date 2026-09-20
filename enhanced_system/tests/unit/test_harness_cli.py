@@ -315,6 +315,40 @@ def test_collect_outcome_filter_skips_mismatch(tmp_path):
 
 @pytest.mark.unit
 @pytest.mark.harness
+def test_collect_outcome_filter_skips_mismatch_with_reject_log(tmp_path):
+    from scripts.harness.collect_trajectories import main
+
+    source = tmp_path / "in.jsonl"
+    source.write_text(
+        json.dumps({"prompt": "Write a short greeting", "expected": "nope"}) + "\n",
+        encoding="utf-8",
+    )
+    dest = tmp_path / "out.jsonl"
+    reject_log = tmp_path / "rejects.jsonl"
+    code = main(
+        [
+            "--input",
+            str(source),
+            "--output",
+            str(dest),
+            "--harness-id",
+            "base_react",
+            "--scripted",
+            '["{\\"tool\\": \\"final_answer\\", \\"args\\": {\\"text\\": \\"hi\\"}}"]',
+            "--reject-log",
+            str(reject_log),
+        ]
+    )
+    assert code == 0
+    assert dest.read_text(encoding="utf-8").strip() == ""
+    assert reject_log.is_file()
+    records = [json.loads(line) for line in reject_log.read_text(encoding="utf-8").splitlines()]
+    assert len(records) == 1
+    assert records[0]["critic_reject_code"] == "OUTCOME_MISMATCH"
+
+
+@pytest.mark.unit
+@pytest.mark.harness
 def test_collect_student_flag(tmp_path):
     from scripts.harness.collect_trajectories import main
 
