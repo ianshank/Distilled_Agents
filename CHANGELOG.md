@@ -11,9 +11,9 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 - **Phase P1 `golden-passk-aqa`:** Honest multi-trial evaluation, golden sets expansion, and CI-load-bearing AQA gate.
 - Expanded golden JSONL schema (`prompt`, `expected`, optional `id`, `harness_id`, `expected_tools`, `slice` [`core`|`hard`], `allow_semantic`) with backwards-compatible Pydantic model `GoldenRow`.
 - Expanded `configs/golden_sets/` with `core_sdlc.jsonl` and `hard_sdlc.jsonl`, backed by deterministic mock responses in `tests/fixtures/mock_responses.json`.
-- Implemented genuine multi-trial `pass_at_1` and `pass_at_k` evaluation in `scripts/harness/eval_harness.py` configured via `MANGOMAS_EVAL_PASS_K` (default 5) and `MANGOMAS_EVAL_PASS_K_TEMPERATURE` (default 0.7 for k>1).
+- Implemented genuine multi-trial `pass_at_1` and `pass_at_k` evaluation in `scripts/harness/eval_harness.py` configured via `MANGOMAS_EVAL_PASS_K` (default 3), `MANGOMAS_EVAL_PASS_N` (default 5), and `MANGOMAS_EVAL_PASS_K_TEMPERATURE` (default 0.8 for k>1).
 - Enforced hard-slice exact match rule: hard rows require exact `answers_match` and no security faults (`semantic_match` alone fails); core slice rows require explicit `allow_semantic: true` for semantic matches.
-- Updated `scripts/harness/run_aqa_gate.py` with honest Pass@K metrics and documentation, accepting `--pass-k`, `--hard-threshold`, and enforcing hard-slice pass thresholds.
+- Updated `scripts/harness/run_aqa_gate.py` with honest single-pass docs/help text, directing to dedicated multi-sample Pass@K evaluation.
 - Added rule traceability matrix `configs/rule_traceability/matrix.yaml` and validation CLI `scripts/harness/check_rule_matrix.py` ensuring all hard golden row IDs are mapped.
 - Added prompt_render synchronization test (`tests/unit/test_prompt_render_sync.py`) guaranteeing parity between `enhanced_system/harness/prompt_render.py` and `scripts/training/distill/prompt_render.py`.
 - Added first-class `aqa-gate` job in `.github/workflows/ci.yml` and wired into `Makefile` (`aqa-gate`, `validate`).

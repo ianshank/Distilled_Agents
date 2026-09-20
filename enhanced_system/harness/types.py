@@ -82,7 +82,7 @@ class HarnessRunResult(BaseModel):
 
 
 class GoldenRow(BaseModel):
-    """Schema for golden evaluation dataset rows (core and hard slices)."""
+    """Schema for golden evaluation dataset rows (core, hard, and ood slices)."""
 
     model_config = ConfigDict(extra="ignore")
 
@@ -91,8 +91,13 @@ class GoldenRow(BaseModel):
     id: Optional[str] = None
     harness_id: Optional[str] = None
     expected_tools: Optional[list[str]] = None
-    slice: Literal["core", "hard"] = "core"
+    slice: Literal["core", "easy", "hard", "ood"] = "core"
     allow_semantic: bool = False
+    grader: Optional[str] = None
+    tags: Optional[list[str]] = None
+    solver_fixture: Optional[str] = None
+    ood: bool = False
+    notes: Optional[str] = None
 
     @field_validator("prompt")
     @classmethod
@@ -106,15 +111,25 @@ class GoldenRow(BaseModel):
     def normalize_slice(cls, v: Any) -> str:
         if isinstance(v, str):
             v_lower = v.strip().lower()
-            if v_lower in ("core", "hard"):
+            if v_lower in ("core", "easy", "hard", "ood"):
                 return v_lower
         return "core" if v is None else str(v)
 
+    @property
+    def is_ood(self) -> bool:
+        """Disjunctive OOD rule: row is OOD iff slice == 'ood' OR ood is True."""
+        return self.slice == "ood" or bool(self.ood)
+
+    @property
+    def is_hard_or_ood(self) -> bool:
+        """Check if row belongs to hard or ood slice."""
+        return self.slice == "hard" or self.is_ood
+
     def validate_for_hard_slice(self) -> None:
         """Validate hard-slice invariant: non-empty id, non-empty expected, slice == 'hard'."""
-        if self.slice != "hard":
-            raise ValueError(f"Row {self.id or '<unnamed>'} must have slice='hard'")
+        if self.slice != "hard" and not self.is_ood:
+            raise ValueError(f"Row {self.id or '<unnamed>'} must have slice='hard' or ood")
         if not self.id or not str(self.id).strip():
-            raise ValueError(f"Hard slice row missing stable id (prompt: {self.prompt!r})")
+            raise ValueError(f"Hard/OOD slice row missing stable id (prompt: {self.prompt!r})")
         if self.expected is None or not str(self.expected).strip():
-            raise ValueError(f"Hard slice row {self.id} must have non-empty expected answer")
+            raise ValueError(f"Hard/OOD slice row {self.id} must have non-empty expected answer")

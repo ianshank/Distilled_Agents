@@ -50,6 +50,23 @@ def test_golden_row_empty_prompt_and_slice_normalize():
 
 @pytest.mark.unit
 @pytest.mark.harness
+def test_golden_row_disjunctive_ood_detection():
+    """Row is OOD if slice == 'ood' OR ood is True."""
+    row_slice_ood = GoldenRow.model_validate({"prompt": "p", "slice": "ood", "ood": False})
+    assert row_slice_ood.is_ood is True
+    assert row_slice_ood.is_hard_or_ood is True
+
+    row_flag_ood = GoldenRow.model_validate({"prompt": "p", "slice": "hard", "ood": True})
+    assert row_flag_ood.is_ood is True
+    assert row_flag_ood.is_hard_or_ood is True
+
+    row_regular = GoldenRow.model_validate({"prompt": "p", "slice": "core", "ood": False})
+    assert row_regular.is_ood is False
+    assert row_regular.is_hard_or_ood is False
+
+
+@pytest.mark.unit
+@pytest.mark.harness
 def test_golden_row_schema_hard_slice_validation():
     """Hard slice rows require id, non-empty expected, and slice=='hard'."""
     valid_hard = {

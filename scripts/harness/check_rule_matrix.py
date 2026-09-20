@@ -57,10 +57,11 @@ def verify_rule_matrix(
     hard_golden_ids: set[str] = set()
     for line_no, payload in iter_jsonl_dicts(golden_file, require_prompt=True, strict=True):
         row_slice = str(payload.get("slice", "core")).strip().lower()
-        if row_slice == "hard":
+        is_ood = row_slice == "ood" or bool(payload.get("ood"))
+        if row_slice == "hard" or is_ood:
             row_id = str(payload.get("id") or "").strip()
             if not row_id:
-                raise ValueError(f"Hard slice row at line {line_no} is missing a stable 'id'")
+                raise ValueError(f"Hard/OOD slice row at line {line_no} is missing a stable 'id'")
             hard_golden_ids.add(row_id)
 
     missing = sorted(hard_golden_ids - matrix_golden_ids)

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""AQA Regression Gate: Multi-trial evaluation of golden sets enforcing pass@1, pass@k, and hard-slice thresholds."""
+"""AQA Regression Gate: Runs golden sets and enforces single-pass pass_rate thresholds.
+
+For multi-trial Chen unbiased Pass@K evaluation (n samples, k thresholds, OOD synthetic-success checks),
+see scripts/harness/run_pass_at_k.py.
+"""
 
 from __future__ import annotations
 
@@ -20,7 +24,7 @@ def run_gate(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s", force=True)
     settings = get_settings()
     parser = argparse.ArgumentParser(
-        description="AQA Regression Gate enforcing multi-trial pass@1, pass@k, and hard-slice thresholds"
+        description="AQA Regression Gate enforcing single-pass pass_rate (for multi-sample Pass@K see run_pass_at_k.py)"
     )
     parser.add_argument("--golden-set", required=True, help="Path to golden set JSONL")
     parser.add_argument(

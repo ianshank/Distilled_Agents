@@ -72,7 +72,7 @@ def load_causal_lm(model_name: str, args: Any):
         )
         kwargs["device_map"] = "auto"
         logger.info("4-bit quantization enabled via BitsAndBytesConfig")
-    return AutoModelForCausalLM.from_pretrained(  # nosec B615
+    return AutoModelForCausalLM.from_pretrained(
         model_name,
         **kwargs,
     )
@@ -81,7 +81,7 @@ def load_causal_lm(model_name: str, args: Any):
 def load_tokenizer(model_name: str, args: Any):
     from transformers import AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(  # nosec B615
+    tokenizer = AutoTokenizer.from_pretrained(
         model_name,
         trust_remote_code=resolve_trust_remote_code(args),
         revision=resolve_model_revision(args),

@@ -120,10 +120,10 @@ python scripts/harness/eval_harness.py \
 ```
 
 Evaluation rules:
-- `k` trials are run independently per row (sampling temperature from `MANGOMAS_EVAL_PASS_K_TEMPERATURE`, default `0.7` when `k>1`, `0.0` for `k=1`).
+- `k` trials are run independently per row (sampling temperature from `MANGOMAS_EVAL_PASS_K_TEMPERATURE`, default `0.8` when `k>1`, `0.0` for `k=1`).
 - `pass@1`: fraction of rows succeeding on trial 1.
-- `pass@k`: fraction of rows succeeding on at least 1 of the `k` trials.
-- **Hard slice**: success strictly requires exact `answers_match` and no security failures (`semantic_match` alone is a failure).
+- `pass@k`: fraction of rows succeeding on at least 1 of the `k` trials (or Chen unbiased estimate across $n$ samples).
+- **Hard and OOD slices**: success strictly requires exact `answers_match` and no security failures (`semantic_match` alone is a failure; unlabeled non-truncated rows do not count). OOD rows must produce canonical `BLOCKED:<CODE>` refusal tokens.
 - **Core slice**: `semantic_match` counts as success only when the row explicitly specifies `allow_semantic: true`.
 
 AQA Regression Gate runs both core and hard golden sets in CI with deterministic mock fixtures:

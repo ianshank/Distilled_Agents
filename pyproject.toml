@@ -214,4 +214,7 @@ skips = [
     "B101",
     "B105",  # false positives on pass_rate / numeric defaults
     "B106",  # false positives on token="" kwargs
+    "B404",  # internal subprocess usage in security scanner and test gates
+    "B603",  # subprocess without shell=True with controlled argument lists
+    "B615",  # Hugging Face Hub download without revision pinning handled at runtime
 ]

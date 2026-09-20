@@ -260,7 +260,7 @@ def _evaluate_file(
                 if sem_matched:
                     row_has_semantic[idx] = True
 
-                if row.slice == "hard":
+                if row.is_hard_or_ood:
                     if matched and not security_failed:
                         trial_success = True
                 else:
@@ -268,7 +268,7 @@ def _evaluate_file(
                         trial_success = True
                     elif row.allow_semantic and sem_matched and not security_failed:
                         trial_success = True
-            elif not result.truncated and not security_failed:
+            elif not row.is_hard_or_ood and not result.truncated and not security_failed:
                 trial_success = True
 
             row_trial_successes[idx].append(trial_success)
@@ -298,7 +298,7 @@ def _evaluate_file(
 
     for idx in evaluated_indices:
         line_no, row = parsed_rows[idx]
-        is_hard = row.slice == "hard"
+        is_hard = row.is_hard_or_ood
         if is_hard:
             hard_total += 1
         else:
