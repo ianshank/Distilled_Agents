@@ -21,6 +21,6 @@
   candidates (no auto-promote).
 - [x] 7. ADR 0007 at land; update distill README false-friends; CHANGELOG;
   NEXT_STEPS.
-- [x] 8. Eval: verify solver is gated against `golden-passk-aqa` hard-slice Pass@K
+- [ ] 8. Eval: verify solver is gated against `golden-passk-aqa` hard-slice Pass@K
   gate; solver MUST NOT be marked done without hard-slice gate. Scripted pass@k
-  green in CI. *(Note: hard-slice Pass@K gate dependency satisfied by aqa-gate-passk existence on PR #23 / landing on main; solver unit proofs and fail-closed OOD rejection are verified against the gate contract).*
+  green in CI. *(Note: hard-slice Pass@K gate dependency satisfied on this PR branch via `aqa-gate-passk`; final completion pending green CI verification).*
