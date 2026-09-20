@@ -45,6 +45,21 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 ### Changed
 - Clarified docstring in `scripts/harness/run_aqa_gate.py` to reflect single-pass pass_rate regression gate, pointing to `run_pass_at_k.py` for multi-sample Pass@K.
 
+### Fixed
+- Trunk CI hygiene (Phase P0 `green-trunk-ci`): formatted files across `enhanced_system`, `scripts`, and `tests` with `ruff format`; resolved mypy `no-any-return` on `PIIScrubber.redact_text` in `enhanced_system/harness/data_governance.py` and `_case_passed` in `enhanced_system/ops/training_system.py`; aligned `Makefile` typecheck target with CI scoped mypy (`enhanced_system/ops enhanced_system/core/cache enhanced_system/harness`); added revision parameter and pin to `resolve_target_modules_for_model` in `scripts/training/distill/trainer.py`; added targeted nosec annotations for controlled subprocess execution and local JSON dataset loading across `enhanced_system/harness/security.py`, `scripts/harness/run_aqa_gate.py`, and `scripts/training/train_dpo_adapter.py`.
+- `test_trajectory_mode_filters_unsupervised_rows` failed because `max_length=16` truncated supervised tokens beyond char position 19 in a 20-char rendered body. Increased to `max_length=32`.
+- `test_trajectory_eval_keeps_raw_rows` had latent truncation bug producing 0-row datasets silently. Added `max_length=32` and row-count assertion.
+- Inline `# nosec B615` on 5 reviewed `from_pretrained()` calls that already pass `revision=` dynamically (false positives after global B615 skip removal).
+
+### Changed
+
+- Collect path disables injection detection and keeps original task text (PII off) for the trajectory **and** backend/prefix. `run_agent` keeps injection on. `InputValidator` patterns are not edited. Collect and SCoRe-SFT score copy source `expected` onto legacy JSONL so DualDistill compose can pair. FTP is skipped when `resume_steps is not None` or `inject_action` is set, and the seed uses `planning.instruction`. `eval_harness` applies the threshold whenever `total > 0` (labeled exact-match combined with unlabeled completion) and skips per-row `ValueError`. Trajectory collator encodes the full rendered body once and requires offset mapping (fast tokenizer) when token/char counts differ. DualDistill `completion` is the merged thought/action sequence.
+- Distillation format triangle, decorative `planning.style`, two training stacks, and paper false-friends: [docs/README_AGENT_DISTILLATION.md](docs/README_AGENT_DISTILLATION.md). Train and harness share one role-tagged string; SageMaker `predict_fn` stays raw-prompt single-shot.
+- Gitleaks allowlists only checked-in training JSONL fixtures. Collect writes a distinct `*.raw.traces.jsonl` when `--output` already ends in `.raw.jsonl`. Trajectory alpha is validated in `[0.0, 1.0]`.
+- FTP teacher prefix is cleared in `finally` after the first generate attempt.
+- CI adds a `types` job and gitleaks on `security` beside existing lint / unit+integration@60 / harness@90. Action pins stay `checkout@v4` / `setup-python@v5` / `upload-artifact@v4`.
+- Nested `enhanced_system/.pre-commit-config.yaml` is a stub; root hooks add gitleaks v8.21.2 and scoped mypy.
+- Dockerfile false `:8080/health` HEALTHCHECK removed (`CMD` is still `basic_inference`). Image Python stays 3.9.
 
 ### Added
 - **Distillation Expansion Phase 2:** DevSecOps and Data Governance.
@@ -78,3 +93,12 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 - Moved operational scripts to `scripts/`.
 - Reorganized tests into unit, integration, and security suites.
 - Consolidated documentation into `docs/`.
+
+## [1.0.0] - 2026-09-10
+
+### Added
+
+- Installable `mangomas` package, root `pyproject.toml`, GitHub Actions CI.
+- Shared SageMaker launcher and `MangoMASSettings`.
+- Cache/errors/distill facades; JSON cache serialization (no pickle).
+- ADRs 0001–0003 (JSON cache, unified launcher, coverage ratchet).

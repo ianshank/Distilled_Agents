@@ -19,7 +19,10 @@ from enhanced_system.harness.score import (
 )
 from enhanced_system.harness.types import (
     GoldenRow,
+    HarnessRunResult,
+    Trajectory,
 )
+from scripts.harness import eval_harness as eval_harness_module
 from scripts.harness.check_rule_matrix import verify_rule_matrix
 from scripts.harness.run_pass_at_k import evaluate_pass_at_k
 from scripts.harness.run_pass_at_k import main as run_pass_k_main
@@ -140,6 +143,10 @@ def test_golden_row_hard_and_ood_validation() -> None:
     row_sem = GoldenRow.model_validate(semantic_hard)
     with pytest.raises(ValueError, match="allow_semantic=False"):
         row_sem.validate_for_hard_or_ood()
+
+    row_core = GoldenRow.model_validate({"id": "core-001", "prompt": "Core", "expected": "ok"})
+    with pytest.raises(ValueError, match="must have slice in"):
+        row_core.validate_for_hard_or_ood()
 
 
 @pytest.mark.unit
@@ -324,6 +331,77 @@ def test_ood_synthetic_success_prohibition(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 @pytest.mark.harness
+def test_ood_security_failure_is_not_synthetic_success() -> None:
+    """Canonical OOD refusals with security findings stay non-violations."""
+
+    class StubRuntime:
+        def run(
+            self, task: str, *, harness_id: str | None = None, temperature: float | None = None
+        ):
+            return HarnessRunResult(
+                final_answer="BLOCKED:CYCLE_DETECTED",
+                harness_id=harness_id or "",
+                trajectory=Trajectory(harness_id=harness_id or ""),
+            )
+
+    class StubScanner:
+        def scan_trajectory(self, trajectory: Trajectory) -> list[dict[str, str]]:
+            return [{"issue_text": "simulated"}]
+
+    row = GoldenRow(
+        id="sqe-ood-cycle-test",
+        prompt="Circular dependency",
+        expected="BLOCKED:CYCLE_DETECTED",
+        slice="ood",
+        ood=True,
+    )
+    result = evaluate_pass_at_k(
+        StubRuntime(),
+        [row],
+        n=2,
+        k=1,
+        harness_id="base_react",
+        scanner=StubScanner(),
+    )
+    assert result["ood_synthetic_success_violations"] == 0
+    assert result["pass_at_k"]["1"] == 0.0
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_pass_at_k_uses_row_harness_and_temperature() -> None:
+    """Pass@K runs honor per-row harness_id and forwarded sampling temperature."""
+
+    class StubRuntime:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str | None, float | None]] = []
+
+        def run(
+            self, task: str, *, harness_id: str | None = None, temperature: float | None = None
+        ):
+            self.calls.append((task, harness_id, temperature))
+            return HarnessRunResult(
+                final_answer="ok",
+                harness_id=harness_id or "",
+                trajectory=Trajectory(harness_id=harness_id or ""),
+            )
+
+    runtime = StubRuntime()
+    rows = [
+        GoldenRow(
+            id="hard-1", prompt="task-1", expected="ok", slice="hard", harness_id="row_harness"
+        ),
+        GoldenRow(id="hard-2", prompt="task-2", expected="ok", slice="hard"),
+    ]
+    evaluate_pass_at_k(runtime, rows, n=1, k=1, harness_id="cli_harness", temperature=0.8)
+    assert runtime.calls == [
+        ("task-1", "row_harness", 0.8),
+        ("task-2", "cli_harness", 0.8),
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.harness
 def test_vacuity_guard_gate_can_fail(tmp_path: Path) -> None:
     """Verify that run_pass_at_k.py exits non-zero when threshold fails or OOD is violated."""
     golden_file = tmp_path / "test_golden.jsonl"
@@ -363,6 +441,9 @@ def test_vacuity_guard_gate_can_fail(tmp_path: Path) -> None:
     )
     assert exit_code_small == 1
 
+    assert run_pass_k_main(["--threshold", "-1"]) == 1
+    assert run_pass_k_main(["--threshold", "101"]) == 1
+
 
 @pytest.mark.unit
 @pytest.mark.harness
@@ -373,6 +454,87 @@ def test_rule_matrix_traceability() -> None:
     result = verify_rule_matrix(matrix_path, golden_path)
     assert result["covered_hard_ids"] == 16
     assert result["total_rules"] >= 16
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_rule_matrix_rejects_missing_hard_id(tmp_path: Path) -> None:
+    """Hard rows without ids fail traceability verification."""
+    matrix_path = tmp_path / "matrix.yaml"
+    golden_path = tmp_path / "golden.jsonl"
+    matrix_path.write_text(
+        "rules:\n  - rule_id: r1\n    source_trace: trace\n    harness_id: base_react\n    golden_id: hard-1\n    solver_status: fixture\n",
+        encoding="utf-8",
+    )
+    golden_path.write_text(
+        json.dumps({"prompt": "task", "expected": "ok", "slice": "hard"}) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="missing a stable 'id'"):
+        verify_rule_matrix(matrix_path, golden_path)
+
+
+@pytest.mark.unit
+@pytest.mark.harness
+def test_eval_harness_uses_row_harness_and_exact_rows_stay_strict(tmp_path: Path) -> None:
+    """Single-pass evaluation honors row harness ids and blocks semantic-only exact rows."""
+
+    class StubRuntime:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str | None]] = []
+
+        def run(self, task: str, *, harness_id: str | None = None):
+            self.calls.append((task, harness_id))
+            answer = "context containers components and code"
+            return HarnessRunResult(
+                final_answer=answer,
+                harness_id=harness_id or "",
+                trajectory=Trajectory(harness_id=harness_id or ""),
+            )
+
+    input_path = tmp_path / "eval.jsonl"
+    input_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "prompt": "semantic exact row",
+                        "expected": "Context, Containers, Components, and Code",
+                        "slice": "core",
+                        "allow_semantic": True,
+                        "grader": "exact",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "prompt": "semantic non-exact row",
+                        "expected": "Context, Containers, Components, and Code",
+                        "slice": "core",
+                        "allow_semantic": True,
+                        "grader": "semantic",
+                        "harness_id": "row_harness",
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    runtime = StubRuntime()
+    result = eval_harness_module._evaluate_file(
+        runtime,
+        input_path,
+        "cli_harness",
+        strict=True,
+        scanner=None,
+    )
+    assert runtime.calls == [
+        ("semantic exact row", "cli_harness"),
+        ("semantic non-exact row", "row_harness"),
+    ]
+    assert result["exact_match"] == 0
+    assert result["semantic_match"] == 1
+    assert result["pass_rate"] == 50.0
 
 
 @pytest.mark.unit
@@ -481,5 +643,11 @@ def test_security_scanner_and_data_governance() -> None:
     assert findings == []
 
     # PIIScrubber missing presidio check
-    with pytest.raises(ImportError, match="Presidio libraries not found"):
-        PIIScrubber()
+    import enhanced_system.harness.data_governance as dg
+
+    if not dg.HAS_PRESIDIO:
+        with pytest.raises(ImportError, match="Presidio libraries not found"):
+            PIIScrubber()
+    else:
+        scrubber = PIIScrubber()
+        assert scrubber.entities is not None

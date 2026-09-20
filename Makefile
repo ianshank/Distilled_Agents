@@ -45,4 +45,4 @@ aqa-gate-passk:
 train-dpo:
 	$(PYTHON) scripts/training/train_dpo_adapter.py --model_name_or_path "gpt2" --dataset_path "tests/fixtures/dpo_preferences.jsonl" --epochs 1 --batch_size 1 --output_dir "./dpo_adapter_test"
 
-validate: lint typecheck test-aqa security gitleaks
+validate: lint typecheck test-aqa aqa-gate security gitleaks

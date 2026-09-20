@@ -68,8 +68,9 @@ def verify_rule_matrix(
             slice_val = str(item.get("slice", "")).lower()
             if slice_val == "hard":
                 row_id = item.get("id")
-                if row_id:
-                    hard_golden_ids.add(row_id)
+                if not row_id or not str(row_id).strip():
+                    raise ValueError("Hard slice row is missing a stable 'id'")
+                hard_golden_ids.add(str(row_id).strip())
 
     missing = hard_golden_ids - matrix_golden_ids
     if missing:

@@ -31,6 +31,7 @@ def evaluate_pass_at_k(
     n: int,
     k: int,
     harness_id: str,
+    temperature: float | None = None,
     strict: bool = False,
     scanner: Any | None = None,
 ) -> dict[str, Any]:
@@ -46,8 +47,13 @@ def evaluate_pass_at_k(
 
         for sample_idx in range(n):
             security_failed = False
+            row_harness_id = row.harness_id or harness_id
             try:
-                result = runtime.run(str(row.prompt), harness_id=harness_id)
+                result = runtime.run(
+                    str(row.prompt),
+                    harness_id=row_harness_id,
+                    temperature=temperature,
+                )
             except (ValueError, RuntimeError) as exc:
                 logger.warning(
                     "Error executing prompt %s (sample %d/%d): %s",
@@ -73,10 +79,11 @@ def evaluate_pass_at_k(
 
             actual_answer = result.final_answer
             is_match = answers_match(actual_answer, expected) and not security_failed
+            answer_mismatch = not answers_match(actual_answer, expected)
 
             if is_match:
                 c += 1
-            elif is_ood:
+            elif is_ood and answer_mismatch:
                 # OOD refusal check: non-empty non-matching answer is an OOD synthetic success violation
                 if bool(actual_answer and str(actual_answer).strip()):
                     ood_synthetic_success_violations += 1
@@ -193,6 +200,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     threshold = args.threshold
     if threshold > 1.0 and threshold <= 100.0:
         threshold = threshold / 100.0
+    if threshold < 0.0 or threshold > 1.0:
+        logger.error("threshold must be in [0, 1] or [0, 100], got %s", args.threshold)
+        return 1
 
     if n < k:
         logger.error("Sample count n=%d must be >= k=%d", n, k)
@@ -283,6 +293,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         n=n,
         k=k,
         harness_id=args.harness_id,
+        temperature=temperature,
         strict=args.strict,
         scanner=scanner,
     )

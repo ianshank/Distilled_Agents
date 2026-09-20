@@ -35,7 +35,7 @@ class PolicyConfig(BaseModel):
 
     teacher: bool = False
     sag_samples: Optional[int] = None
-    sag_temperature: float = 0.0
+    sag_temperature: Optional[float] = None
 
 
 class HarnessSpec(BaseModel):
@@ -149,6 +149,10 @@ class GoldenRow(BaseModel):
 
     def validate_for_hard_or_ood(self) -> None:
         """Validate invariants for hard or OOD slice rows in Pass@K gate."""
+        if not self.is_hard_or_ood:
+            raise ValueError(
+                f"Row {self.id or '<unnamed>'} must have slice in {{'hard', 'ood'}} or ood=true"
+            )
         if not self.id or not str(self.id).strip():
             raise ValueError(f"Row missing stable id (prompt: {self.prompt!r})")
         if self.expected is None or not str(self.expected).strip():

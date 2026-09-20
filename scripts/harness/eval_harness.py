@@ -13,6 +13,7 @@ from typing import Any
 from enhanced_system.harness.factory import HarnessFactory
 from enhanced_system.harness.jsonl import JsonlRowError, iter_jsonl_dicts
 from enhanced_system.harness.score import answers_match
+from enhanced_system.harness.types import GoldenRow
 from enhanced_system.ops.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -115,11 +116,13 @@ def _evaluate_file(
     rows = iter_jsonl_dicts(path, require_prompt=True, strict=strict)
     for line_no, payload in rows:
         try:
+            row = GoldenRow.model_validate(payload)
+            row_harness_id = row.harness_id or harness_id
             result = runtime.run(  # type: ignore[attr-defined]
-                str(payload["prompt"]),
-                harness_id=harness_id,
+                row.prompt,
+                harness_id=row_harness_id,
             )
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             logger.warning("skipping line %s: %s", line_no, exc)
             if strict:
                 raise
@@ -149,8 +152,8 @@ def _evaluate_file(
             tool_steps += 1
             if step.tool_id:
                 valid_tools += 1
-        expected = payload.get("expected")
-        expected_tools = payload.get("expected_tools")
+        expected = row.expected
+        expected_tools = row.expected_tools
         labeled = expected is not None and bool(str(expected).strip())
 
         # Tool sequence accuracy
@@ -172,9 +175,15 @@ def _evaluate_file(
             if matched and not security_failed:
                 exact += 1
                 successes += 1
-            elif sem_matched and not security_failed:
+            elif (
+                row.allow_semantic
+                and row.grader != "exact"
+                and not row.is_hard_or_ood
+                and sem_matched
+                and not security_failed
+            ):
                 semantic_matches += 1
-                successes += 1  # Count semantic match as a success
+                successes += 1
         elif not result.truncated and not security_failed:
             successes += 1
     pass_rate = 100.0 * successes / total if total else 0.0
