@@ -25,9 +25,9 @@ from enhanced_system.harness import HarnessFactory
 from enhanced_system.harness.backends.echo import EchoBackend
 from enhanced_system.harness.tools import (
     TOOL_REGISTRY,
-    SqeConstraintSolverTool,
     get_tool,
 )
+from enhanced_system.harness.tools.solver import SqeConstraintSolverTool
 
 
 @pytest.mark.unit
@@ -47,7 +47,7 @@ def test_solver_registry_and_lookup():
 @pytest.mark.harness
 def test_no_forbidden_constructs_in_solver():
     """Verify solver contains no exec, eval, subprocess, network, or external solvers."""
-    solver_path = Path(__file__).resolve().parents[2] / "harness" / "tools" / "constraint.py"
+    solver_path = Path(__file__).resolve().parents[2] / "harness" / "tools" / "solver.py"
     source = solver_path.read_text(encoding="utf-8")
     tree = ast.parse(source)
 

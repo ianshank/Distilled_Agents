@@ -7,8 +7,8 @@ from typing import Any
 
 from enhanced_system.harness.tools.constraint import (
     ConstraintCheckTool,
-    SqeConstraintSolverTool,
 )
+from enhanced_system.harness.tools.solver import SqeConstraintSolverTool
 
 
 class JsonSchemaTool:
