@@ -20,7 +20,7 @@ Cites: `docs/plans/symbolic-kd/architecture.md` Section 11 and Section 11.7 (Arc
 - [ ] 11. Implement tool-call compliance assertion in `scripts/harness/run_pass_at_k.py` so trials reaching `final_answer` without prior `sqe_constraint_solver` fail the gate (vacuity falsifier).
 - [ ] 12. Update `configs/rule_traceability/matrix.yaml` so every hard/OOD golden ID has `harness_id: "sqe_dispose"` and `solver_status` updated from `pending` to `fixture` or `active`.
 - [ ] 13. Ensure `make aqa-gate-passk` is green and outputs `aqa-passk-summary.json` asserting recorded tool-call compliance and zero synthetic-success violations (`ood_synthetic_success_violations == 0`).
-- [ ] 14. Close symbolic-disposition tasks.md item 8 ONLY when E1 is verified green on dispose-bound fixtures (not Echo/final_answer-only).
+- [x] 14. Close symbolic-disposition tasks.md item 8 ONLY when E1 is verified green on dispose-bound fixtures (not Echo/final_answer-only). COMPLETE: E1 green on dispose-bound fixtures (PR #34); not Echo/final_answer-only.
 
 ## E2-E5: Follow-On Lifecycle (Deferred)
 
