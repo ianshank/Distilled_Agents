@@ -1,6 +1,6 @@
 # Next steps (out of this harness + operator pack)
 
-## Programme of record — Symbolic KD (2026-09-20)
+## Programme of record - Symbolic KD (2026-09-20)
 
 Disposition-first symbolic knowledge distillation is tracked here:
 
@@ -8,15 +8,15 @@ Disposition-first symbolic knowledge distillation is tracked here:
 - Peer review: [docs/plans/symbolic-kd/REVIEW.md](plans/symbolic-kd/REVIEW.md)
 - OpenSpec index: [openspec/README.md](../openspec/README.md)
 
-**Order:** P0 green trunk → P1 golden + real pass@k AQA in CI (implemented in Phase 0 I1) → P2 critic cascade → P3 solver dispose tools → P4 TRL GKD *usage* (gated). Phase 6 SageMaker registry / A/B MUST NOT leapfrog P0–P3. Do not treat #16’s AQA docstring as pass@k delivery.
+**Order:** P0 green trunk -> P1 golden + real pass@k AQA in CI (implemented in Phase 0 I1) -> P2 critic cascade -> P3 solver dispose tools -> P4 TRL GKD *usage* (gated). Phase 6 SageMaker registry / A/B MUST NOT leapfrog P0-P3. Do not treat #16's AQA docstring as pass@k delivery.
 
-*Note (Phase P1 completed):* P1 `golden-passk-aqa` has implemented genuine multi-trial pass@1 and pass@k, expanded core and hard golden corpora, rule traceability verification, and CI-load-bearing scripted AQA gating. Unlocks Phase P2 (`critic-cascade`).
+*Note (Phase P1 completed):* P1 `golden-passk-aqa` has implemented genuine multi-trial pass@1 and pass@k, expanded core and hard golden corpora, rule traceability verification, and CI-load-bearing scripted AQA gating. Unlocks Phase P2 (`critic-cascade`). Archived under `openspec/changes/archive/golden-passk-aqa/`.
 
-*Note (Phase P2 completed):* P2 `critic-cascade` has implemented pure critic helpers (`enhanced_system/harness/critic.py`), allowlist and outcome cascade filtering on `collect_trajectories.py`, DualDistill (0,0) drop telemetry, recovery trace retention (`critic_kept_recovery`), structured JSONL reject sink (`artifacts/critic_rejects.jsonl`), and standard reject codes per `_shared/blocked-reject-codes.md`. Unlocks Phase P3 (`symbolic-disposition`).
+*Note (Phase P2 completed):* P2 `critic-cascade` has implemented pure critic helpers (`enhanced_system/harness/critic.py`), allowlist and outcome cascade filtering on `collect_trajectories.py`, DualDistill (0,0) drop telemetry, recovery trace retention (`critic_kept_recovery`), structured JSONL reject sink (`artifacts/critic_rejects.jsonl`), and standard reject codes per `_shared/blocked-reject-codes.md`. Unlocks Phase P3 (`symbolic-disposition`). Archived under `openspec/changes/archive/critic-cascade/`.
 
-*Note (Phase P3 / I3 in progress):* P3 / I3 `symbolic-disposition` has implemented pure-Python constraint checking (`constraint_check`) and DAG topological sort + boolean constraint solving (`sqe_constraint_solver`), dedicated harness YAML specs (`qc_constraints`, `sqe_dispose`), fail-closed OOD refusal (`BLOCKED:<CODE>`), hard golden coverage, rule traceability mapping, candidate rule extraction (`scripts/harness/extract_rules.py`), unit proofs, and ADR 0007. Kill criteria remain HOLD pending full CI Pass@K hard-slice gate and critic telemetry integration. Phase 2–3 / GKD / Serve / Edge-AI remain locked.
+*Note (Phase P3 / I3 completed; Phase 0 kill CLEARED):* P3 / I3 `symbolic-disposition` has implemented pure-Python constraint checking (`constraint_check`) and DAG topological sort + boolean constraint solving (`sqe_constraint_solver`), dedicated harness YAML specs (`qc_constraints`, `sqe_dispose`), fail-closed OOD refusal (`BLOCKED:<CODE>`), hard golden coverage, rule traceability mapping, candidate rule extraction (`scripts/harness/extract_rules.py`), unit proofs, and canonical ADR 0007 (`docs/adr/0007-symbolic-dispose-tools.md`). Phase 0 intake kill criteria are CLEARED on main citing GitHub Actions run `35518614849` and artifacts `aqa-passk-summary.json` + `critic-rejects`. Phase 2-3 / Serve / Edge-AI / INV-16 remain locked. GKD remains optional behind ADR 0008 (`trl-gkd-usage`). Next step is E2E functional proof (Pass@K x sqe_dispose; tracked in `openspec/changes/sqe-dispose-e2e-bind/`). Archived under `openspec/changes/archive/symbolic-disposition/`.
 
-*Note (Phase P4 specification):* P4 `trl-gkd-usage` spec defines GKD/on-policy adapter (`enhanced_system/training/gkd_adapter.py`), label-masked divergence and fail-safe vocab mismatch checks, default alpha=0.0 and fail-closed GKD gating, and ADR 0008. Unlocking Phase 4 remains gated on clearance of Phase 0 kill criteria.
+*Note (Phase P4 completed):* P4 `trl-gkd-usage` has pinned `trl==0.15.2`, implemented the GKD/on-policy adapter (`enhanced_system/training/gkd_adapter.py`, `scripts/training/distill/gkd_adapter.py`, `scripts/training/train_gkd_adapter.py`), enforced label-masked divergence and fail-safe vocab mismatch checks, preserved default alpha=0.0 and fail-closed GKD gating, and documented ADR 0008. GKD usage remains optional behind ADR 0008 and gated on E2E BC smoke.
 
 ---
 
@@ -24,7 +24,7 @@ Tracked follow-ups so this change stays reviewable without mixing large refactor
 
 ## Remaining module splits
 
-Keep facades; split implementations in a dedicated PR when a file stays above ~300–400 lines. Do not split these here:
+Keep facades; split implementations in a dedicated PR when a file stays above ~300-400 lines. Do not split these here:
 
 - `enhanced_system/core/adaptive_router.py`
 - `enhanced_system/core/input_validator.py`
@@ -34,11 +34,11 @@ Keep facades; split implementations in a dedicated PR when a file stays above ~3
 - `enhanced_system/core/consensus_inference.py`
 - `enhanced_system/training/data_curator.py`
 
-Do not edit `InputValidator` regexes to “allow coding prompts”; serving tests require `SELECT … FROM` to fail. Collect vs `run_agent` already forks `enable_injection_detection`.
+Do not edit `InputValidator` regexes to "allow coding prompts"; serving tests require `SELECT ... FROM` to fail. Collect vs `run_agent` already forks `enable_injection_detection`.
 
 ## Coverage ratchet toward 80% on **core**
 
-ADR 0003: global `fail_under` stays **60**. Dual-marked harness tests inflate tree coverage; do not raise 60→65 on that harness-inflated number. Raise monotonically toward 80% on core modules, with a later second job for `scripts/` at a lower gate.
+ADR 0003: global `fail_under` stays **60**. Dual-marked harness tests inflate tree coverage; do not raise 60->65 on that harness-inflated number. Raise monotonically toward 80% on core modules, with a later second job for `scripts/` at a lower gate.
 
 Harness package gate stays `.coveragerc.harness` `fail_under=90`. Do not omit `protocols.py` from the *global* omit list.
 
@@ -83,4 +83,4 @@ Do not add live AWS e2e. Keep `e2e` / `slow` / `benchmark` unused for **live AWS
 
 ## Dependabot
 
-Leave GitHub Actions major bumps (#4/#5/#6, checkout/setup-python/upload-artifact v7) unmerged until the harness coverage job is re-checked against those runners. Pip PRs (#7–#11) stay separate.
+Leave GitHub Actions major bumps (#4/#5/#6, checkout/setup-python/upload-artifact v7) unmerged until the harness coverage job is re-checked against those runners. Pip PRs (#7-11) stay separate.

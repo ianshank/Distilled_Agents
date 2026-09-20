@@ -22,5 +22,4 @@
 - [x] 7. ADR 0007 at land; update distill README false-friends; CHANGELOG;
   NEXT_STEPS.
 - [ ] 8. Eval: verify solver is gated against `golden-passk-aqa` hard-slice Pass@K
-  gate; solver MUST NOT be marked done without hard-slice gate. Scripted pass@k
-  green in CI. *(Note: hard-slice Pass@K gate dependency satisfied on this PR branch via `aqa-gate-passk`; final completion pending green CI verification).*
+  gate; solver MUST NOT be marked done without hard-slice gate. Close ONLY when E1 is green on dispose-bound fixtures (sqe_hard_ood solver-before-final_answer fixtures, not Echo/final_answer-only). Follow-on tracking in openspec/changes/sqe-dispose-e2e-bind/.

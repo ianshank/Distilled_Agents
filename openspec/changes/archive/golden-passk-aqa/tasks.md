@@ -24,4 +24,4 @@
   and OOD synthetic-success refusal check.
 - [x] 9. Update `docs/README_AGENT_DISTILLATION.md` + `docs/NEXT_STEPS.md`
   + CHANGELOG; link this change.
-- [ ] 10. Archive note in REVIEW when CI job is green on main.
+- [x] 10. Archive note in REVIEW when CI job is green on main.

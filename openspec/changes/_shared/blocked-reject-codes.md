@@ -1,9 +1,9 @@
 # Shared Contract: BLOCKED and Reject Codes
 
 Shared normative reference for rejection codes, failure tokens, and telemetry across:
-- `openspec/changes/golden-passk-aqa/`
-- `openspec/changes/critic-cascade/`
-- `openspec/changes/symbolic-disposition/`
+- `openspec/changes/archive/golden-passk-aqa/`
+- `openspec/changes/archive/critic-cascade/`
+- `openspec/changes/archive/symbolic-disposition/`
 
 ## Standard Reject Codes
 

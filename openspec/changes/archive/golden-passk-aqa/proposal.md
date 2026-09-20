@@ -1,6 +1,6 @@
 # Proposal: golden-passk-aqa
 
-**Status:** proposed  
+**Status:** archived  
 **Date:** 2026-09-20  
 **Depends on:** `green-trunk-ci` merged  
 **Plan:** Phase 1  

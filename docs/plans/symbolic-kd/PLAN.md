@@ -1,11 +1,11 @@
-# Implementation Plan — Symbolic KD (disposition-first)
+# Implementation Plan - Symbolic KD (disposition-first)
 
 **ID:** PLAN-2026-09-20-symbolic-kd  
-**Date:** 2026-09-20 · **Base tip:** `94e6c6a` (`main`, post-#16)  
-**Motivated by:** `./REVIEW.md` — multi-model consensus reframed against live
+**Date:** 2026-09-20 | **Base tip:** `94e6c6a` (`main`, post-#16)  
+**Motivated by:** `./REVIEW.md` - multi-model consensus reframed against live
 Distilled_Agents evidence.  
 **OpenSpec changes:**  
-`openspec/changes/{green-trunk-ci,golden-passk-aqa,critic-cascade,symbolic-disposition,trl-gkd-usage}/`  
+`openspec/changes/archive/{green-trunk-ci,golden-passk-aqa,critic-cascade,symbolic-disposition}/` (archived) and `openspec/changes/trl-gkd-usage/` (active)  
 **Scope:** green trunk; honest golden + pass@k AQA in CI; critic cascade on
 collect/compose; frozen solver dispose tools; then optional on-policy KD usage.  
 **Non-goals:** neurosymbolic student *network*; unbounded MCP autotools;
@@ -21,7 +21,7 @@ without a new ADR.
 |---|---|
 | Organising principle | Eval meaning before scale; disposition before weights |
 | Format triangle | Train string == harness generate; Serve stays single-shot |
-| Knobs | `MANGOMAS_*` / `MangoMASSettings` only — no call-site literals |
+| Knobs | `MANGOMAS_*` / `MangoMASSettings` only - no call-site literals |
 | Tools | Frozen `TOOL_REGISTRY` only; primary dispose tool id `sqe_constraint_solver` |
 | Pass@K gate | Chen unbiased estimator defaults $n=5$, gate $k=3$, exact match only on hard/OOD |
 | Reject codes | Standardized enum per `openspec/changes/_shared/blocked-reject-codes.md` |
@@ -34,43 +34,45 @@ without a new ADR.
 
 ## Phase map
 
-| Phase | OpenSpec change | Unlock condition |
-|---|---|---|
-| P0 | `green-trunk-ci` | none |
-| P1 | `golden-passk-aqa` | P0 CI green on main |
-| P2 | `critic-cascade` | P1 hard-slice pass@k job exists (may be initially red) |
-| P3 | `symbolic-disposition` | P1b green on scripted CI + P2 metrics merged |
-| P4 | `trl-gkd-usage` | P1–P2 green; explicit usage ADR |
-| P5 | (ops runbook later) | P3+P4 meet edge budgets — out of this PLAN’s code scope |
+| Phase | OpenSpec change | Unlock condition | Status |
+|---|---|---|---|
+| P0 | `changes/archive/green-trunk-ci` | none | CLEARED (run 35518614849) |
+| P1 | `changes/archive/golden-passk-aqa` | P0 CI green on main | CLEARED (run 35518614849, `aqa-passk-summary.json`) |
+| P2 | `changes/archive/critic-cascade` | P1 hard-slice pass@k job exists | CLEARED (run 35518614849, `critic-rejects`) |
+| P3 | `changes/archive/symbolic-disposition` | P1b green on scripted CI + P2 metrics merged | CLEARED on main; ADR 0007 canonicalized |
+| P4 | `changes/trl-gkd-usage` | P1-P2 green; explicit usage ADR | Implemented (ADR 0008; optional behind knob) |
+| P5 | (ops runbook later) | P3+P4 meet edge budgets - out of this PLAN's code scope | Locked |
+
+Phase 0 intake kill criteria are CLEARED on `main` citing GitHub Actions run `35518614849` and artifacts `aqa-passk-summary.json` + `critic-rejects`. Edge-AI / INV-16 and Serve tool-loop remain locked. GKD remains optional behind ADR 0008.
 
 ---
 
-## Phase 0 — Green trunk
+## Phase 0 - Green trunk
 
-See `openspec/changes/green-trunk-ci/`. Hotfix only: ruff format, mypy cast,
-Bandit revision pins / justified skips. No feature work on a red trunk.
+See `openspec/changes/archive/green-trunk-ci/`. Hotfix only: ruff format, mypy cast,
+Bandit revision pins / justified skips. Cleared in CI.
 
-## Phase 1 — Honest eval
+## Phase 1 - Honest eval
 
-See `openspec/changes/golden-passk-aqa/`. Expand golden schema; implement real
+See `openspec/changes/archive/golden-passk-aqa/`. Expand golden schema; implement real
 pass@1/pass@k; rename AQA docs; wire scripted gate into CI; add rule
-traceability stub + prompt_render hash check.
+traceability stub + prompt_render hash check. Cleared with artifact `aqa-passk-summary.json`.
 
-## Phase 2 — Critic cascade
+## Phase 2 - Critic cascade
 
-See `openspec/changes/critic-cascade/`. Config-gated filters on collect/compose;
-keep recovery traces when outcome matches; emit reject/keep metrics.
+See `openspec/changes/archive/critic-cascade/`. Config-gated filters on collect/compose;
+keep recovery traces when outcome matches; emit reject/keep metrics. Cleared with artifact `critic-rejects`.
 
-## Phase 3 — Symbolic disposition
+## Phase 3 - Symbolic disposition
 
-See `openspec/changes/symbolic-disposition/`. New frozen tool(s); narrow harness
-YAML; ADR 0006 addendum; OOD → tool_error / refuse, never confabulate into
-control path.
+See `openspec/changes/archive/symbolic-disposition/`. New frozen tool(s); narrow harness
+YAML; canonical ADR 0007; OOD -> tool_error / refuse, never confabulate into
+control path. Cleared on main; E2E Pass@K x dispose follow-on tracked in `openspec/changes/sqe-dispose-e2e-bind/`.
 
-## Phase 4 — On-policy KD usage
+## Phase 4 - On-policy KD usage
 
 See `openspec/changes/trl-gkd-usage/`. Exact TRL minor pin + GKD/on-policy path
-with label-mask/vocab tests; trajectory alpha remains 0 until tests say otherwise.
+with label-mask/vocab tests; trajectory alpha remains 0 until tests say otherwise. Documented in ADR 0008.
 
 ---
 

@@ -1,4 +1,4 @@
-# OpenSpec — coordination contract (Distilled_Agents)
+# OpenSpec - coordination contract (Distilled_Agents)
 
 ## Lifecycle → compile-down
 
