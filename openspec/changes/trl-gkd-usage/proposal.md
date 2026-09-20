@@ -1,6 +1,6 @@
 # Proposal: trl-gkd-usage
 
-**Status:** proposed (gated)  
+**Status:** implemented  
 **Date:** 2026-09-20  
 **Depends on:** P1–P2 green; P3 recommended before claiming “neurosymbolic”  
 **Plan:** Phase 4  

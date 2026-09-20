@@ -81,6 +81,24 @@ def main():
     parser.add_argument("--agent_role", type=str, default="Default")
     parser.add_argument("--agent_specialization", type=str, default="Default")
     parser.add_argument("--capabilities", type=str, default="")
+    parser.add_argument(
+        "--use_gkd",
+        type=str,
+        default=os.getenv("MANGOMAS_GKD_ENABLED", "False"),
+        help="Use TRL GKD / on-policy distillation for trajectory training (requires trl==0.15.2)",
+    )
+    parser.add_argument(
+        "--gkd_beta",
+        type=float,
+        default=None,
+        help="GKD Generalized JSD beta parameter (default from settings: 0.5)",
+    )
+    parser.add_argument(
+        "--gkd_lmbda",
+        type=float,
+        default=None,
+        help="GKD on-policy student lambda fraction (default from settings: 0.5)",
+    )
     args = parser.parse_args()
     args.use_fp16 = args.use_fp16.lower() == "true"
     args.use_device_map = args.use_device_map.lower() == "true"
@@ -90,6 +108,17 @@ def main():
     args.trajectory_mode = args.trajectory_mode.lower() == "true"
     args.use_dora = args.use_dora.lower() == "true"
     args.quantize_4bit = args.quantize_4bit.lower() == "true"
+    args.use_gkd = args.use_gkd.lower() == "true"
+    if args.use_gkd:
+        try:
+            from scripts.training.distill.gkd_adapter import verify_trl_version_pin
+        except ImportError:
+            from distill.gkd_adapter import verify_trl_version_pin
+        try:
+            verify_trl_version_pin(strict=False)
+        except ImportError as exc:
+            logger.error("%s", exc)
+            raise SystemExit(1) from exc
     if args.trajectory_mode:
         try:
             args.distillation_alpha = parse_trajectory_distill_alpha(

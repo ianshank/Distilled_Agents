@@ -74,6 +74,15 @@ class MangoMASSettings(BaseSettings):
     constraint_max_edges: int = Field(default=256)
     constraint_max_constraints: int = Field(default=128)
 
+    # TRL GKD / on-policy distillation settings (Phase 4)
+    gkd_enabled: bool = Field(default=False)
+    gkd_lmbda: float = Field(default=0.5)
+    gkd_beta: float = Field(default=0.5)
+    gkd_temperature: float = Field(default=0.9)
+    gkd_max_new_tokens: int = Field(default=128)
+    gkd_seq_kd: bool = Field(default=False)
+    gkd_loss_type: str = Field(default="generalized_jsd")
+
     def role_arn(self, account_id: str) -> str:
         return f"arn:aws:iam::{account_id}:role/{self.execution_role_name}"
 

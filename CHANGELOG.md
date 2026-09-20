@@ -8,7 +8,16 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 ## [Unreleased]
 
 ### Added
-- **Phase P3 `symbolic-disposition`:** Pure-Python constraint checking, symbolic disposition tools, fail-closed refusal on OOD, and hard golden coverage.
+- **Phase P4 `trl-gkd-usage`:** Pinned exact TRL version (`trl==0.15.2`), implemented config-driven GKD / on-policy distillation adapter module, label-masked generalized JSD and KL divergence, safe vocab mismatch handling, default `trajectory_distill_alpha=0.0`, and ADR 0008.
+- Pinned exact `trl==0.15.2` in `pyproject.toml` (under `alignment` and `all`), documenting version rationale (stable GKDTrainer/GKDConfig, SFT caching fixes, transformers>=4.45.0 compatibility).
+- Added GKD operational settings in `enhanced_system/ops/settings.py` (`gkd_enabled`, `gkd_lmbda`, `gkd_beta`, `gkd_temperature`, `gkd_max_new_tokens`, `gkd_seq_kd`, `gkd_loss_type`), preserving fail-closed defaults (`gkd_enabled: false`, `trajectory_distill_alpha: 0.0`).
+- Implemented `enhanced_system/training/gkd_adapter.py` and `scripts/training/distill/gkd_adapter.py` providing `AgentGKDTrainer`, `compute_label_masked_gkd_loss`, `validate_vocab_alignment`, `verify_trl_version_pin`, and `GKDTrainingConfig`.
+- Enforced strict label-masking for divergence loss: KL/JSD divergence is computed only on supervised tokens (`labels != -100`), ensuring user turns, observations, and error frames are not contaminated.
+- Enforced fail-safe vocabulary compatibility: mismatched tokenizers or logits vocabularies are strictly refused or safely fall back to pure task loss with runtime warnings; cross-vocab KL is never computed.
+- Added standalone CLI `scripts/training/train_gkd_adapter.py` for trajectory on-policy training with LoRA.
+- Added `--use_gkd`, `--gkd_beta`, and `--gkd_lmbda` flags to `scripts/training/train_distilled_adapter.py`.
+- Updated `docs/README_AGENT_DISTILLATION.md` paper false-friends table updating GKD from Deferred to Optional behind ADR 0008.
+- Documented ADR 0008 (`docs/adr/0008-trl-gkd-usage.md`).
 - Added `ConstraintCheckTool` (`constraint_check`) and `SqeConstraintSolverTool` (`sqe_constraint_solver`) in `enhanced_system/harness/tools/constraint.py` and exported through `TOOL_REGISTRY`.
 - Supported pure-Python DAG topological sorting (lexicographically least order via Kahn's algorithm with a min-heap) and boolean condition tree solving without external native solver binaries.
 - Enforced standard reject codes conforming to `openspec/changes/_shared/blocked-reject-codes.md` (`CYCLE_DETECTED`, `UNSAT`, `SCHEMA_VIOLATION`, `SYNTAX_INVALID`, `UNSUPPORTED_THEORY`, `RESOURCE_LIMIT`).
