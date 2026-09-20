@@ -4,11 +4,12 @@
 import argparse
 import json
 import logging
-import subprocess
+import subprocess  # nosec: B404
 import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -35,7 +36,8 @@ def main() -> int:
     cmd = [
         sys.executable,
         "scripts/harness/eval_harness.py",
-        "--input", str(golden_set_path),
+        "--input",
+        str(golden_set_path),
         "--threshold",
         str(threshold),
         "--scan-security",
@@ -54,7 +56,8 @@ def main() -> int:
         cmd.extend(["--scripted", json.dumps(scripted_payload)])
 
     logger.info("Running AQA Regression Gate against %s...", golden_set_path.name)
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    # nosec: B603 - Controlled list args invoking sys.executable with shell=False for regression gate (green-trunk-ci)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)  # nosec: B603
 
     # We only print stdout if it's there (eval_harness dumps JSON at the end)
     if result.stdout:
@@ -68,6 +71,7 @@ def main() -> int:
 
     logger.info("AQA Gate PASSED.")
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

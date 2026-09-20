@@ -30,27 +30,31 @@ def test_rca_009_no_any_return_fixed():
     from enhanced_system.core.batch_processor import BatchRequest
     from enhanced_system.core.enums import Priority
 
-    future = asyncio.Future()
-    task1 = BatchRequest(
-        request_id="1",
-        task="test",
-        priority=Priority.HIGH,
-        future=future,
-        timestamp=time.time(),
-        metadata={},
-    )
-    task2 = BatchRequest(
-        request_id="2",
-        task="test",
-        priority=Priority.LOW,
-        future=future,
-        timestamp=time.time(),
-        metadata={},
-    )
+    loop = asyncio.new_event_loop()
+    try:
+        future = loop.create_future()
+        task1 = BatchRequest(
+            request_id="1",
+            task="test",
+            priority=Priority.HIGH,
+            future=future,
+            timestamp=time.time(),
+            metadata={},
+        )
+        task2 = BatchRequest(
+            request_id="2",
+            task="test",
+            priority=Priority.LOW,
+            future=future,
+            timestamp=time.time(),
+            metadata={},
+        )
 
-    # Priority queue relies on __lt__ being strictly bool
-    is_less = task1 < task2
-    assert isinstance(is_less, bool)
+        # Priority queue relies on __lt__ being strictly bool
+        is_less = task1 < task2
+        assert isinstance(is_less, bool)
+    finally:
+        loop.close()
 
 
 @pytest.mark.regression

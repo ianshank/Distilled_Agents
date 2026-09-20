@@ -39,7 +39,9 @@ class DistilledAgentInference:
         logger.info(f"Loading model from: {model_dir}")
         self.model_dir = model_dir
         configured_root = os.getenv("MANGOMAS_ADAPTER_ROOT")
-        self.adapter_root = Path(configured_root).resolve() if configured_root else Path(model_dir).resolve()
+        self.adapter_root = (
+            Path(configured_root).resolve() if configured_root else Path(model_dir).resolve()
+        )
         self.available_adapters = self._discover_available_adapters()
 
         try:
@@ -60,7 +62,9 @@ class DistilledAgentInference:
             # Check if LoRA adapter is present
             if os.path.exists(os.path.join(model_dir, "adapter_config.json")):
                 logger.info("Loading default LoRA adapter...")
-                self.model = PeftModel.from_pretrained(self.model, model_dir, adapter_name="default")
+                self.model = PeftModel.from_pretrained(
+                    self.model, model_dir, adapter_name="default"
+                )
                 self.adapters_loaded.append("default")
                 self.active_adapter = "default"
 
@@ -114,7 +118,9 @@ class DistilledAgentInference:
         if adapter_name not in self.adapters_loaded:
             raise ValueError(f"Adapter {adapter_name} not loaded.")
         if adapter_name == self.active_adapter:
-            raise ValueError(f"Cannot unload active adapter '{adapter_name}'. Switch to another adapter first.")
+            raise ValueError(
+                f"Cannot unload active adapter '{adapter_name}'. Switch to another adapter first."
+            )
 
         with self._adapter_lock:
             logger.info(f"Unloading adapter '{adapter_name}'")
@@ -233,15 +239,17 @@ def output_fn(prediction: Dict[str, Any], content_type: str = "application/json"
 # Flask app for local testing
 if __name__ == "__main__":
     from flask import Flask, jsonify, request
+
     try:
         from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+
         INFERENCE_REQUESTS = Counter("inference_requests_total", "Total inference requests")
         INFERENCE_ERRORS = Counter("inference_errors_total", "Total inference errors")
         # Tune buckets for LLM generation: 0.1s to 60.0s
         INFERENCE_LATENCY = Histogram(
             "inference_latency_seconds",
             "Inference latency",
-            buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 45.0, 60.0, float("inf"))
+            buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 45.0, 60.0, float("inf")),
         )
         HAS_PROMETHEUS = True
     except ImportError:
@@ -261,9 +269,11 @@ if __name__ == "__main__":
         return jsonify({"status": "healthy", "active_adapter": active})
 
     if HAS_PROMETHEUS:
+
         @app.route("/metrics", methods=["GET"])
         def metrics():
             from flask import Response
+
             return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
 
     @app.route("/adapter/load", methods=["POST"])
@@ -307,7 +317,9 @@ if __name__ == "__main__":
             return jsonify({"error": "Missing adapter_name"}), 400
         try:
             inference_handler.set_adapter(adapter_name)
-            return jsonify({"status": "switched", "active_adapter": inference_handler.active_adapter})
+            return jsonify(
+                {"status": "switched", "active_adapter": inference_handler.active_adapter}
+            )
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -348,7 +360,9 @@ if __name__ == "__main__":
         if not token and not non_local:
             return None
         if not token:
-            return jsonify({"error": "Adapter management requires MANGOMAS_ADAPTER_ADMIN_TOKEN"}), 403
+            return jsonify(
+                {"error": "Adapter management requires MANGOMAS_ADAPTER_ADMIN_TOKEN"}
+            ), 403
         expected = token
         candidate = request.headers.get("X-Adapter-Token", "")
         auth_header = request.headers.get("Authorization", "")

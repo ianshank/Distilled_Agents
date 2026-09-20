@@ -19,6 +19,7 @@ else:
 try:
     from presidio_analyzer import AnalyzerEngine as _AnalyzerEngine
     from presidio_anonymizer import AnonymizerEngine as _AnonymizerEngine
+
     HAS_PRESIDIO = True
 except ImportError:
     HAS_PRESIDIO = False
@@ -42,7 +43,9 @@ class PIIScrubber:
         try:
             self.analyzer: TypedAnalyzerEngine = _AnalyzerEngine()
         except OSError as e:
-            raise RuntimeError("Failed to load NLP model for Presidio. Try: python -m spacy download en_core_web_lg") from e
+            raise RuntimeError(
+                "Failed to load NLP model for Presidio. Try: python -m spacy download en_core_web_lg"
+            ) from e
 
         self.anonymizer: TypedAnonymizerEngine = _AnonymizerEngine()
 
@@ -72,7 +75,7 @@ class PIIScrubber:
         # presidio-analyzer and presidio-anonymizer have mismatched type hints for RecognizerResult
         anon_results = cast(List[AnonymizerResult], results)
         anonymized = self.anonymizer.anonymize(text=text, analyzer_results=anon_results)
-        return anonymized.text
+        return str(anonymized.text)
 
     def redact_object(self, obj: Any) -> Any:
         """Recursively redact PII from JSON-like dictionaries and lists."""
