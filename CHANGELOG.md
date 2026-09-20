@@ -8,6 +8,10 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 ## [Unreleased]
 
 ### Added
+- OpenSpec coordination layer and symbolic-KD programme docs (`openspec/`, `docs/plans/symbolic-kd/{PLAN,REVIEW}.md`) locking P0–P4 disposition-first plan after tip `94e6c6a` peer review.
+
+
+### Added
 - **Distillation Expansion Phase 2:** DevSecOps and Data Governance.
 - Added `SecurityScanner` (Bandit API) validating agent trajectory AST safety.
 - Added `PIIScrubber` (Presidio + Spacy) enforcing data governance on agent outputs.
