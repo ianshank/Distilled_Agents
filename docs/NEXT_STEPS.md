@@ -18,6 +18,8 @@ Disposition-first symbolic knowledge distillation is tracked here:
 
 *Note (Phase P4 completed):* P4 `trl-gkd-usage` has pinned `trl==0.15.2`, implemented the GKD/on-policy adapter (`enhanced_system/training/gkd_adapter.py`, `scripts/training/distill/gkd_adapter.py`, `scripts/training/train_gkd_adapter.py`), enforced label-masked divergence and fail-safe vocab mismatch checks, preserved default alpha=0.0 and fail-closed GKD gating, and documented ADR 0008. GKD usage remains optional behind ADR 0008 and gated on E2E BC smoke.
 
+*Note (Local GPU E2E & Antigravity Agent Pack completed):* Implemented checked-in local GPU E2E verification suite (`scripts/harness/run_e2e_gpu.py`, `tests/e2e/test_local_gpu_e2e.py`) executing live CUDA inference and multi-turn agent loops on workstation GPU hardware (NVIDIA GeForce RTX 5060 Ti, 15.93 GB VRAM). Integrated Antigravity gated SDLC agent pack (`.agents/`, `config/workflow-contract.json`, `GEMINI.md`) with stage-aware pre-tool path gates, smoke tested and verified clean across full pre-PR test suite.
+
 ---
 
 Tracked follow-ups so this change stays reviewable without mixing large refactors.
@@ -69,6 +71,8 @@ With Phases 1-5 closed out on `feature/distillation-expansion`, the immediate ne
 2. **Endpoint Provisioning**: Expand `simple_launch_sagemaker.py` to support real-time endpoint deployment of the compiled DPO weights.
 3. **A/B Testing Framework**: Extend the Prometheus `/metrics` pipeline we just added to include cohort routing telemetry, allowing us to mathematically compare base Agent implementations against Distilled versions via the `predict_fn`.
 
+*Note (Phase 6 SDLC Dry Run completed):* The `train_distilled_adapter.py` pipeline was updated to resolve breaking API changes in Transformers v4.41+ and v4.46+. A local Distillation Dry Run, backed by deterministic `aqa-gate` thresholding on `core_sdlc.jsonl` and `hard_sdlc.jsonl`, passed entirely. The CI pipeline now mandates these AQA checks and `/narrow-critic` style/security scanning before human merge.
+
 ## Dependencies
 
 The `peft==0.4.0` training-image pin has successfully been upgraded to `peft>=0.14.0,<0.15.0`. SageMaker estimators now run `transformers 4.45.0` natively. The next step is evaluating Qwen2.5 integration fully on SageMaker instances.
@@ -79,7 +83,7 @@ Strict type-checking (`disallow_untyped_defs = true`) has been successfully esta
 
 ## Tests
 
-Do not add live AWS e2e. Keep `e2e` / `slow` / `benchmark` unused for **live AWS**. Local Echo harness pipelines stay `integration` (and `harness`). Contract tests must keep boto3 monkeypatched. Harness code coverage is now enforced at 80% via `--cov-fail-under=80`.
+Do not add live AWS e2e. Keep `e2e` / `slow` / `benchmark` unused for **live AWS**. Local Echo harness pipelines stay `integration` (and `harness`). Contract tests must keep boto3 monkeypatched. Harness code coverage is now enforced at 80% via `--cov-fail-under=80`. Dedicated regression suite (`tests/test_regression_suite.py`) enforces SEC-001..003, CQ-001..004, CFG-001..002, and TRN-001. Deterministic gating runs across `core_sdlc.jsonl`, `hard_sdlc.jsonl`, and `sqe_hard_ood.jsonl` (Pass@K Chen estimator). Local GPU E2E validation is checked in under `scripts/harness/run_e2e_gpu.py` and `tests/e2e/test_local_gpu_e2e.py` (marked `@pytest.mark.e2e` and `@pytest.mark.gpu`), validating local CUDA execution with zero live AWS dependencies.
 
 ## Dependabot
 

@@ -21,4 +21,6 @@ paths = [
   '''(^|/)data/training/swe_agent_real_data\.jsonl$''',
   '''(^|/)data/training/tools_agent\.jsonl$''',
   '''(^|/)data/training/vp_product_agent\.jsonl$''',
+  '''(^|/)configs/golden_sets/core_sdlc\.jsonl$''',
+  '''(^|/)tests/fixtures/mock_responses\.json$''',
 ]

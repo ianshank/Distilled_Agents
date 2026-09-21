@@ -11,7 +11,7 @@ C4Context
     System_Ext(sagemaker, "Amazon SageMaker", "Training jobs and optional endpoints")
     System_Ext(s3, "Amazon S3", "Datasets, adapters, L3 cache")
     Rel(operator, mangomas, "CLIs / Cursor skills / make validate")
-    Rel(developer, mangomas, "PRs; CI keeps harness 90% job")
+    Rel(developer, mangomas, "PRs; CI enforces 80% harness coverage, AQA & Pass@K gates")
     Rel(mangomas, sagemaker, "Create training jobs; optional single-shot invoke")
     Rel(mangomas, s3, "Upload data, store adapters")
 ```

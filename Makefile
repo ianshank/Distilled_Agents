@@ -4,7 +4,7 @@ GITLEAKS ?= gitleaks
 # Nested enhanced_system/pytest.ini testpaths would miss tests/harness/.
 PYTEST := $(PYTHON) -m pytest --rootdir=$(CURDIR)
 
-.PHONY: install lint fmt typecheck test test-harness test-aqa security gitleaks aqa-gate aqa-gate-passk validate collect-sqe-dispose compose-dualdistill-sqe test-critic-sqe-dispose
+.PHONY: install lint fmt typecheck test test-harness test-aqa test-regression security gitleaks aqa-gate aqa-gate-passk validate collect-sqe-dispose compose-dualdistill-sqe test-critic-sqe-dispose train-dpo agent-pack-smoke test-e2e-gpu run-e2e-gpu
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -29,6 +29,9 @@ test-harness:
 test-aqa:
 	$(PYTEST) -m "unit or integration or regression or harness" --cov=enhanced_system --cov-report=term --cov-fail-under=60
 	$(PYTEST) -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness --cov-report=term --cov-fail-under=80
+
+test-regression:
+	$(PYTEST) -m regression -v
 
 security:
 	$(PYTHON) -m bandit -r enhanced_system scripts -x tests,enhanced_system/tests,enhanced_system/examples -c pyproject.toml -q
@@ -62,4 +65,13 @@ test-critic-sqe-dispose:
 train-dpo:
 	$(PYTHON) scripts/training/train_dpo_adapter.py --model_name_or_path "gpt2" --dataset_path "tests/fixtures/dpo_preferences.jsonl" --epochs 1 --batch_size 1 --output_dir "./dpo_adapter_test"
 
-validate: lint typecheck test-aqa aqa-gate security gitleaks
+agent-pack-smoke:
+	$(PYTHON) scripts/infrastructure/agent_pack_smoke_test.py
+
+test-e2e-gpu:
+	$(PYTEST) tests/e2e/ -v -m "e2e and gpu"
+
+run-e2e-gpu:
+	$(PYTHON) scripts/harness/run_e2e_gpu.py
+
+validate: lint typecheck test-aqa test-regression aqa-gate aqa-gate-passk agent-pack-smoke security gitleaks

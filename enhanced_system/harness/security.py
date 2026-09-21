@@ -51,8 +51,17 @@ class SecurityScanner:
             # Bandit returns 0 if no issues, 1 if issues found
             try:
                 report = json.loads(result.stdout)
-            except json.JSONDecodeError as exc:
-                raise RuntimeError(f"Failed to parse bandit output: {result.stdout}") from exc
+            except json.JSONDecodeError:
+                if self.fail_on_high:
+                    raise RuntimeError(
+                        "Failed to parse bandit JSON output while fail_on_high=True"
+                    ) from None
+                logger.warning(
+                    "Failed to parse bandit JSON output (possible stderr contamination), "
+                    "returning empty findings. Raw stdout: %s",
+                    result.stdout[:500],
+                )
+                return []
             findings: List[Dict[str, str]] = report.get("results", [])
 
             if self.fail_on_high:

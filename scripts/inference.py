@@ -4,6 +4,7 @@ MangoMAS Distilled Agent Inference Script
 SageMaker-compatible inference script for distilled agent models
 """
 
+import hmac
 import json
 import logging
 import os
@@ -140,9 +141,15 @@ class DistilledAgentInference:
         """Generate predictions"""
         assert self.model is not None, "Model not loaded"
         assert self.tokenizer is not None, "Tokenizer not loaded"
+        # SEC-003: Validate prompt size to prevent DoS via unbounded tokenizer input
+        max_prompt_bytes = int(os.getenv("MANGOMAS_MAX_PROMPT_BYTES", "1048576"))
         try:
             # Extract input parameters
             prompt = input_data.get("prompt", "")
+            if len(prompt.encode("utf-8")) > max_prompt_bytes:
+                raise ValueError(
+                    f"Prompt exceeds maximum size: {len(prompt.encode('utf-8'))} > {max_prompt_bytes} bytes"
+                )
             max_length = input_data.get("max_length", 512)
             temperature = input_data.get("temperature", 0.7)
             top_p = input_data.get("top_p", 0.9)
@@ -202,7 +209,7 @@ class DistilledAgentInference:
 
         except Exception as e:
             logger.error(f"Error during prediction: {e}")
-            return {"error": str(e)}
+            raise  # SEC-002: Let Flask handler return proper HTTP 500
 
     def output_fn(self, prediction: Dict[str, Any], content_type: str = "application/json") -> str:
         """Format output"""
@@ -258,8 +265,11 @@ if __name__ == "__main__":
 
     app = Flask(__name__)
 
-    # Load model
-    model_dir = os.getenv("MODEL_DIR", "/opt/ml/model")
+    # Load model — CFG-001: Use MANGOMAS_ prefix with backwards-compatible fallback
+    _legacy_model_dir = os.getenv("MODEL_DIR")
+    if _legacy_model_dir and not os.getenv("MANGOMAS_MODEL_DIR"):
+        logger.warning("MODEL_DIR is deprecated, use MANGOMAS_MODEL_DIR instead")
+    model_dir = os.getenv("MANGOMAS_MODEL_DIR", _legacy_model_dir or "/opt/ml/model")
     inference_handler.model_fn(model_dir)
 
     @app.route("/ping", methods=["GET"])
@@ -350,8 +360,11 @@ if __name__ == "__main__":
                 INFERENCE_ERRORS.inc()
             return jsonify({"error": str(e)}), 500
 
-    # Run Flask app
-    port = int(os.getenv("PORT", 8080))
+    # CFG-002: Use MANGOMAS_ prefix with backwards-compatible fallback
+    _legacy_port = os.getenv("PORT")
+    if _legacy_port and not os.getenv("MANGOMAS_PORT"):
+        logger.warning("PORT is deprecated, use MANGOMAS_PORT instead")
+    port = int(os.getenv("MANGOMAS_PORT", _legacy_port or "8080"))
     host = os.getenv("MANGOMAS_BIND_HOST", os.getenv("BIND_HOST", "127.0.0.1"))
 
     def _require_adapter_auth():
@@ -368,7 +381,7 @@ if __name__ == "__main__":
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             candidate = auth_header[7:]
-        if candidate != expected:
+        if not hmac.compare_digest(candidate.encode("utf-8"), expected.encode("utf-8")):
             return jsonify({"error": "Unauthorized"}), 401
         return None
 

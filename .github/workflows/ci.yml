@@ -95,7 +95,8 @@ jobs:
       - name: Gitleaks
         run: gitleaks detect --source . --verbose --redact --config .gitleaks.toml
       - name: pip-audit
-        run: pip-audit --skip-editable || true
+        run: pip-audit --skip-editable
+        continue-on-error: true  # CI-001: Report CVEs visibly; remove continue-on-error after baseline
 
   aqa-gate:
     runs-on: ubuntu-latest

@@ -1,0 +1,9 @@
+{
+  "name": "product-sdlc-ml",
+  "version": "1.0.0",
+  "description": "Gated product + SDLC + ML workflow: custom agents, skills, hooks, artifact contract.",
+  "agents": "agents",
+  "skills": "skills",
+  "rules": "rules",
+  "hooks": "hooks.json"
+}

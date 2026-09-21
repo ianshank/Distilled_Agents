@@ -125,14 +125,18 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 markers = [
-    "unit: Unit tests",
-    "integration: Integration tests",
-    "e2e: End-to-end tests",
+    "unit: Fast isolated unit test",
+    "integration: Integration test with mocked externals",
+    "e2e: End-to-end integration test",
     "slow: Slow running tests",
     "benchmark: Performance benchmarks",
     "harness: Agent harness runtime and trajectory tests",
-    "regression: CLI/skill contract regressions",
+    "regression: Regression test for a fixed defect or CLI/skill contract regression",
     "e2_sqe: Tests for E2 sqe_dispose collect/compose critic pipelines",
+    "aqa: Automated quality assurance gate",
+    "gpu: Requires NVIDIA GPU (skip in CI)",
+    "live_llm: Requires live LLM API endpoint",
+    "security: Security-focused test",
 ]
 asyncio_mode = "auto"
 addopts = "-v --strict-markers --tb=short"

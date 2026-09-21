@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -25,7 +26,10 @@ def parse_args():
         "--dataset_path", type=str, required=True, help="Path to preference JSONL dataset"
     )
     parser.add_argument(
-        "--output_dir", type=str, default="./dpo_adapter", help="Output adapter directory"
+        "--output_dir",
+        type=str,
+        default=os.getenv("MANGOMAS_MODEL_DIR", "./dpo_adapter"),
+        help="Output adapter directory (default: MANGOMAS_MODEL_DIR or ./dpo_adapter)",
     )
     parser.add_argument("--use_fp16", action="store_true", help="Use FP16 precision")
     parser.add_argument("--use_device_map", action="store_true", help="Use auto device map")

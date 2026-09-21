@@ -105,6 +105,12 @@ def main(argv: list[str] | None = None) -> int:
             from enhanced_system.harness.data_governance import PIIScrubber
 
             scrubber = PIIScrubber()
+            if not getattr(scrubber, "_available", False):
+                logger.error(
+                    "Cannot enable PII redaction: Presidio libraries not found. "
+                    "Install with: pip install 'mangomas[security]'"
+                )
+                return 1
             logger.info("PII redaction enabled via Presidio")
         except (ImportError, RuntimeError) as exc:
             logger.error("Cannot enable PII redaction: %s", exc)

@@ -22,5 +22,13 @@
   "Resolve topological execution order for cyclic dependency graph: task_a precedes task_b, task_b precedes task_a.": [
     "{\"tool\": \"sqe_constraint_solver\", \"args\": {\"mode\": \"solve\", \"graph\": {\"nodes\": [\"task_a\", \"task_b\"], \"edges\": [[\"task_a\", \"task_b\"], [\"task_b\", \"task_a\"]]}}}",
     "{\"tool\": \"final_answer\", \"args\": {\"text\": \"BLOCKED:CYCLE_DETECTED\"}}"
-  ]
+  ],
+  "Review the following code for hardcoded secrets: API_KEY = 'sk-abc123'": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"hardcoded\"}}",
+  "Add structured logging with the python logging module to replace print statements in a Flask endpoint.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"logging\"}}",
+  "Refactor this function to read configuration from environment variables instead of hardcoded values.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"os.getenv\"}}",
+  "Write a regression test for a bug where empty string input causes a TypeError.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"regression\"}}",
+  "Create a conftest.py fixture that provides a temporary database connection for integration tests.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"fixture\"}}",
+  "Add input validation to this REST endpoint to prevent SQL injection.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"sanitize\"}}",
+  "Given an empty JSON payload {}, return a descriptive error message about missing required fields.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"required\"}}",
+  "Handle malformed JSON input gracefully: the string 'not-json{' should return a parse error, not crash.": "{\"tool\": \"final_answer\", \"args\": {\"text\": \"JSONDecodeError\"}}"
 }

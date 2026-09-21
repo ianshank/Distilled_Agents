@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "name": "product-sdlc-ml",
+  "stages": [
+    {
+      "id": "discover",
+      "required": ["opportunity.md"]
+    },
+    {
+      "id": "specify",
+      "required": ["proposal.md", "design.md", "tasks.md"]
+    },
+    {
+      "id": "design",
+      "required": ["architecture.md", "experiment_plan.md"]
+    },
+    {
+      "id": "build",
+      "required": ["test_report.json"]
+    },
+    {
+      "id": "evaluate",
+      "required": ["eval_decision.json"]
+    },
+    {
+      "id": "ship",
+      "required": ["release_notes.md"]
+    },
+    {
+      "id": "learn",
+      "required": ["learnings.md"]
+    }
+  ],
+  "allowed_write_prefixes": ["artifacts/", "openspec/changes/", "docs/"],
+  "allowed_commands": [
+    "pytest",
+    "ruff",
+    "mypy",
+    "planlint",
+    "python",
+    "python3",
+    "npm",
+    "make",
+    "agy",
+    "git"
+  ],
+  "denied_command_patterns": [
+    "rm -rf /",
+    "rm -rf ~",
+    "sudo",
+    "curl | sh",
+    "wget | sh",
+    "mkfs",
+    "dd if=",
+    ":(){",
+    "shutdown",
+    "reboot"
+  ],
+  "ship_requires_decision": "ship"
+}

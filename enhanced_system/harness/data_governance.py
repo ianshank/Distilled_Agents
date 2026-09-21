@@ -31,23 +31,31 @@ class PIIScrubber:
     """Redacts PII from text and complex JSON structures using Presidio.
 
     Requires the `security` optional dependency group.
+    Degrades gracefully when Presidio is not installed (CQ-002).
     """
 
     def __init__(self, entities: Optional[List[str]] = None):
+        self._available = HAS_PRESIDIO
+        self.analyzer: Optional[TypedAnalyzerEngine] = None
+        self.anonymizer: Optional[TypedAnonymizerEngine] = None
+
         if not HAS_PRESIDIO:
-            raise ImportError(
-                "Presidio libraries not found. Install with: pip install 'mangomas[security]'"
+            logger.warning(
+                "Presidio libraries not found — PII scanning disabled. "
+                "Install with: pip install 'mangomas[security]'"
             )
+            self.entities = entities or []
+            return
 
         # Initialize Presidio
         try:
-            self.analyzer: TypedAnalyzerEngine = _AnalyzerEngine()
+            self.analyzer = _AnalyzerEngine()
         except OSError as e:
             raise RuntimeError(
                 "Failed to load NLP model for Presidio. Try: python -m spacy download en_core_web_lg"
             ) from e
 
-        self.anonymizer: TypedAnonymizerEngine = _AnonymizerEngine()
+        self.anonymizer = _AnonymizerEngine()
 
         # Default high-risk entities
         self.entities = entities or [
@@ -65,6 +73,8 @@ class PIIScrubber:
     def redact_text(self, text: str) -> str:
         """Redact PII from a single string."""
         if not text or not isinstance(text, str):
+            return text
+        if not self._available or self.analyzer is None or self.anonymizer is None:
             return text
 
         results = self.analyzer.analyze(text=text, entities=self.entities, language="en")
