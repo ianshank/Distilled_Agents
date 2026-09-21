@@ -298,7 +298,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run local E2E validation using GPU/Echo backends")
     parser.add_argument(
         "--model",
-        default=settings.student_model or "microsoft/DialoGPT-medium",
+        default=settings.student_model,
         help="HuggingFace model identifier or local model directory",
     )
     parser.add_argument(
