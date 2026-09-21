@@ -4,7 +4,7 @@ GITLEAKS ?= gitleaks
 # Nested enhanced_system/pytest.ini testpaths would miss tests/harness/.
 PYTEST := $(PYTHON) -m pytest --rootdir=$(CURDIR)
 
-.PHONY: install lint fmt typecheck test test-harness test-aqa test-regression security gitleaks aqa-gate aqa-gate-passk validate collect-sqe-dispose compose-dualdistill-sqe test-critic-sqe-dispose train-dpo agent-pack-smoke
+.PHONY: install lint fmt typecheck test test-harness test-aqa test-regression security gitleaks aqa-gate aqa-gate-passk validate collect-sqe-dispose compose-dualdistill-sqe test-critic-sqe-dispose train-dpo agent-pack-smoke test-e2e-gpu run-e2e-gpu
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -67,5 +67,11 @@ train-dpo:
 
 agent-pack-smoke:
 	$(PYTHON) scripts/infrastructure/agent_pack_smoke_test.py
+
+test-e2e-gpu:
+	$(PYTEST) tests/e2e/ -v -m "e2e and gpu"
+
+run-e2e-gpu:
+	$(PYTHON) scripts/harness/run_e2e_gpu.py
 
 validate: lint typecheck test-aqa test-regression aqa-gate aqa-gate-passk agent-pack-smoke security gitleaks
