@@ -58,13 +58,13 @@ jobs:
       - name: Harness package coverage
         run: pytest -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness --cov-report=term --cov-fail-under=80
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-xml
           path: coverage.xml
       - name: Upload critic rejects artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: critic-rejects
@@ -123,7 +123,7 @@ jobs:
       - name: Run AQA Pass@K Gate
         run: make aqa-gate-passk
       - name: Upload Pass@K summary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: aqa-passk-summary.json
