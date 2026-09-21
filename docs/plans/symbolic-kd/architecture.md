@@ -361,7 +361,7 @@ Land in order. Docs-only does not clear E2E proof.
 | **E0** | Docs / OpenSpec delta | This addendum + Spec Writer change package (`openspec/changes/sqe-dispose-e2e-bind/`) pinning harness_id/fixture contracts | Review only |
 | **E1** | Pass@K x dispose | Annotate `sqe_hard_ood.jsonl`; rewrite mock fixtures to solver->`final_answer`; matrix rows for all hard/OOD ids; keep `aqa-gate-passk` sole Chen entry | Green `aqa-gate-passk` proving solver tool calls on scripted path |
 | **E2** | Collect / compose | Critic-on collect/compose against `sqe_dispose` traces; reject sink still `artifacts/critic_rejects.jsonl` — **details in §12** | Unit/integration with `OUTCOME_MISMATCH` / `DUALDISTILL_DROP_0_0`; Makefile `collect-sqe-dispose` + `compose-dualdistill-sqe`; no GKD until E3 |
-| **E3** | BC smoke | Small behavior-cloning / trajectory smoke on dispose harness (no GKD enable) | Smoke job green |
+| **E3** | BC smoke | Small behavior-cloning smoke on dispose-composed trajectories — **details in §13** | `make train-bc-smoke` green; `trajectory_distill_alpha=0` (not GKD); no Edge/INV-16 |
 | **E4** | CI harden | Fail CI if golden lacks `harness_id: sqe_dispose` or fixtures skip solver | Required checks |
 | **E5** | OpenSpec archive | Archive completed change folders after E1-E4 green | Archive hygiene |
 
@@ -472,6 +472,98 @@ E2 is done when all of the following hold:
 
 ### 12.6 Out of scope for E2
 
-- E3 BC smoke corpus/job naming (still deferred).
+- E3 BC smoke corpus/job naming — **defined in §13** (no longer deferred).
 - GKD enable, Serve tool-loop, Edge-AI, INV-16.
 - Changing Chen defaults, golden bucket minima, or the vacuity falsifier from §11.
+
+
+## 13. E3 note — BC smoke on `sqe_dispose` (alpha=0)
+
+**Status:** E2 is on `main` (#35/#36/#37). E3 proves a **behavior-cloning** smoke path from dispose-composed trajectories. This is supervised trajectory training with distillation weight **zero**, not GKD.
+
+**Locks:** `gkd_enabled` stays false; do not invoke `scripts/training/train_gkd_adapter.py` or enable `trl-gkd-usage`. No Edge-AI / INV-16 / Serve tool-loop.
+
+### 13.1 Composed fixture path
+
+| Path | Role |
+| --- | --- |
+| `artifacts/trajectories/sqe_dispose_dualdistill.jsonl` | Live compose output from `make compose-dualdistill-sqe` (gitignored; local/dev) |
+| `tests/fixtures/sqe_dispose_dualdistill_smoke.jsonl` | **Canonical smoke corpus** checked into git — a small, deterministic DualDistill-shaped subset suitable for CI (Implementer may generate once from compose, then freeze) |
+
+`make train-bc-smoke` MUST read the checked-in fixture by default. Optional override: `BC_SMOKE_TRAIN_FILE=artifacts/trajectories/sqe_dispose_dualdistill.jsonl` for local full-compose runs.
+
+Fixture contract (each row):
+
+- Carries a dispose-bound trajectory whose tool trace includes `sqe_constraint_solver` before `final_answer` (same vacuity rule as §11).
+- Schema compatible with `trajectory_mode` collator (`trajectory.steps` / supervised spans).
+- At least one hard SAT row and one OOD `BLOCKED:<CODE>` row so smoke covers both branches.
+- Tiny: enough for 1–2 optimizer steps on CPU (order of a few rows, not full golden).
+
+### 13.2 Makefile target
+
+Implementer SHALL add:
+
+```make
+train-bc-smoke:
+	$(PYTHON) scripts/training/train_distilled_adapter.py \
+	  --student_model_name $${MANGOMAS_STUDENT_MODEL:-$${MANGOMAS_CPU_MODEL:-distilgpt2}} \
+	  --train_file $${BC_SMOKE_TRAIN_FILE:-tests/fixtures/sqe_dispose_dualdistill_smoke.jsonl} \
+	  --trajectory_mode true \
+	  --distillation_alpha 0.0 \
+	  --output_dir artifacts/bc_smoke_adapter \
+	  --max_steps 2
+```
+
+Normative pins:
+
+| Pin | Value |
+| --- | --- |
+| Target name | `train-bc-smoke` |
+| Entrypoint | `scripts/training/train_distilled_adapter.py` (not `train_gkd_adapter.py`) |
+| Mode | `--trajectory_mode true` |
+| Distillation weight | `--distillation_alpha 0.0` and/or `MANGOMAS_TRAJECTORY_DISTILL_ALPHA=0.0` (BC / SFT-on-trajectory only) |
+| GKD | Forbidden: no `--gkd`, no `MANGOMAS_GKD_ENABLED=true`, no `train_gkd_adapter.py` |
+| Default train file | `tests/fixtures/sqe_dispose_dualdistill_smoke.jsonl` |
+
+### 13.3 Reusable settings / env (model ids)
+
+Use existing `enhanced_system.ops.settings.MangoMasSettings` / `MANGOMAS_` env prefix — do not hardcode Hub ids in the Makefile beyond defaults already in settings.
+
+| Setting / env | Smoke use |
+| --- | --- |
+| `MANGOMAS_CPU_MODEL` (settings `cpu_model`, default `distilgpt2`) | Preferred student for CI smoke (CPU-friendly) |
+| `MANGOMAS_STUDENT_MODEL` (settings `student_model`) | Optional override when GPU/larger student is intentional |
+| `MANGOMAS_TEACHER_MODEL` | Unused when alpha=0; must not be required for smoke green |
+| `MANGOMAS_TRAJECTORY_DISTILL_ALPHA` | Must be `0.0` for E3 BC smoke |
+| `MANGOMAS_GKD_ENABLED` | Must remain false / unset |
+| `BC_SMOKE_TRAIN_FILE` | Optional path override (defaults to checked-in fixture) |
+
+No new model-id literals in application code; CLI defaults may mirror settings defaults only.
+
+### 13.4 Success metric (smoke green)
+
+`make train-bc-smoke` is green when all hold:
+
+1. Process exits 0.
+2. Runs in trajectory mode with effective `distillation_alpha == 0.0` (log or summary field asserts this).
+3. Completes the configured smoke step budget (e.g. `--max_steps 2`) without importing/enabling GKD.
+4. Writes an adapter artifact under `artifacts/bc_smoke_adapter/` (or configured `--output_dir`).
+5. CI job (when wired) uses `MANGOMAS_CPU_MODEL` / tiny fixture only — no Hub teacher download required for alpha=0.
+
+Failure of any of the above fails E3. Green `aqa-gate-passk` alone does **not** satisfy E3.
+
+### 13.5 Acceptance vs later GKD
+
+| | E3 BC smoke | Later GKD (post-E3, separate unlock) |
+| --- | --- | --- |
+| Entrypoint | `train_distilled_adapter.py` | `train_gkd_adapter.py` / GKD flags |
+| Alpha / lambda | `trajectory_distill_alpha = 0` | `gkd_enabled=true`, GKD lambdas from settings |
+| Corpus | `tests/fixtures/sqe_dispose_dualdistill_smoke.jsonl` | Larger on-policy set (out of E3) |
+| Unlock | This section | Conductor unlock after E3 green |
+
+### 13.6 Out of scope for E3
+
+- Enabling GKD or changing `trl-gkd-usage` from library-only to default-on.
+- Edge-AI, INV-16, Serve tool-loop.
+- Redefining Chen Pass@K, golden bucket minima, or §11 vacuity falsifier.
+- Requiring teacher forward passes or multi-GPU for smoke green.
