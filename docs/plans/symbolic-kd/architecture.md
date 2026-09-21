@@ -360,8 +360,8 @@ Land in order. Docs-only does not clear E2E proof.
 | --- | --- | --- | --- |
 | **E0** | Docs / OpenSpec delta | This addendum + Spec Writer change package (`openspec/changes/sqe-dispose-e2e-bind/`) pinning harness_id/fixture contracts | Review only |
 | **E1** | Pass@K x dispose | Annotate `sqe_hard_ood.jsonl`; rewrite mock fixtures to solver->`final_answer`; matrix rows for all hard/OOD ids; keep `aqa-gate-passk` sole Chen entry | Green `aqa-gate-passk` proving solver tool calls on scripted path |
-| **E2** | Collect / compose | Critic-on collect/compose against `sqe_dispose` traces; reject sink still `artifacts/critic_rejects.jsonl` | Unit/integration with `OUTCOME_MISMATCH` / `DUALDISTILL_DROP_0_0` |
-| **E3** | BC smoke | Small behavior-cloning / trajectory smoke on dispose harness (no GKD enable) | Smoke job green |
+| **E2** | Collect / compose | Critic-on collect/compose against `sqe_dispose` traces; reject sink still `artifacts/critic_rejects.jsonl` — **details in §12** | Unit/integration with `OUTCOME_MISMATCH` / `DUALDISTILL_DROP_0_0`; Makefile `collect-sqe-dispose` + `compose-dualdistill-sqe`; no GKD until E3 |
+| **E3** | BC smoke | Small behavior-cloning smoke on dispose-composed trajectories — **details in §13** | `make train-bc-smoke` green; `trajectory_distill_alpha=0` (not GKD); no Edge/INV-16 |
 | **E4** | CI harden | Fail CI if golden lacks `harness_id: sqe_dispose` or fixtures skip solver | Required checks |
 | **E5** | OpenSpec archive | Archive completed change folders after E1-E4 green | Archive hygiene |
 
@@ -403,3 +403,167 @@ Coordinate OpenSpec deltas with Spec Writer under existing packages (`golden-pas
 | ADR 0007 | Canonical `docs/adr/0007-symbolic-dispose-tools.md` (supersedes `0007-symbolic-disposition-fail-closed.md`). Do not invent ADR 0008 for dispose. |
 | Task close | `openspec/changes/archive/symbolic-disposition/tasks.md` Section 8 closes only when Section 11 falsifier + `aqa-gate-passk` are green on dispose-bound fixtures |
 | Out of scope | GKD enable before E3 BC smoke; Edge-AI; INV-16; Pass@K via `run_aqa_gate.py` |
+
+
+## 12. E2 note — collect → critic → compose under `sqe_dispose`
+
+**Status:** E1 is on `main` (#34). E2 wires the existing critic cascade to **dispose-bound** traces. This is a thin ops/architecture pin, not a new critic design.
+
+**Locks:** no GKD / on-policy KD enable until **E3 BC smoke** is green. No Edge-AI / INV-16. `aqa-gate-passk` remains the sole Chen Pass@K gate (unchanged by E2).
+
+### 12.1 Pipeline
+
+```
+configs/golden_sets/sqe_hard_ood.jsonl
+  -> make collect-sqe-dispose
+       scripts/harness/collect_trajectories.py
+         --harness-id sqe_dispose
+         --scripted tests/fixtures/mock_responses_sqe_passk.json
+         --critic / MANGOMAS_CRITIC_ENABLED=1
+         --reject-log artifacts/critic_rejects.jsonl
+         --output artifacts/trajectories/sqe_dispose_teacher_a.jsonl
+  -> (optional second teacher file for DualDistill)
+  -> make compose-dualdistill-sqe
+       scripts/harness/compose_dualdistill.py
+         --first/--second teacher JSONLs
+         --reject-log artifacts/critic_rejects.jsonl
+         --output artifacts/trajectories/sqe_dispose_dualdistill.jsonl
+```
+
+Critic helpers stay in `enhanced_system/harness/critic.py` (`check_tool_allowlist`, `check_outcome`, `check_expected_tools`, `RejectSink`). Recovery traces with matching outcomes remain kept.
+
+### 12.2 Makefile targets (Implementer SHALL add)
+
+| Target | Invokes | Required flags / paths |
+| --- | --- | --- |
+| `collect-sqe-dispose` | `scripts/harness/collect_trajectories.py` | `--harness-id sqe_dispose`; input prompts derived from `configs/golden_sets/sqe_hard_ood.jsonl` (or a generated prompt JSONL beside it); `--scripted tests/fixtures/mock_responses_sqe_passk.json` for CI-deterministic runs; critic on; `--reject-log artifacts/critic_rejects.jsonl`; write under `artifacts/trajectories/` |
+| `compose-dualdistill-sqe` | `scripts/harness/compose_dualdistill.py` | Two teacher JSONLs from dispose collect; `--reject-log artifacts/critic_rejects.jsonl`; output under `artifacts/trajectories/` |
+| `test-critic-sqe-dispose` (optional alias) | pytest markers covering dispose collect/compose critic paths | Must assert both reject codes below |
+
+Do **not** invent a second Pass@K Makefile target. Do **not** route E2 collect through `run_aqa_gate.py`.
+
+### 12.3 Fixture and artifact paths
+
+| Path | Role in E2 |
+| --- | --- |
+| `configs/golden_sets/sqe_hard_ood.jsonl` | Prompt/expected corpus; rows already carry `harness_id: sqe_dispose` and `expected_tools: [sqe_constraint_solver, final_answer]` post-E1 |
+| `configs/harnesses/sqe_dispose.yaml` | Allowlist: `sqe_constraint_solver`, `final_answer` only |
+| `tests/fixtures/mock_responses_sqe_passk.json` | Scripted teacher policy for deterministic CI collect (solver before `final_answer`; OOD `BLOCKED:<CODE>`) |
+| `artifacts/trajectories/sqe_dispose_*.jsonl` | Collected / composed outputs (gitignored) |
+| `artifacts/critic_rejects.jsonl` | Sole reject sink (override via `--reject-log` / `MANGOMAS_CRITIC_REJECT_LOG` only) |
+
+### 12.4 DualDistill drop rule (single)
+
+- Compose continues to drop pairs only when **both** teachers score 0 on the graded outcome (existing `(0,0)` rule).
+- That drop MUST log `critic_reject_code: DUALDISTILL_DROP_0_0` via `RejectSink`.
+- **Forbidden:** a second DualDistill drop rule (for example dropping on partial credit, schema-only faults, or asymmetric teacher failure).
+- Collect outcome filter drops log `critic_reject_code: OUTCOME_MISMATCH` when `final_answer` fails `answers_match`.
+- Allowlist / expected-tools rejects use shared codes from `openspec/changes/_shared/blocked-reject-codes.md` where applicable; they do not replace the `(0,0)` rule.
+
+### 12.5 E2 acceptance
+
+E2 is done when all of the following hold:
+
+1. `make collect-sqe-dispose` produces dispose-harness trajectories whose tool traces include `sqe_constraint_solver` before `final_answer` under scripted fixtures.
+2. Critic-on collect emits at least one `OUTCOME_MISMATCH` record to `artifacts/critic_rejects.jsonl` in unit/integration tests (injected mismatch fixture).
+3. `make compose-dualdistill-sqe` (or tested equivalent) logs `DUALDISTILL_DROP_0_0` for a synthetic `(0,0)` pair and does **not** drop that pair under any additional rule.
+4. No Makefile/CI path enables GKD trainers or `trl-gkd-usage` entrypoints.
+5. `make aqa-gate-passk` remains green and is not redefined by E2.
+
+### 12.6 Out of scope for E2
+
+- E3 BC smoke corpus/job naming — **defined in §13** (no longer deferred).
+- GKD enable, Serve tool-loop, Edge-AI, INV-16.
+- Changing Chen defaults, golden bucket minima, or the vacuity falsifier from §11.
+
+
+## 13. E3 note — BC smoke on `sqe_dispose` (alpha=0)
+
+**Status:** E2 is on `main` (#35/#36/#37). E3 proves a **behavior-cloning** smoke path from dispose-composed trajectories. This is supervised trajectory training with distillation weight **zero**, not GKD.
+
+**Locks:** `gkd_enabled` stays false; do not invoke `scripts/training/train_gkd_adapter.py` or enable `trl-gkd-usage`. No Edge-AI / INV-16 / Serve tool-loop.
+
+### 13.1 Composed fixture path
+
+| Path | Role |
+| --- | --- |
+| `artifacts/trajectories/sqe_dispose_dualdistill.jsonl` | Live compose output from `make compose-dualdistill-sqe` (gitignored; local/dev) |
+| `tests/fixtures/sqe_dispose_dualdistill_smoke.jsonl` | **Canonical smoke corpus** checked into git — a small, deterministic DualDistill-shaped subset suitable for CI (Implementer may generate once from compose, then freeze) |
+
+`make train-bc-smoke` MUST read the checked-in fixture by default. Optional override: `BC_SMOKE_TRAIN_FILE=artifacts/trajectories/sqe_dispose_dualdistill.jsonl` for local full-compose runs.
+
+Fixture contract (each row):
+
+- Carries a dispose-bound trajectory whose tool trace includes `sqe_constraint_solver` before `final_answer` (same vacuity rule as §11).
+- Schema compatible with `trajectory_mode` collator (`trajectory.steps` / supervised spans).
+- At least one hard SAT row and one OOD `BLOCKED:<CODE>` row so smoke covers both branches.
+- Tiny: enough for 1–2 optimizer steps on CPU (order of a few rows, not full golden).
+
+### 13.2 Makefile target
+
+Implementer SHALL add:
+
+```make
+train-bc-smoke:
+	$(PYTHON) scripts/training/train_distilled_adapter.py \
+	  --student_model_name $${MANGOMAS_STUDENT_MODEL:-$${MANGOMAS_CPU_MODEL:-distilgpt2}} \
+	  --train_file $${BC_SMOKE_TRAIN_FILE:-tests/fixtures/sqe_dispose_dualdistill_smoke.jsonl} \
+	  --trajectory_mode true \
+	  --distillation_alpha 0.0 \
+	  --output_dir artifacts/bc_smoke_adapter \
+	  --max_steps 2
+```
+
+Normative pins:
+
+| Pin | Value |
+| --- | --- |
+| Target name | `train-bc-smoke` |
+| Entrypoint | `scripts/training/train_distilled_adapter.py` (not `train_gkd_adapter.py`) |
+| Mode | `--trajectory_mode true` |
+| Distillation weight | `--distillation_alpha 0.0` and/or `MANGOMAS_TRAJECTORY_DISTILL_ALPHA=0.0` (BC / SFT-on-trajectory only) |
+| GKD | Forbidden: no `--gkd`, no `MANGOMAS_GKD_ENABLED=true`, no `train_gkd_adapter.py` |
+| Default train file | `tests/fixtures/sqe_dispose_dualdistill_smoke.jsonl` |
+
+### 13.3 Reusable settings / env (model ids)
+
+Use existing `enhanced_system.ops.settings.MangoMasSettings` / `MANGOMAS_` env prefix — do not hardcode Hub ids in the Makefile beyond defaults already in settings.
+
+| Setting / env | Smoke use |
+| --- | --- |
+| `MANGOMAS_CPU_MODEL` (settings `cpu_model`, default `distilgpt2`) | Preferred student for CI smoke (CPU-friendly) |
+| `MANGOMAS_STUDENT_MODEL` (settings `student_model`) | Optional override when GPU/larger student is intentional |
+| `MANGOMAS_TEACHER_MODEL` | Unused when alpha=0; must not be required for smoke green |
+| `MANGOMAS_TRAJECTORY_DISTILL_ALPHA` | Must be `0.0` for E3 BC smoke |
+| `MANGOMAS_GKD_ENABLED` | Must remain false / unset |
+| `BC_SMOKE_TRAIN_FILE` | Optional path override (defaults to checked-in fixture) |
+
+No new model-id literals in application code; CLI defaults may mirror settings defaults only.
+
+### 13.4 Success metric (smoke green)
+
+`make train-bc-smoke` is green when all hold:
+
+1. Process exits 0.
+2. Runs in trajectory mode with effective `distillation_alpha == 0.0` (log or summary field asserts this).
+3. Completes the configured smoke step budget (e.g. `--max_steps 2`) without importing/enabling GKD.
+4. Writes an adapter artifact under `artifacts/bc_smoke_adapter/` (or configured `--output_dir`).
+5. CI job (when wired) uses `MANGOMAS_CPU_MODEL` / tiny fixture only — no Hub teacher download required for alpha=0.
+
+Failure of any of the above fails E3. Green `aqa-gate-passk` alone does **not** satisfy E3.
+
+### 13.5 Acceptance vs later GKD
+
+| | E3 BC smoke | Later GKD (post-E3, separate unlock) |
+| --- | --- | --- |
+| Entrypoint | `train_distilled_adapter.py` | `train_gkd_adapter.py` / GKD flags |
+| Alpha / lambda | `trajectory_distill_alpha = 0` | `gkd_enabled=true`, GKD lambdas from settings |
+| Corpus | `tests/fixtures/sqe_dispose_dualdistill_smoke.jsonl` | Larger on-policy set (out of E3) |
+| Unlock | This section | Conductor unlock after E3 green |
+
+### 13.6 Out of scope for E3
+
+- Enabling GKD or changing `trl-gkd-usage` from library-only to default-on.
+- Edge-AI, INV-16, Serve tool-loop.
+- Redefining Chen Pass@K, golden bucket minima, or §11 vacuity falsifier.
+- Requiring teacher forward passes or multi-GPU for smoke green.

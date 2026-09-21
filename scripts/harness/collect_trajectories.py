@@ -88,8 +88,8 @@ def main(argv: list[str] | None = None) -> int:
         if scripted_path.is_file():
             try:
                 scripted = json.loads(scripted_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as exc:
-                logger.error("invalid --scripted file %s JSON: %s", scripted_path, exc)
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.error("invalid scripted responses file %s: %s", scripted_path, exc)
                 return 1
         else:
             try:
@@ -283,6 +283,7 @@ def _collect_rows(
                                     "line_no": line_no,
                                     "final_answer": result.final_answer,
                                     "expected": expected_str,
+                                    "harness_id": harness_id,
                                 },
                             )
                         if metrics is not None:

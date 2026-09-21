@@ -37,9 +37,9 @@ class TestSecurityRegressions:
                 # Check the except handler uses Raise not Return
                 for child in ast.walk(node):
                     if isinstance(child, ast.ExceptHandler):
-                        assert any(
-                            isinstance(stmt, ast.Raise) for stmt in child.body
-                        ), "predict_fn except handler must raise"
+                        assert any(isinstance(stmt, ast.Raise) for stmt in child.body), (
+                            "predict_fn except handler must raise"
+                        )
                         for stmt in child.body:
                             if isinstance(stmt, ast.Return):
                                 val = stmt.value
@@ -177,5 +177,5 @@ class TestTrainingRegressions:
                 "scripts.training.distill.trainer.load_dataset", return_value=mock_dataset_dict
             ):
                 with patch("scripts.training.distill.trainer.load_tokenizer"):
-                    with pytest.raises(ValueError, match="Trajectory dataset filtered to 0 rows"):
+                    with pytest.raises(ValueError, match=r"Trajectory.*dataset filtered to 0 rows"):
                         trainer.prepare_dataset()

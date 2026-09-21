@@ -41,6 +41,26 @@ Shared chat format: `enhanced_system/harness/prompt_render.py` and `scripts/trai
 - AMD-lite memory is workflow/function hints, not `HarnessTailor` drop-tool.
 - Do not add live AWS e2e tests. Contract tests must monkeypatch boto3.
 
+## Antigravity & SDLC Agents
+
+This workspace integrates the gated Product + SDLC + ML agent pack (`.agents/`, `config/workflow-contract.json`, `GEMINI.md`):
+
+1. **Custom Agents** (`.agents/agents/`):
+   - `product-intake`: Opportunity framing and requirements intake.
+   - `researcher`: Read-only literature and codebase exploration.
+   - `spec-writer`: OpenSpec proposals, design docs, and tasks (`openspec/changes/`).
+   - `architect` / `ml-framer`: Architecture, component modeling, and experiment plans.
+   - `delivery`: Main implementation agent (Planning Mode, test reports).
+   - `critic`: Read-only dialectic review, falsifier verification, and schema checks.
+   - `releaser`: Release notes and shipping gates.
+2. **Workflow Contract & Invariants** (`config/workflow-contract.json`, `.agents/rules/workflow-invariants.md`):
+   - Strict stages: `discover` -> `specify` -> `design` -> `build` -> `evaluate` -> `ship` -> `learn`.
+   - Current stage tracked in `artifacts/stage.json`.
+   - Ship requires `artifacts/eval_decision.json` with decision `ship`.
+3. **Automated Gates & Hooks** (`.agents/hooks.json`):
+   - `PreToolUse`: Verifies allowed write prefixes and command allowlists via `.agents/hooks/pre_tool_use.py`.
+   - `Stop`: Verifies stage artifact completeness before allowing turns to conclude via `.agents/hooks/stop_gate.py`.
+
 ## Pre-PR
 
 ```bash
@@ -48,3 +68,4 @@ make validate
 pytest -m "unit or integration or regression or harness" --cov=enhanced_system --cov-report=term --cov-fail-under=60
 pytest -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness --cov-report=term --cov-fail-under=80
 ```
+

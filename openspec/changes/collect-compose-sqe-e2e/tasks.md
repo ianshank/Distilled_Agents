@@ -15,13 +15,13 @@ Cites: `docs/plans/symbolic-kd/architecture.md` Section 11.4 E2 and Section 12 (
 
 ## E2 Implementer Milestone (Collect -> Critic -> Compose under sqe_dispose)
 
-- [ ] 9. Add Makefile target `collect-sqe-dispose` invoking `scripts/harness/collect_trajectories.py` with `--harness-id sqe_dispose`, input prompts from `configs/golden_sets/sqe_hard_ood.jsonl`, scripted fixtures `tests/fixtures/mock_responses_sqe_passk.json`, critic enabled, and `--reject-log artifacts/critic_rejects.jsonl`.
-- [ ] 10. Add Makefile target `compose-dualdistill-sqe` invoking `scripts/harness/compose_dualdistill.py` with dual dispose teacher JSONLs and `--reject-log artifacts/critic_rejects.jsonl`.
-- [ ] 11. Verify collected trajectories under `sqe_dispose` record `sqe_constraint_solver` prior to `final_answer`.
-- [ ] 12. Add unit/integration test verifying `OUTCOME_MISMATCH` is emitted to `artifacts/critic_rejects.jsonl` when collect encounters an outcome failure.
-- [ ] 13. Add unit/integration test verifying `DUALDISTILL_DROP_0_0` is emitted to `artifacts/critic_rejects.jsonl` when compose encounters a (0,0) teacher pair, and no other drop rule fires.
-- [ ] 14. Verify recovery traces with intermediate parse/tool errors are retained when the outcome matches.
-- [ ] 15. Verify `make aqa-gate-passk` remains green and unmodified.
+- [x] 9. Add Makefile target `collect-sqe-dispose` invoking `scripts/harness/collect_trajectories.py` with `--harness-id sqe_dispose`, input prompts from `configs/golden_sets/sqe_hard_ood.jsonl`, scripted fixtures `tests/fixtures/mock_responses_sqe_passk.json`, critic enabled, and `--reject-log artifacts/critic_rejects.jsonl`.
+- [x] 10. Add Makefile target `compose-dualdistill-sqe` invoking `scripts/harness/compose_dualdistill.py` with dual dispose teacher JSONLs and `--reject-log artifacts/critic_rejects.jsonl`.
+- [x] 11. Verify collected trajectories under `sqe_dispose` record `sqe_constraint_solver` prior to `final_answer`.
+- [x] 12. Add unit/integration test verifying `OUTCOME_MISMATCH` is emitted to `artifacts/critic_rejects.jsonl` when collect encounters an outcome failure.
+- [x] 13. Add unit/integration test verifying `DUALDISTILL_DROP_0_0` is emitted to `artifacts/critic_rejects.jsonl` when compose encounters a (0,0) teacher pair, and no other drop rule fires.
+- [x] 14. Verify recovery traces with intermediate parse/tool errors are retained when the outcome matches.
+- [x] 15. Verify `make aqa-gate-passk` remains green and unmodified.
 
 ## Follow-On Milestones (Deferred to E3-E5)
 

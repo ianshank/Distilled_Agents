@@ -152,7 +152,9 @@ class AgentDistillationTrainer:
         from .trajectory_collator import has_supervised_tokens
 
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
-        filtered = split.filter(lambda row: has_supervised_tokens(tokenizer, row, self.args.max_length))
+        filtered = split.filter(
+            lambda row: has_supervised_tokens(tokenizer, row, self.args.max_length)
+        )
         logger.info("Trajectory %s: filtered %s -> %s rows", split_name, len(split), len(filtered))
         if len(filtered) == 0:
             raise ValueError(
