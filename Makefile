@@ -4,7 +4,7 @@ GITLEAKS ?= gitleaks
 # Nested enhanced_system/pytest.ini testpaths would miss tests/harness/.
 PYTEST := $(PYTHON) -m pytest --rootdir=$(CURDIR)
 
-.PHONY: install lint fmt typecheck test test-harness test-aqa security gitleaks aqa-gate aqa-gate-passk validate
+.PHONY: install lint fmt typecheck test test-harness test-aqa security gitleaks aqa-gate aqa-gate-passk validate collect-sqe-dispose compose-dualdistill-sqe test-critic-sqe-dispose
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -43,6 +43,21 @@ aqa-gate:
 
 aqa-gate-passk:
 	$(PYTHON) scripts/harness/run_pass_at_k.py --golden-set configs/golden_sets/sqe_hard_ood.jsonl --threshold 1.0 --scripted tests/fixtures/mock_responses_sqe_passk.json --output aqa-passk-summary.json
+
+collect-sqe-dispose:
+	mkdir -p artifacts/trajectories
+	$(PYTHON) scripts/harness/collect_trajectories.py --input configs/golden_sets/sqe_hard_ood.jsonl --output artifacts/trajectories/sqe_dispose_teacher_a.jsonl --harness-id sqe_dispose --scripted tests/fixtures/mock_responses_sqe_passk.json --critic --reject-log artifacts/critic_rejects.jsonl
+	cp -f artifacts/trajectories/sqe_dispose_teacher_a.jsonl artifacts/trajectories/sqe_dispose_teacher_b.jsonl
+
+compose-dualdistill-sqe:
+	mkdir -p artifacts/trajectories
+	@if [ ! -f artifacts/trajectories/sqe_dispose_teacher_a.jsonl ] || [ ! -f artifacts/trajectories/sqe_dispose_teacher_b.jsonl ]; then \
+		$(MAKE) collect-sqe-dispose; \
+	fi
+	$(PYTHON) scripts/harness/compose_dualdistill.py --first artifacts/trajectories/sqe_dispose_teacher_a.jsonl --second artifacts/trajectories/sqe_dispose_teacher_b.jsonl --output artifacts/trajectories/sqe_dispose_dualdistill.jsonl --reject-log artifacts/critic_rejects.jsonl
+
+test-critic-sqe-dispose:
+	$(PYTEST) -m "harness and e2_sqe"
 
 train-dpo:
 	$(PYTHON) scripts/training/train_dpo_adapter.py --model_name_or_path "gpt2" --dataset_path "tests/fixtures/dpo_preferences.jsonl" --epochs 1 --batch_size 1 --output_dir "./dpo_adapter_test"
