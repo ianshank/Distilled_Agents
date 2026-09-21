@@ -39,6 +39,8 @@ C4Component
         Component(narrow_critic, "Narrow Critic", "Security/Style PR hook")
         Component(aqa_gate, "AQA Gate", "Deterministic Skill Validation (run_aqa_gate.py)")
         Component(passk_gate, "Pass@K Gate", "Chen Unbiased Estimator (run_pass_at_k.py)")
+        Component(gpu_e2e, "GPU E2E Suite", "Live CUDA Loop (run_e2e_gpu.py)")
+        Component(agent_pack, "Agent Pack", "Gated SDLC Pack (.agents/ + contract)")
         Component(tier_c, "Human Merge Gate", "Objective-gate verification")
     }
     Rel(runtime, settings, "get_settings(); not Config.harness limits")

@@ -24,6 +24,17 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
   - Added TRN-001 fail-fast `ValueError` check in `AgentDistillationTrainer` when a trajectory dataset filters to 0 rows.
   - Added narrow-critic hook and Tier A/B/C verification documentation (`/sdlc-orchestrator` workflow).
 
+- **Local GPU E2E Suite (`run_e2e_gpu.py`, `tests/e2e/test_local_gpu_e2e.py`):**
+  - Added standalone CLI `scripts/harness/run_e2e_gpu.py` exercising EchoBackend, EvalHarness, and live CUDA TransformersBackend inference on GPU hardware (`NVIDIA GeForce RTX 5060 Ti`), with automatic VRAM garbage collection and structured JSON reporting.
+  - Added automated Pytest suite `tests/e2e/test_local_gpu_e2e.py` with `@pytest.mark.e2e` and `@pytest.mark.gpu` decorators covering device detection, CUDA tensor placement, agent runtime multi-turn tool loops, and CLI runner execution.
+  - Added Makefile targets `test-e2e-gpu` and `run-e2e-gpu`.
+  - Generated validation evidence in `artifacts/e2e_results.json` confirming 7 PASS, 0 FAIL, 0 ERROR.
+
+- **Antigravity Gated SDLC Agent Pack Integration:**
+  - Integrated gated workflow contract (`config/workflow-contract.json`) and agent pack (`.agents/agents/`, `.agents/skills/`, `.agents/rules/`, `.agents/hooks/`, `hooks.json`, `plugin.json`, `GEMINI.md`).
+  - Added stage-aware path gating in `.agents/hooks/common.py` allowing source tree edits during `build`, `evaluate`, and `ship` stages while enforcing artifact immutability during intake and specification.
+  - Added `scripts/infrastructure/agent_pack_smoke_test.py` smoke test validating agent pack hooks, schemas, and contract invariants.
+
 - **Phase P4 `trl-gkd-usage`:** Pinned exact TRL version (`trl==0.15.2`), implemented config-driven GKD / on-policy distillation adapter module, label-masked generalized JSD and KL divergence, safe vocab mismatch handling, default `trajectory_distill_alpha=0.0`, and ADR 0008.
   - Pinned exact `trl==0.15.2` in `pyproject.toml` (under `alignment` and `all`), documenting version rationale (stable GKDTrainer/GKDConfig, SFT caching fixes, transformers>=4.45.0 compatibility).
   - Added GKD operational settings in `enhanced_system/ops/settings.py` (`gkd_enabled`, `gkd_lmbda`, `gkd_beta`, `gkd_temperature`, `gkd_max_new_tokens`, `gkd_seq_kd`, `gkd_loss_type`), preserving fail-closed defaults (`gkd_enabled: false`, `trajectory_distill_alpha: 0.0`).
