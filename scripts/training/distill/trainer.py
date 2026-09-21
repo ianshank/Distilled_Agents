@@ -148,26 +148,26 @@ class AgentDistillationTrainer:
         rev = getattr(self.args, "model_revision", None)
         return resolve_target_modules_for_model(self.args.student_model_name, revision=rev)
 
+    def _filter_supervised_trajectory_rows(self, split, split_name: str):
+        from .trajectory_collator import has_supervised_tokens
+
+        tokenizer = load_tokenizer(self.args.student_model_name, self.args)
+        filtered = split.filter(lambda row: has_supervised_tokens(tokenizer, row, self.args.max_length))
+        logger.info("Trajectory %s: filtered %s -> %s rows", split_name, len(split), len(filtered))
+        if len(filtered) == 0:
+            raise ValueError(
+                f"Trajectory {split_name} dataset filtered to 0 rows. "
+                "Ensure the input JSONL contains valid trajectory 'turns' instead of bare prompts."
+            )
+        return filtered
+
     def prepare_dataset(self) -> Dataset:
         train_file = resolve_train_file(train_file=getattr(self.args, "train_file", None))
         # Local JSON file loading; Hub is not contacted (green-trunk-ci)
         dataset = load_dataset("json", data_files={"train": train_file})  # nosec: B615
         if getattr(self.args, "trajectory_mode", False):
-            from .trajectory_collator import has_supervised_tokens
-
             logger.info("Trajectory mode: keeping raw columns for masked collator")
-            tokenizer = load_tokenizer(self.args.student_model_name, self.args)
-            filtered = dataset["train"].filter(
-                lambda row: has_supervised_tokens(tokenizer, row, self.args.max_length)
-            )
-            logger.info(
-                "Trajectory mode: filtered %s -> %s rows", len(dataset["train"]), len(filtered)
-            )
-            if len(filtered) == 0:
-                raise ValueError(
-                    "Trajectory dataset filtered to 0 rows. Ensure the input JSONL contains valid trajectory 'turns' instead of bare prompts."
-                )
-            return filtered
+            return self._filter_supervised_trajectory_rows(dataset["train"], "train")
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
 
         def tokenize_function(examples):
@@ -283,16 +283,7 @@ class AgentDistillationTrainer:
         # Local JSON file loading; Hub is not contacted (green-trunk-ci)
         dataset = load_dataset("json", data_files={"eval": self.args.eval_file})  # nosec: B615
         if getattr(self.args, "trajectory_mode", False):
-            from .trajectory_collator import has_supervised_tokens
-
-            tokenizer = load_tokenizer(self.args.student_model_name, self.args)
-            filtered = dataset["eval"].filter(
-                lambda row: has_supervised_tokens(tokenizer, row, self.args.max_length)
-            )
-            logger.info(
-                "Trajectory eval: filtered %s -> %s rows", len(dataset["eval"]), len(filtered)
-            )
-            return filtered
+            return self._filter_supervised_trajectory_rows(dataset["eval"], "eval")
         tokenizer = load_tokenizer(self.args.student_model_name, self.args)
 
         def tokenize_function(examples):

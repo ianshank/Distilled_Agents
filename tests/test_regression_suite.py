@@ -30,11 +30,16 @@ class TestSecurityRegressions:
 
         src = Path(__file__).resolve().parents[1] / "scripts" / "inference.py"
         tree = ast.parse(src.read_text(encoding="utf-8"))
+        predict_fn = None
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name == "predict_fn":
+                predict_fn = node
                 # Check the except handler uses Raise not Return
                 for child in ast.walk(node):
                     if isinstance(child, ast.ExceptHandler):
+                        assert any(
+                            isinstance(stmt, ast.Raise) for stmt in child.body
+                        ), "predict_fn except handler must raise"
                         for stmt in child.body:
                             if isinstance(stmt, ast.Return):
                                 val = stmt.value
@@ -44,9 +49,11 @@ class TestSecurityRegressions:
                                             pytest.fail(
                                                 "predict_fn still returns {error: ...} instead of raising"
                                             )
+        assert predict_fn is not None, "predict_fn function definition must exist"
 
     def test_sec_003_prompt_size_validation(self):
         """SEC-003: predict_fn must validate prompt byte size."""
+        import ast
         from pathlib import Path
 
         src = Path(__file__).resolve().parents[1] / "scripts" / "inference.py"
@@ -54,6 +61,11 @@ class TestSecurityRegressions:
         assert "MANGOMAS_MAX_PROMPT_BYTES" in source_text, (
             "predict_fn must reference MANGOMAS_MAX_PROMPT_BYTES for size validation"
         )
+        tree = ast.parse(source_text)
+        assert any(
+            isinstance(node, ast.FunctionDef) and node.name == "predict_fn"
+            for node in ast.walk(tree)
+        ), "predict_fn function definition must exist"
 
 
 @pytest.mark.regression
@@ -84,11 +96,7 @@ class TestCodeQualityRegressions:
         ):
             from enhanced_system.harness.data_governance import PIIScrubber
 
-            scrubber = PIIScrubber.__new__(PIIScrubber)
-            scrubber._available = False
-            scrubber.analyzer = None
-            scrubber.anonymizer = None
-            scrubber.entities = []
+            scrubber = PIIScrubber()
             result = scrubber.redact_text("test@example.com")
             assert result == "test@example.com", "Should return text unchanged without presidio"
 
@@ -136,6 +144,10 @@ class TestTrainingRegressions:
         from unittest.mock import MagicMock, patch
 
         import pytest
+
+        pytest.importorskip("torch")
+        pytest.importorskip("datasets")
+        pytest.importorskip("transformers")
 
         repo_root = Path(__file__).resolve().parents[1]
         if str(repo_root) not in sys.path:

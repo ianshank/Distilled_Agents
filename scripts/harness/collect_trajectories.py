@@ -88,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         if scripted_path.is_file():
             try:
                 scripted = json.loads(scripted_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError as exc:
+            except (OSError, json.JSONDecodeError) as exc:
                 logger.error("invalid --scripted file %s JSON: %s", scripted_path, exc)
                 return 1
         else:
@@ -105,6 +105,12 @@ def main(argv: list[str] | None = None) -> int:
             from enhanced_system.harness.data_governance import PIIScrubber
 
             scrubber = PIIScrubber()
+            if not getattr(scrubber, "_available", False):
+                logger.error(
+                    "Cannot enable PII redaction: Presidio libraries not found. "
+                    "Install with: pip install 'mangomas[security]'"
+                )
+                return 1
             logger.info("PII redaction enabled via Presidio")
         except (ImportError, RuntimeError) as exc:
             logger.error("Cannot enable PII redaction: %s", exc)

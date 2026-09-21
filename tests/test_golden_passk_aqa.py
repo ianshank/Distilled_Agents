@@ -804,7 +804,7 @@ def test_vacuity_falsifier_solver_bypass_fails_gate(tmp_path: Path) -> None:
 @pytest.mark.unit
 @pytest.mark.harness
 def test_security_scanner_and_data_governance() -> None:
-    """SecurityScanner scans code and trajectories; PIIScrubber validates missing presidio."""
+    """SecurityScanner scans code and trajectories; PIIScrubber handles missing presidio."""
     from enhanced_system.harness.data_governance import PIIScrubber
     from enhanced_system.harness.security import SecurityScanner
     from enhanced_system.harness.types import Step, Trajectory
@@ -830,8 +830,8 @@ def test_security_scanner_and_data_governance() -> None:
     import enhanced_system.harness.data_governance as dg
 
     if not dg.HAS_PRESIDIO:
-        with pytest.raises(ImportError, match="Presidio libraries not found"):
-            PIIScrubber()
+        scrubber = PIIScrubber()
+        assert scrubber.redact_text("test@example.com") == "test@example.com"
     else:
         scrubber = PIIScrubber()
         assert scrubber.entities is not None

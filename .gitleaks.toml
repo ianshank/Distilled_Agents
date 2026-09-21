@@ -23,5 +23,4 @@ paths = [
   '''(^|/)data/training/vp_product_agent\.jsonl$''',
   '''(^|/)configs/golden_sets/core_sdlc\.jsonl$''',
   '''(^|/)tests/fixtures/mock_responses\.json$''',
-  '''(^|/)tests/test_regression_suite\.py$''',
 ]

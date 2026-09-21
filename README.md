@@ -99,7 +99,7 @@ pytest -m harness --cov-config=.coveragerc.harness --cov=enhanced_system.harness
 ruff check enhanced_system scripts tests
 ```
 
-Global coverage `fail_under` is 60. Harness package coverage is 80 via `.coveragerc.harness`. Invoke pytest from the repo root so `tests/harness/` is collected.
+Global coverage `fail_under` is 60. Harness package coverage is 90 via `.coveragerc.harness`. Invoke pytest from the repo root so `tests/harness/` is collected.
 
 ## Key Components
 
@@ -107,7 +107,7 @@ Global coverage `fail_under` is 60. Harness package coverage is 80 via `.coverag
 To support enterprise-grade ML operations, the pipeline now enforces:
 - **PII Redaction**: `enhanced_system/harness/data_governance.py` integrates Presidio to scrub high-risk PII from trajectories before dataset compilation. *(Note: Transformer-based NLP models run synchronously here and may inject 100-300ms of latency per tool-loop).*
 - **Output Security Scanning**: `enhanced_system/harness/security.py` uses Bandit to scan generated agent outputs, blocking malicious payload injection during evaluation.
-- **Narrow Critic Hook**: A `/narrow-critic` subagent review loop enforces Style/Security standards and acts as a Tier A Pre-PR validation gate.
+- **Pre-PR Gates**: `make validate` and CI enforce AQA, Bandit, and Gitleaks checks as validation gates.
 - **Strict Supply Chain**: `trust_remote_code=False` is enforced at the framework level and requires explicit environment variable overrides.
 
 ### DPO & GKD Orchestration (Phase 3 & P4)
